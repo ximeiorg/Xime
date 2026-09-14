@@ -844,6 +844,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                             candidateActions = emptyList()
                         )
                     }
+                    // 待确认英文已删空：候选展开页若开着则收起（无内容可展示）
+                    service.maybeCollapseCandidatePage()
                 }
             }
 
@@ -884,6 +886,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     associationCandidates = emptyList(),
                     isShowingRecentClipboard = false
                 )
+                // 候选展开页：联想/剪贴板候选清空后无内容，收起
+                service.maybeCollapseCandidatePage()
             }
 
             // 4. 无候选也无编码：直接回删已上屏文本
@@ -900,6 +904,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     associationCandidates = emptyList(),
                     isShowingRecentClipboard = false
                 )
+                // 候选展开页：无候选无编码，收起
+                service.maybeCollapseCandidatePage()
             }
         }
     }

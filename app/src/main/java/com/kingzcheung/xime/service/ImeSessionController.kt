@@ -253,6 +253,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             candidateActions = if (isT9Schema) emptyList() else pluginActions
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
+        // 候选展开页：编码删空（候选与联想均空）时自动收起，不留空页
+        service.maybeCollapseCandidatePage()
         // composing 快照 → 插件（input_changed 事件；空编码表示本轮输入结束）
         service.pluginEvents.dispatchInputChanged(if (isT9Schema) displayText else result.inputText)
 

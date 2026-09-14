@@ -106,6 +106,7 @@ data class CandidateBarCallbacks(
 fun CandidateBar(
     state: CandidateBarState,
     page: KeyboardPage = KeyboardPage.Main(com.kingzcheung.xime.keyboard.MainType.FULL),
+    candidatePageExpanded: Boolean = false,
     toolbarActions: List<ToolbarAction> = emptyList(),
     visuals: CandidateBarVisuals,
     callbacks: CandidateBarCallbacks,
@@ -519,7 +520,7 @@ fun CandidateBar(
                         }
                     }
                 }
-                page is KeyboardPage.Overlay && page.route is OverlayRoute.CandidatePage -> {
+                candidatePageExpanded -> {
                     if (callbacks.onBack != null) {
                         Box(
                             modifier = Modifier

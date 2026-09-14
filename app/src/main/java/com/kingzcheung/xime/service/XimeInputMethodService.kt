@@ -267,6 +267,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory(applicationContext as android.app.Application)
         ).get(KeyboardViewModel::class.java)
     }
+
+    /** 候选展开页自动收起：候选与联想均空（编码删空）时收起在位展开页，不留空页。
+     *  在状态生产端调用（而非依赖 UI 重组观察）——候选变化时键盘区作用域被设计为跳过重组。 */
+    internal fun maybeCollapseCandidatePage() {
+        if (!keyboardViewModel.candidatePageExpanded.value) return
+        val cs = candidateState.value
+        if (cs.candidates.isEmpty() && cs.associationCandidates.isEmpty()) {
+            keyboardViewModel.setCandidatePageExpanded(false)
+        }
+    }
     
     internal val predictionManager = PredictionManager(
         context = this,

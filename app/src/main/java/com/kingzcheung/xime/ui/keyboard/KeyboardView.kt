@@ -102,6 +102,22 @@ fun KeyboardView(
     val isShifted by viewModel.isShifted.collectAsStateWithLifecycle()
     val keyboardState by viewModel.keyboardState.collectAsStateWithLifecycle()
     val page by viewModel.page.collectAsStateWithLifecycle()
+    val candidatePageExpanded by viewModel.candidatePageExpanded.collectAsStateWithLifecycle()
+
+    // 候选展开页自动收起：编码删空（无候选也无联想）时不留空页。
+    // 展开态是候选栏的在位扩展（非 Overlay），删除实时更新页内候选，删空即回到键盘。
+    LaunchedEffect(
+        candidatePageExpanded,
+        candidateState.value.candidates.size,
+        candidateState.value.associationCandidates.size
+    ) {
+        if (candidatePageExpanded &&
+            candidateState.value.candidates.isEmpty() &&
+            candidateState.value.associationCandidates.isEmpty()
+        ) {
+            viewModel.setCandidatePageExpanded(false)
+        }
+    }
     val viewState by viewModel.viewState.collectAsStateWithLifecycle()
     val isLandscape = if (state.isFloatingMode) false
         else LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -344,6 +360,7 @@ fun KeyboardView(
             CandidateBar(
                 state = candidateBarState,
                 page = page,
+                candidatePageExpanded = candidatePageExpanded,
                 isFloatingMode = state.isFloatingMode,
                 isVoiceSticky = state.voiceSticky,
                 voiceAmplitude = voiceAmplitudeState.value,
@@ -460,7 +477,7 @@ fun KeyboardView(
                                     else viewModel.popOverlay()
                                 }
                                 is KeyboardPage.Panel -> viewModel.exitPanel()
-                                is KeyboardPage.Main -> {}
+                                is KeyboardPage.Main -> viewModel.setCandidatePageExpanded(false)
                             }
                         }
                     },
@@ -471,7 +488,7 @@ fun KeyboardView(
                     },
                     onShowMoreCandidates = {
                         onHapticFeedback?.invoke()
-                        viewModel.showOverlay(OverlayRoute.CandidatePage)
+                        viewModel.setCandidatePageExpanded(true)
                     },
                     onInputTextClick = {
                         if (candidateState.value.inputText.isNotEmpty()) {
@@ -520,6 +537,48 @@ fun KeyboardView(
                 inlineSuggestions = inlineSuggestions,
             )
 
+            if (candidatePageExpanded) {
+                // 候选展开页：候选栏的在位展开态（顶部即真实候选栏，实时跟随编码/删除变化）。
+                // 不再走 Overlay 全屏页——Overlay 会在部分状态刷新时整页关闭，产生闪动。
+                CandidatePage(
+                    state = CandidatePageState(
+                        candidates = candidateState.value.candidates.toList(),
+                        candidateComments = candidateState.value.candidateComments.toList(),
+                        associationCandidates = candidateState.value.associationCandidates.toList(),
+                        backgroundColor = keyboardBgColor,
+                        textColor = candidateTextColor,
+                        keyBackgroundColor = keyBgColor,
+                        hasNextPage = candidateState.value.hasNextPage,
+                        hasPrevPage = candidateState.value.hasPrevPage,
+                        bottomPaddingDp = state.keyboardBottomPaddingDp,
+                    ),
+                    callbacks = CandidatePageCallbacks(
+                        onCandidateSelect = { index ->
+                            callbacks.onCandidateSelect(index)
+                            viewModel.setCandidatePageExpanded(false)
+                        },
+                        onAssociationSelect = { index ->
+                            callbacks.onAssociationSelect?.invoke(index)
+                            viewModel.setCandidatePageExpanded(false)
+                        },
+                        onPageDown = { onHapticFeedback?.invoke(); callbacks.onPageDown?.invoke() },
+                        onPageUp = { onHapticFeedback?.invoke(); callbacks.onPageUp?.invoke() },
+                        onCommitText = { text ->
+                            onHapticFeedback?.invoke()
+                            callbacks.onCommitText?.invoke(text)
+                        },
+                        onDelete = {
+                            onHapticFeedback?.invoke()
+                            callbacks.onKeyPress("delete", false)
+                        },
+                        onEnter = {
+                            onHapticFeedback?.invoke()
+                            callbacks.onKeyPress("enter", false)
+                        },
+                    ),
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                )
+            } else {
             val isMainKeyboard = page is KeyboardPage.Main
             if (isMainKeyboard) {
                 val mainType = (page as KeyboardPage.Main).type
@@ -978,6 +1037,7 @@ fun KeyboardView(
 
                 }
             }
+            } // candidatePageExpanded else
 
             val configuration = LocalConfiguration.current
             val isLandscapeBottom = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -1232,32 +1292,6 @@ fun KeyboardView(
                         bottomPaddingDp = state.keyboardBottomPaddingDp,
                         modifier = Modifier.fillMaxWidth().fillMaxHeight(),
                         onHapticFeedback = onHapticFeedback,
-                    )
-                    is OverlayRoute.CandidatePage -> CandidatePage(
-                        state = CandidatePageState(
-                            candidates = candidateState.value.candidates.toList(),
-                            candidateComments = candidateState.value.candidateComments.toList(),
-                            associationCandidates = candidateState.value.associationCandidates.toList(),
-                            backgroundColor = keyboardBgColor,
-                            textColor = candidateTextColor,
-                            hasNextPage = candidateState.value.hasNextPage,
-                            hasPrevPage = candidateState.value.hasPrevPage,
-                            bottomPaddingDp = state.keyboardBottomPaddingDp,
-                        ),
-                        callbacks = CandidatePageCallbacks(
-                            onCandidateSelect = { index ->
-                                callbacks.onCandidateSelect(index)
-                                viewModel.closeOverlay()
-                            },
-                            onAssociationSelect = { index ->
-                                callbacks.onAssociationSelect?.invoke(index)
-                                viewModel.closeOverlay()
-                            },
-                            onPageDown = { onHapticFeedback?.invoke(); callbacks.onPageDown?.invoke() },
-                            onPageUp = { onHapticFeedback?.invoke(); callbacks.onPageUp?.invoke() },
-                            onBack = { viewModel.closeOverlay() },
-                        ),
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is OverlayRoute.SplitWords -> SplitWordsView(
                         text = p.route.text,

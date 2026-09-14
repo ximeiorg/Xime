@@ -120,6 +120,15 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     private val _page = MutableStateFlow<KeyboardPage>(KeyboardPage.Main(MainType.FULL))
     val page: StateFlow<KeyboardPage> = _page.asStateFlow()
 
+    /** 候选展开页：候选栏的在位展开态（非 Overlay——顶部保持真实候选栏，实时跟随编码/删除）。 */
+    private val _candidatePageExpanded = MutableStateFlow(false)
+    val candidatePageExpanded: StateFlow<Boolean> = _candidatePageExpanded.asStateFlow()
+
+    /** 打开/收起候选展开页。 */
+    fun setCandidatePageExpanded(expanded: Boolean) {
+        _candidatePageExpanded.value = expanded
+    }
+
 
     /** 是否从 handwriting 进入英文键盘，用于 ASCII 切回时恢复 handwriting */
     var handwritingShouldReturn: Boolean = false
@@ -541,6 +550,7 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
     fun resetKeyboard(isAsciiMode: Boolean, schemaId: String = "", forceNumberPanel: Boolean = false) {
         _isShifted.value = false
         _shiftMode.value = ShiftMode.OFF
+        _candidatePageExpanded.value = false
         KeysConfigHelper.setActiveKeyboardSchema(schemaId)
         if (forceNumberPanel) {
             // 数字输入框自动进入数字面板：记录默认主布局，供面板"abc"返回键恢复
