@@ -36,12 +36,16 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
      * （部署/维护持锁时排队，完成后自动切换），不静默失败、不阻塞主线程。
      * 返回 false 仅表示引擎不可用（session 创建失败）。
      */
-    internal suspend fun switchAscii(reason: Reason): Boolean {
+    internal suspend fun switchAscii(
+        reason: Reason,
+        switchAction: String? = null,
+    ): Boolean {
         val candState = service.candidateState.value
         val pendingEnglish = candState.pendingEnglishText
+        val hardwareCommitCode = switchAction == "commit_code"
         FileLogger.i(
             XimeInputMethodService.TAG,
-            "switchAscii[$reason]: start, pendingEnglish='${if (pendingEnglish.isEmpty()) "-" else pendingEnglish}', " +
+            "switchAscii[$reason]: action=${switchAction ?: "ui"}, pendingEnglish='${if (pendingEnglish.isEmpty()) "-" else pendingEnglish}', " +
                 "isComposing=${candState.isComposing}, candidates=${candState.candidates.size}"
         )
         if (pendingEnglish.isNotEmpty()) {
@@ -54,16 +58,27 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
                 )
             }
         } else if (candState.isComposing) {
-            if (candState.candidates.isNotEmpty()) {
+            if (candState.candidates.isNotEmpty() && !hardwareCommitCode) {
                 service.keyRouter.selectCandidateAsync(0)
             } else {
+                // commit_code 按方案语义提交原始编码，不要误选候选词。
                 val input = candState.inputText
                 if (input.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
                         service.commitText(input)
+                        service.candidateState.value = service.candidateState.value.copy(
+                            inputText = "",
+                            preeditText = "",
+                            pendingEnglishText = "",
+                            candidates = emptyList(),
+                            candidateComments = emptyList(),
+                            associationCandidates = emptyList(),
+                            isComposing = false,
+                            candidateActions = emptyList()
+                        )
                     }
-                    service.rimeEngine.clearComposition()
                 }
+                service.rimeEngine.clearComposition()
             }
         }
         val t0 = System.nanoTime()

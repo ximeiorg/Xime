@@ -710,14 +710,29 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /**
+     * 按当前方案的 ascii_composer.switch_key 语义处理物理修饰键。
+     * 这里只识别方案明确配置的切换动作；noop/未配置不会切换。
+     */
+    internal fun handleHardwareSwitchKey(keyName: String) {
+        val job = service.serviceScope.launch(service.keyProcessingDispatcher, start = CoroutineStart.LAZY) {
+            val action = service.rimeEngine.getCurrentSchemaSwitchKeyAction(keyName)
+                ?.lowercase()
+                ?.trim()
+            if (action in setOf("commit_code", "commit_text", "inline_ascii")) {
+                dispatchAsciiSwitch(persist = true, switchAction = action)
+            }
+        }
+        service.keyJobs.trySend(job)
+    }
+
+    /**
      * ascii 切换统一分发（key-processing 协程内执行）。
      *
      * 乐观更新：立即按目标模式切换 UI（主键盘布局/面板字符），不等引擎异步切换，
-     * 消除"进入面板/切键盘后才闪变"的可见延迟（引擎切换完成后权威同步，一致则无感）。
-     * [persist] 仅决定日志溯源原因（USER_TOGGLE / PANEL_SYNC）；ascii 为会话级
-     * 状态，两种来源均不写 user.yaml，收起键盘后回到默认中文。
+     * 引擎切换完成后再权威同步。硬件修饰键传入当前方案的 switch_key 动作，
+     * 由 AsciiModeController 按 commit_code / commit_text 区分提交内容。
      */
-    private suspend fun dispatchAsciiSwitch(persist: Boolean) {
+    private suspend fun dispatchAsciiSwitch(persist: Boolean, switchAction: String? = null) {
         val original = service.uiState.value.isAsciiMode
         val optimisticTarget = !original
         val schemaId = service.rimeEngine.getCurrentSchema()
@@ -732,7 +747,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val t0 = System.nanoTime()
         FileLogger.i(XimeInputMethodService.TAG, "dispatchAsciiSwitch(persist=$persist): ui ascii=${service.uiState.value.isAsciiMode}, thread=${Thread.currentThread().name}")
         val reason = if (persist) AsciiModeController.Reason.USER_TOGGLE else AsciiModeController.Reason.PANEL_SYNC
-        if (!service.asciiModeController.switchAscii(reason)) {
+        if (!service.asciiModeController.switchAscii(reason, switchAction)) {
             // 引擎不可用：回滚乐观状态到切换前的原值
             withContext(Dispatchers.Main) {
                 service.uiState.value = service.uiState.value.copy(isAsciiMode = original)
