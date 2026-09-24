@@ -1758,7 +1758,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 KeyEvent.KEYCODE_0 -> { keyRouter.selectCandidate(9); highlightIndex.intValue = 0; return true }
             }
         }
-        val isShifted = e.isShiftPressed
+        // Caps Lock is an alphabetic modifier. Keep symbols unchanged and let
+        // Shift+Caps Lock produce lowercase letters, matching hardware keyboards.
+        val isCapsLockOn = (e.metaState and KeyEvent.META_CAPS_LOCK_ON) != 0
+        val isShifted = e.isShiftPressed.xor(
+            isCapsLockOn && keyCode in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z
+        )
         val unicodeChar = e.getUnicodeChar(e.metaState)
         val key = keyCodeToKey(keyCode, isShifted, unicodeChar)
         if (key != null) {
