@@ -215,7 +215,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
     }
 
     internal fun switchSchema(schemaId: String) {
-        service.asciiModeController.cancelInlineAsciiForModeChange()
+        service.asciiModeController.finishInlineAsciiForModeChange()
         if (isHandwritingSchema(schemaId)) {
             // 检查手写模型文件是否已下载
             if (!com.kingzcheung.xime.handwriting.HandwritingEngine.hasModel(service)) {
