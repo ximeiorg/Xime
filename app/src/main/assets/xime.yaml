@@ -661,6 +661,30 @@ keyboard:
   # 第三方九键方案在 xime.custom.yaml 的 t9.schemas 追加即可，无需改代码。
   t9:
     schemas: [t9_pinyin, t9, wanxiang_t9]
+    # ── 布局（三列结构，可完全自定义；未配置时为以下内置默认，与历史布局一致）──
+    # left：左列（自上而下）。candidates = 拼音候选面板占位（候选态显示音节，
+    #   空闲态显示下方 side_symbols）；也可放功能键或自定义键。
+    # rows：主区（中间列）按行，每行一个键 id 列表。
+    # right：右列（自上而下）。
+    # 键 id 分三类：
+    #   1. 数字 "0"~"9"：九键输入键。点按固定为九键数字输入（T9 核心交互）；
+    #      键面字母用 keys.<id>.tap.label 覆盖（内置：1=分词、2=ABC…9=WXYZ），
+    #      长按候选用 keys.<id>.long_press（上屏所选文本，内置 2=A/B/C…9=W/X/Y/Z，1 无长按），
+    #      手势在 keys.<id> 配置（下方内置默认：上滑直接输入键面数字）。
+    #   2. 功能键：candidates / symbol(符号) / number(数字面板) / space(空格) /
+    #      earth(中英切换) / delete(退格) / clear(重输) / enter(回车)。
+    #      组件与行为内置，位置可任意安排；键在行/列中的相对宽度用 keys.<id>.width 覆盖
+    #      （默认：candidates 3、space 1.8、enter 2，其余 1）。
+    #   3. 其他任意 id：自定义键，行为在 keys.<id> 定义（tap.label 为键面文字，
+    #      缺省键面显示键名、点按提交键名本身；手势同全键盘写法）。
+    layout:
+      left: [candidates, symbol]
+      rows:
+        - ["1", "2", "3"]
+        - ["4", "5", "6"]
+        - ["7", "8", "9"]
+        - [number, space, earth]
+      right: [delete, clear, enter]
     # ── 左侧快捷符号栏（空闲态显示；列表长度不限，超过 4 个时可上下滑动）──
     # 用户在 xime.custom.yaml 的同路径覆盖整个列表，未配置时使用内置默认值
     side_symbols:
@@ -669,7 +693,7 @@ keyboard:
       - "？"
       - "！"
     # ── 数字键手势（可自定义：在 xime.custom.yaml 的 keyboard.t9.keys 同路径覆盖）──
-    # 键 id 为数字字符串 "1"~"9"；tap/长按（选字母）为九键核心交互，不在配置范围。
+    # 键 id 为数字字符串 "1"~"9"（也可为 layout 中出现的自定义键 id）。
     # 内置默认：上滑直接输入键面数字（无需切数字键盘）；下滑内置不绑定动作，
     # 可按键级自行配置（如 swipe_down: { label: "复制", action: "copy" }，
     # 或 switch_route: clipboard 打开剪贴板面板）。
@@ -680,15 +704,19 @@ keyboard:
     # 内置默认 display: "key" + bubble: false：数字作为键面角标提示、拖动不弹气泡。
     # 想要拖动气泡自行改为 bubble: true。手势功能与提示相互独立。
     keys:
-      "1": { swipe_up: { value: "1", display: "key", bubble: false } }
-      "2": { swipe_up: { value: "2", display: "key", bubble: false } }
-      "3": { swipe_up: { value: "3", display: "key", bubble: false } }
-      "4": { swipe_up: { value: "4", display: "key", bubble: false } }
-      "5": { swipe_up: { value: "5", display: "key", bubble: false } }
-      "6": { swipe_up: { value: "6", display: "key", bubble: false } }
-      "7": { swipe_up: { value: "7", display: "key", bubble: false } }
-      "8": { swipe_up: { value: "8", display: "key", bubble: false } }
-      "9": { swipe_up: { value: "9", display: "key", bubble: false } }
+      # 内置默认键面（tap.label 键面字母组）与长按候选（long_press.values，弹出气泡
+      # 滑动选择后上屏所选文本）直接写在下方，可按需修改；"1" 无长按为历史行为。
+      # 注意 keys 覆盖是键级整体替换：在 xime.custom.yaml 覆盖某个数字键时，
+      # 键面/长按/手势要一并写上，漏写的字段回退代码内置兜底。
+      "1": { tap: { label: "分词" }, swipe_up: { value: "1", display: "key", bubble: false } }
+      "2": { tap: { label: "ABC" }, long_press: { display: "bubble", values: ["A", "B", "C"] }, swipe_up: { value: "2", display: "key", bubble: false } }
+      "3": { tap: { label: "DEF" }, long_press: { display: "bubble", values: ["D", "E", "F"] }, swipe_up: { value: "3", display: "key", bubble: false } }
+      "4": { tap: { label: "GHI" }, long_press: { display: "bubble", values: ["G", "H", "I"] }, swipe_up: { value: "4", display: "key", bubble: false } }
+      "5": { tap: { label: "JKL" }, long_press: { display: "bubble", values: ["J", "K", "L"] }, swipe_up: { value: "5", display: "key", bubble: false } }
+      "6": { tap: { label: "MNO" }, long_press: { display: "bubble", values: ["M", "N", "O"] }, swipe_up: { value: "6", display: "key", bubble: false } }
+      "7": { tap: { label: "PQRS" }, long_press: { display: "bubble", values: ["P", "Q", "R", "S"] }, swipe_up: { value: "7", display: "key", bubble: false } }
+      "8": { tap: { label: "TUV" }, long_press: { display: "bubble", values: ["T", "U", "V"] }, swipe_up: { value: "8", display: "key", bubble: false } }
+      "9": { tap: { label: "WXYZ" }, long_press: { display: "bubble", values: ["W", "X", "Y", "Z"] }, swipe_up: { value: "9", display: "key", bubble: false } }
 
   # 笔画键盘配置
   # 注意：本键盘不支持 button_layout（按键布局模式），固定 standard 键面布局；

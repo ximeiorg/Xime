@@ -177,6 +177,8 @@ jobs:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
           AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+          # 交叉链接必须有显式 linker：rustc 默认用宿主 cc，最终链接 aarch64 产物会失败
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package artifact
@@ -199,10 +201,15 @@ jobs:
           path: xipm-*
           if-no-files-found: error
 
-  # 将各平台 xipm 二进制追加到 Release（等 APK job 创建完 Release）
+  # 将各平台 xipm 二进制追加到 Release（等 APK job 创建完 Release）。
+  # 单个平台构建失败不阻塞发布：publish 条件只要求 APK job 成功，
+  # 已成功的平台照常上架（失败平台在下一次 tag 补齐）。
   publish-xipm:
     runs-on: ubuntu-latest
     needs: [build, build-xipm]
+    if: >-
+      always() && !cancelled() &&
+      needs.build.result == 'success'
     steps:
       - name: Download xipm artifacts
         uses: actions/download-artifact@v4

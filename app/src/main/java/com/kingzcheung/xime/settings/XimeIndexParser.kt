@@ -25,6 +25,10 @@ object XimeIndexParser {
     fun parsePluginsDirectIndex(text: String): PluginsDirectIndex =
         yaml.decodeFromString(PluginsDirectIndex.serializer(), text)
 
+    /** 解析单个插件条目（与 [parseScheme] 对称，测试/工具用）。 */
+    fun parsePlugin(text: String): MarketPlugin =
+        yaml.decodeFromString(MarketPlugin.serializer(), text)
+
     /** 解析布局扁平索引（layouts/index.yaml）。 */
     fun parseLayoutsDirectIndex(text: String): LayoutsDirectIndex =
         yaml.decodeFromString(LayoutsDirectIndex.serializer(), text)
@@ -102,21 +106,28 @@ object XimeIndexParser {
             installedVersion = installedVersion,
         )
 
-    /** 插件条目：兼容性判定与方案一致（appVersion 约束）。[installedVersions] 为本地已安装版本表（id → versionName）。 */
+    /** 插件条目：兼容性判定与方案一致（appVersion 约束）；索引 v2 的 minHostVersion
+     *  作为附加门禁折入（声明为 3.0.0 即按 >=3.0.0 判定）。[installedVersions] 为本地已安装版本表（id → versionName）。 */
     fun toPluginItem(
         plugin: MarketPlugin,
         appVersion: String,
         installedVersions: Map<String, String>,
     ): MarketPluginItem {
         val installedVersion = installedVersions[plugin.id]
+        val hostCompatible = plugin.minHostVersion.isBlank() ||
+            isCompatible(appVersion, ">=" + plugin.minHostVersion.trim())
         return MarketPluginItem(
             plugin = plugin,
-            compatible = isCompatible(appVersion, plugin.appVersion),
+            compatible = isCompatible(appVersion, plugin.appVersion) && hostCompatible,
             minAppVersion = minAppVersionLabel(plugin.appVersion),
             installed = installedVersion != null,
             installedVersion = installedVersion,
         )
     }
+
+    /** 平台可见性（索引 v2 platforms）：未声明视为不限；声明了则仅 android 可见。 */
+    fun isAvailableOnAndroid(plugin: MarketPlugin): Boolean =
+        plugin.platforms.isEmpty() || "android" in plugin.platforms
 
     /** 布局条目：兼容性判定同方案/插件；[installedSchemaIds] 用于依赖方案校验。 */
     fun toLayoutItem(

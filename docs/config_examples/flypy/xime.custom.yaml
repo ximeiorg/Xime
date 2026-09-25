@@ -7,51 +7,6 @@ metadata:
   generator: "Xime Config Generator" # 暂时无用
   modified_time: "2026-06-18"
 
-xime_index:
-  # 方案/插件/模型市场索引端点（ximeiorg/xime-index）。
-  # 可替换为自建代理/镜像，下载器按顺序依次尝试，直到成功为止。
-  # 末尾需要 /。
-  base_urls:
-    - "https://cdn.jsdelivr.net/gh/ximeiorg/xime-index@master/"
-    - "https://fastly.jsdelivr.net/gh/ximeiorg/xime-index@master/"
-    - "https://index.ximei.me/"
-    - "https://raw.githubusercontent.com/ximeiorg/xime-index/refs/heads/main/"
-
-style:
-  color_scheme: lavender_purple
-
-color_schemes:
-  lavender_purple:
-    name: "薰衣草紫"
-    primary_color: 0x8F73E2
-  
-  ocean_blue:
-    name: "海洋蔚蓝"
-    primary_color: 0x1A73E8
-  
-  forest_green:
-    name: "森林翠绿"
-    primary_color: 0x2E7D32
-  
-  sunset_orange:
-    name: "落日橙光"
-    primary_color: 0xE65100
-  
-  coral_red:
-    name: "珊瑚绯红"
-    primary_color: 0xC62828
-  
-  slate_gray:
-    name: "沉稳石墨"
-    primary_color: 0x424242
-  
-  rose_pink:
-    name: "浪漫玫瑰"
-    primary_color: 0xAD1457
-  
-  teal_cyan:
-    name: "青碧如水"
-    primary_color: 0x00796B
 
 # ── 26 键全键盘手势配置 ──
 # 每个按键可定义 4 个手势：

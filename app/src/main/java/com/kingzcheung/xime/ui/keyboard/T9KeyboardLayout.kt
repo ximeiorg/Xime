@@ -80,7 +80,8 @@ import kotlinx.coroutines.launch
 /**
  * 拼音九键（T9）键盘布局。
  *
- * 布局说明：
+ * 布局说明（三列结构，由 xime.yaml keyboard.t9.layout 的 left/rows/right 驱动，
+ * 未配置时为以下内置默认布局，与历史行为一致；键 id 分派见 KeysConfigHelper.T9_FUNCTION_KEY_IDS）：
  * - 左侧候选区：占用右侧第 1/4/7 三个数字键的垂直高度，显示当前音节候选拼音。
  * - 右侧主键区：
  *   第1行：分词(1) | ABC(2) | DEF(3) | 退格
@@ -392,326 +393,263 @@ private fun T9KeyboardContent(
         } else Modifier
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        // ── 第1列：左侧候选区（拼音候选项） ──
-        Column(
-            modifier = Modifier
+    // 布局由 xime.yaml keyboard.t9.layout 驱动（configVersion 感知热重载）；
+    // 未配置时为内置默认，与历史硬编码布局一致（三列：左列/主区/右列）。
+    val t9Layout = remember(configVersion) { KeysConfigHelper.getT9Layout() }
+
+    /** 布局项相对权重：keys.<id>.width 优先，否则功能键默认（候选面板 3、空格 1.8、回车 2，其余 1）。 */
+    fun keyWeight(id: String): Float {
+        KeysConfigHelper.getT9KeyGesture(id)?.width?.takeIf { it > 0f }?.let { return it }
+        return when (id) {
+            "candidates" -> 3f
+            "space" -> 1.8f
+            "enter" -> 2f
+            else -> 1f
+        }
+    }
+
+    /** 数字键键面字母：keys.<id>.tap.label 可覆盖，未配置回退内置默认（无默认时显示数字本身）。 */
+    fun digitLetters(id: String): String =
+        KeysConfigHelper.getT9KeyLabel(id) ?: DEFAULT_T9_DIGIT_LETTERS[id] ?: id
+
+    /** 数字键长按候选：keys.<id>.long_press 可覆盖（显示 label 缺省 value），未配置回退内置默认。 */
+    fun digitLongPress(id: String): List<String>? =
+        KeysConfigHelper.getT9KeyLongPressLabels(id) ?: DEFAULT_T9_DIGIT_LONG_PRESS[id]
+
+    /** 左侧拼音候选面板（candidates 占位）：候选态显示音节选择，空闲态显示 side_symbols。 */
+    @Composable
+    fun CandidatesPanel(modifier: Modifier) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
                 .fillMaxHeight()
-                .weight(0.8f),
-            verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
+                .padding(LocalKeyVisualPadding.current)
+                .then(candidateShadowModifier)
+                .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
+                .background(keyBackgroundColor)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(3f)
-                    .padding(LocalKeyVisualPadding.current)
-                    .then(candidateShadowModifier)
-                    .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                    .background(keyBackgroundColor)
-            ) {
-                val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
-                val currentFirstOptions = controller.firstOptions
-                // 空闲态符号列表来自 xime.yaml keyboard.t9.side_symbols（可自定义，>4 滚动）
-                val configVersion by KeysConfigHelper.configVersion.collectAsState()
-                val t9SideSymbols = remember(configVersion) { KeysConfigHelper.getT9SideSymbols() }
-                val displayItems: List<String> = if (showCandidates) {
-                    currentFirstOptions.map { it.pinyin }
-                } else {
-                    t9SideSymbols
-                }
-                if (displayItems.size <= 4) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        displayItems.forEachIndexed { index, item ->
-                            if (showCandidates) {
+            val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
+            val currentFirstOptions = controller.firstOptions
+            // 空闲态符号列表来自 xime.yaml keyboard.t9.side_symbols（可自定义，>4 滚动）
+            val configVersion by KeysConfigHelper.configVersion.collectAsState()
+            val t9SideSymbols = remember(configVersion) { KeysConfigHelper.getT9SideSymbols() }
+            val displayItems: List<String> = if (showCandidates) {
+                currentFirstOptions.map { it.pinyin }
+            } else {
+                t9SideSymbols
+            }
+            if (displayItems.size <= 4) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    displayItems.forEachIndexed { index, item ->
+                        if (showCandidates) {
                             val option = currentFirstOptions[index]
                             val isSelected = controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
                                     controller.selectedOption == option &&
                                     controller.isSelectedOptionInCurrentCandidates()
-                                    CandidateItem(
-                                        text = option.pinyin,
-                                        onClick = { controller.onChoiceSelected(option) },
-                                        onPress = { onKeyPressDown?.invoke(option.pinyin) },
-                                        textColor = keyTextColor,
-                                        backgroundColor = keyBackgroundColor,
-                                        accentColor = accentColor,
-                                        fontSize = candidateFontSize,
-                                        isSelected = isSelected,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .weight(1f)
-                                    )
-                            } else {
-                                CandidateItem(
-                                    text = item,
-                                    onClick = { onKeyPress(item) },
-                                    onPress = { onKeyPressDown?.invoke(item) },
-                                    textColor = keyTextColor,
-                                    backgroundColor = keyBackgroundColor,
-                                    accentColor = accentColor,
-                                    fontSize = candidateFontSize,
-                                    isSelected = false,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f)
-                                )
-                            }
+                            CandidateItem(
+                                text = option.pinyin,
+                                onClick = { controller.onChoiceSelected(option) },
+                                onPress = { onKeyPressDown?.invoke(option.pinyin) },
+                                textColor = keyTextColor,
+                                backgroundColor = keyBackgroundColor,
+                                accentColor = accentColor,
+                                fontSize = candidateFontSize,
+                                isSelected = isSelected,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            )
+                        } else {
+                            CandidateItem(
+                                text = item,
+                                onClick = { onKeyPress(item) },
+                                onPress = { onKeyPressDown?.invoke(item) },
+                                textColor = keyTextColor,
+                                backgroundColor = keyBackgroundColor,
+                                accentColor = accentColor,
+                                fontSize = candidateFontSize,
+                                isSelected = false,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                            )
                         }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        itemsIndexed(displayItems) { index, item ->
-                            if (showCandidates) {
-                                val option = currentFirstOptions[index]
-                                val isSelected = controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
-                                        controller.selectedOption == option &&
-                                        controller.isSelectedOptionInCurrentCandidates()
-                                CandidateItem(
-                                    text = option.pinyin,
-                                    onClick = { controller.onChoiceSelected(option) },
-                                    onPress = { onKeyPressDown?.invoke(option.pinyin) },
-                                    textColor = keyTextColor,
-                                    backgroundColor = keyBackgroundColor,
-                                    accentColor = accentColor,
-                                    fontSize = candidateFontSize,
-                                    isSelected = isSelected,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(if (compactMode) 26.dp else 32.dp)
-                                )
-                            } else {
-                                CandidateItem(
-                                    text = item,
-                                    onClick = { onKeyPress(item) },
-                                    onPress = { onKeyPressDown?.invoke(item) },
-                                    textColor = keyTextColor,
-                                    backgroundColor = keyBackgroundColor,
-                                    accentColor = accentColor,
-                                    fontSize = candidateFontSize,
-                                    isSelected = false,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(if (compactMode) 26.dp else 32.dp)
-                                )
-                            }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    itemsIndexed(displayItems) { index, item ->
+                        if (showCandidates) {
+                            val option = currentFirstOptions[index]
+                            val isSelected = controller.leftPanelState == T9InputController.LeftPanelState.SELECTION &&
+                                    controller.selectedOption == option &&
+                                    controller.isSelectedOptionInCurrentCandidates()
+                            CandidateItem(
+                                text = option.pinyin,
+                                onClick = { controller.onChoiceSelected(option) },
+                                onPress = { onKeyPressDown?.invoke(option.pinyin) },
+                                textColor = keyTextColor,
+                                backgroundColor = keyBackgroundColor,
+                                accentColor = accentColor,
+                                fontSize = candidateFontSize,
+                                isSelected = isSelected,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(if (compactMode) 26.dp else 32.dp)
+                            )
+                        } else {
+                            CandidateItem(
+                                text = item,
+                                onClick = { onKeyPress(item) },
+                                onPress = { onKeyPressDown?.invoke(item) },
+                                textColor = keyTextColor,
+                                backgroundColor = keyBackgroundColor,
+                                accentColor = accentColor,
+                                fontSize = candidateFontSize,
+                                isSelected = false,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(if (compactMode) 26.dp else 32.dp)
+                            )
                         }
                     }
                 }
             }
+        }
+    }
 
-            KeyButton(
+    /** 九键数字输入键：点按固定为九键数字输入；键面字母/长按候选/手势可配。 */
+    @Composable
+    fun DigitKey(digit: String, modifier: Modifier) {
+        val longPress = digitLongPress(digit)
+        if (longPress.isNullOrEmpty()) {
+            // 无长按候选（默认 "1" 分词键）：无长按弹出、按下态不进滑动气泡层（历史路径）
+            NineKeyButton(
+                digit = digit,
+                letters = digitLetters(digit),
+                onClick = { controller.onDigitPressed(digit) },
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                modifier = modifier,
+                onPress = { onKeyPressDown?.invoke(digit) },
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+                fontSize = t9DigitFontSize,
+                swipes = swipesFor(digit),
+            )
+        } else {
+            T9DigitKey(
+                swipes = swipesFor(digit),
+                digit = digit, letters = digitLetters(digit), longPressItems = longPress,
+                onClick = { controller.onDigitPressed(digit) },
+                onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
+                onSwipeStateChange = { state, bounds ->
+                    if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
+                        onSwipeStateChange?.invoke(state, bounds)
+                },
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                modifier = modifier,
+                onPress = { onKeyPressDown?.invoke(digit) },
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+                fontSize = t9DigitFontSize,
+            )
+        }
+    }
+
+    /** 自定义键：数字 id 走九键输入键；其余按 keys.<id> 行为渲染（tap 定义键面与动作，手势可配；无配置提交键名本身）。 */
+    @Composable
+    fun CustomKey(id: String, modifier: Modifier) {
+        if (id.length == 1 && id[0] in '0'..'9') {
+            DigitKey(id, modifier)
+            return
+        }
+        val binding = KeysConfigHelper.getT9KeyGesture(id)
+        val tap = binding?.tap
+        val configLabel = tap?.label?.takeIf { it.isNotEmpty() }
+        // 键名兜底显示：含小写字母时显示大写键名（与全键盘键名兜底一致）
+        val label = configLabel ?: id.takeIf { it.any { ch -> ch in 'a'..'z' } }?.uppercase() ?: id
+        val swipes = swipesFor(id)
+        SwipeableKeyButton(
+            text = label,
+            onClick = {
+                if (tap != null && tap.action != null) {
+                    invokeKeyAction(tap, onKeyPress, callbacks.onCommitText, onGestureAction)
+                } else {
+                    onKeyPress(id)
+                }
+            },
+            backgroundColor = keyBackgroundColor,
+            textColor = keyTextColor,
+            modifier = modifier,
+            onPress = { onKeyPressDown?.invoke(id) },
+            swipeText = swipes.swipeUpText,
+            swipeDownText = swipes.swipeDownText,
+            swipeUpKeyLabel = swipes.swipeUpKeyLabel,
+            swipeDownKeyLabel = swipes.swipeDownKeyLabel,
+            onSwipe = swipes.onSwipeUp?.let { handler -> { _: String -> handler() } },
+            onSwipeDown = swipes.onSwipeDown?.let { handler -> { _: String -> handler() } },
+            shadowEnabled = shadowEnabled,
+            shadowElevation = shadowElevation,
+            shadowShapeRadius = shadowShapeRadius,
+        )
+    }
+
+    /** 布局键位渲染分发：功能键走内置组件（行为内置），数字走九键输入键，其余为自定义键。 */
+    @Composable
+    fun KeyCell(id: String, modifier: Modifier) {
+        when (id) {
+            "candidates" -> CandidatesPanel(modifier)
+            "symbol" -> KeyButton(
                 text = "符号",
                 onClick = { onKeyPress("symbol") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = modifier,
                 onPress = { onKeyPressDown?.invoke("symbol") },
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius,
                 fontSize = ctrlFontSize,
             )
-        }
-
-        // ── 第2列：数字键区 ──
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(3.4f),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            ) {
-                NineKeyButton(
-                    swipes = swipesFor("1"),
-
-                    digit = "1", letters = "分词",
-                    onClick = { controller.onDigitPressed("1") },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("1") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-                T9DigitKey(
-                    swipes = swipesFor("2"),
-                    digit = "2", letters = "ABC", longPressItems = listOf("A", "B", "C"),
-                    onClick = { controller.onDigitPressed("2") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("2") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-                T9DigitKey(
-                    swipes = swipesFor("3"),
-                    digit = "3", letters = "DEF", longPressItems = listOf("D", "E", "F"),
-                    onClick = { controller.onDigitPressed("3") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("3") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            ) {
-                T9DigitKey(
-                    swipes = swipesFor("4"),
-                    digit = "4", letters = "GHI", longPressItems = listOf("G", "H", "I"),
-                    onClick = { controller.onDigitPressed("4") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("4") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-                T9DigitKey(
-                    swipes = swipesFor("5"),
-                    digit = "5", letters = "JKL", longPressItems = listOf("J", "K", "L"),
-                    onClick = { controller.onDigitPressed("5") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("5") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-                T9DigitKey(
-                    swipes = swipesFor("6"),
-                    digit = "6", letters = "MNO", longPressItems = listOf("M", "N", "O"),
-                    onClick = { controller.onDigitPressed("6") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("6") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            ) {
-                T9DigitKey(
-                    swipes = swipesFor("7"),
-                    digit = "7", letters = "PQRS", longPressItems = listOf("P", "Q", "R", "S"),
-                    onClick = { controller.onDigitPressed("7") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("7") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-                T9DigitKey(
-                    swipes = swipesFor("8"),
-                    digit = "8", letters = "TUV", longPressItems = listOf("T", "U", "V"),
-                    onClick = { controller.onDigitPressed("8") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("8") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-                T9DigitKey(
-                    swipes = swipesFor("9"),
-                    digit = "9", letters = "WXYZ", longPressItems = listOf("W", "X", "Y", "Z"),
-                    onClick = { controller.onDigitPressed("9") },
-                    onLongPressSelect = { letter -> controller.clearAll(); onKeyPress(letter) },
-                    onSwipeStateChange = { state, bounds ->
-                        if (!(state.isPressed && !state.isLongPress && state.pressedText != null))
-                            onSwipeStateChange?.invoke(state, bounds)
-                    },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("9") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                    fontSize = t9DigitFontSize,
-                )
-            }
-            Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                KeyButton(
-                    text = "123", onClick = { onKeyPress("number") },
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("mode_change") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                )
-                T9SpaceKey(
-                    schemaName = uiState.schemaName, isSttEnabled = uiState.isSttEnabled,
-                    voiceSticky = uiState.voiceSticky,
-                    onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
-                    onVoiceModeChange = callbacks.onVoiceModeChange,
-                    backgroundColor = keyBackgroundColor, textColor = keyTextColor,
-                    modifier = Modifier.weight(1.8f),
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                )
-                IconKeyButton(
-                    icon = rememberVectorPainter(Icons.Default.Language),
-                    onClick = { onKeyPress("ime_switch") },
-                    backgroundColor = keyBackgroundColor, iconColor = keyTextColor,
-                    modifier = Modifier.weight(1f),
-                    onPress = { onKeyPressDown?.invoke("ime_switch") },
-                    shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
-                )
-            }
-        }
-
-        // ── 第3列：功能键（退格 / 重输 / 确定） ──
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(0.8f),
-        ) {
-            SwipeableIconKeyButton(
+            "number" -> KeyButton(
+                text = "123",
+                onClick = { onKeyPress("number") },
+                backgroundColor = keyBackgroundColor,
+                textColor = keyTextColor,
+                modifier = modifier,
+                onPress = { onKeyPressDown?.invoke("mode_change") },
+                shadowEnabled = shadowEnabled,
+                shadowElevation = shadowElevation,
+                shadowShapeRadius = shadowShapeRadius,
+            )
+            "space" -> T9SpaceKey(
+                schemaName = uiState.schemaName, isSttEnabled = uiState.isSttEnabled,
+                voiceSticky = uiState.voiceSticky,
+                onKeyPress = onKeyPress, onKeyPressDown = onKeyPressDown,
+                onVoiceModeChange = callbacks.onVoiceModeChange,
+                backgroundColor = keyBackgroundColor, textColor = keyTextColor,
+                modifier = modifier,
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+            )
+            "earth" -> IconKeyButton(
+                icon = rememberVectorPainter(Icons.Default.Language),
+                onClick = { onKeyPress("ime_switch") },
+                backgroundColor = keyBackgroundColor, iconColor = keyTextColor,
+                modifier = modifier,
+                onPress = { onKeyPressDown?.invoke("ime_switch") },
+                shadowEnabled = shadowEnabled, shadowElevation = shadowElevation, shadowShapeRadius = shadowShapeRadius,
+            )
+            "delete" -> SwipeableIconKeyButton(
                 icon = rememberVectorPainter(Icons.AutoMirrored.Filled.Backspace),
                 onClick = { onDelete() },
                 onLongClick = { onDelete() },
                 backgroundColor = specialKeyBackgroundColor,
                 iconColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = modifier,
                 swipeText = if (compactMode) null else "清空",
                 onSwipe = { onKeyPress("clear_composition") },
                 onPress = { onKeyPressDown?.invoke("delete") },
@@ -730,7 +668,7 @@ private fun T9KeyboardContent(
                 shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius,
             )
-            ResetKey(
+            "clear" -> ResetKey(
                 onClick = {
                     controller.clearAll()
                     // 重输 = 只清输入态（预编辑/候选/左栏），不动已上屏文本（对标主流输入法 2026-08-11）：
@@ -741,26 +679,94 @@ private fun T9KeyboardContent(
                 onPress = { onKeyPressDown?.invoke("clear") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(1f),
+                modifier = modifier,
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius,
                 compactMode = compactMode,
             )
-            KeyButton(
+            "enter" -> KeyButton(
                 text = uiState.enterKeyText,
                 onClick = { onKeyPress("enter") },
                 backgroundColor = specialKeyBackgroundColor,
                 textColor = specialKeyTextColor,
-                modifier = Modifier.weight(2f),
+                modifier = modifier,
                 onPress = { onKeyPressDown?.invoke("enter") },
                 shadowEnabled = shadowEnabled,
                 shadowElevation = shadowElevation,
                 shadowShapeRadius = shadowShapeRadius,
             )
+            else -> CustomKey(id, modifier)
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxSize(),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        // ── 第1列：左列（keyboard.t9.layout.left，candidates 为拼音候选面板占位） ──
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(0.8f),
+            verticalArrangement = Arrangement.spacedBy(if (compactMode) 2.dp else 4.dp)
+        ) {
+            t9Layout.left.forEach { id ->
+                KeyCell(id, Modifier.weight(keyWeight(id)))
+            }
+        }
+
+        // ── 第2列：主区（keyboard.t9.layout.rows，每行一个键 id 列表） ──
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(3.4f),
+        ) {
+            t9Layout.rows.forEach { rowIds ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                ) {
+                    rowIds.forEach { id ->
+                        KeyCell(id, Modifier.weight(keyWeight(id)))
+                    }
+                }
+            }
+        }
+
+        // ── 第3列：右列（keyboard.t9.layout.right，功能键列） ──
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(0.8f),
+        ) {
+            t9Layout.right.forEach { id ->
+                KeyCell(id, Modifier.weight(keyWeight(id)))
+            }
         }
     }
 }
+
+// ─── 九键数字键默认键面（keyboard.t9.keys.<id> 可覆盖） ─────────────────
+
+/** 九键数字键内置键面字母（与历史硬编码一致；keys.<id>.tap.label 可覆盖）。 */
+private val DEFAULT_T9_DIGIT_LETTERS: Map<String, String> = mapOf(
+    "1" to "分词", "2" to "ABC", "3" to "DEF",
+    "4" to "GHI", "5" to "JKL", "6" to "MNO",
+    "7" to "PQRS", "8" to "TUV", "9" to "WXYZ",
+)
+
+/** 九键数字键内置长按候选字母（keys.<id>.long_press 可覆盖；"1" 无长按为历史行为）。 */
+private val DEFAULT_T9_DIGIT_LONG_PRESS: Map<String, List<String>> = mapOf(
+    "2" to listOf("A", "B", "C"),
+    "3" to listOf("D", "E", "F"),
+    "4" to listOf("G", "H", "I"),
+    "5" to listOf("J", "K", "L"),
+    "6" to listOf("M", "N", "O"),
+    "7" to listOf("P", "Q", "R", "S"),
+    "8" to listOf("T", "U", "V"),
+    "9" to listOf("W", "X", "Y", "Z"),
+)
 
 // ─── 九键数字键（可长按） ──────────────────────────────────────────────
 

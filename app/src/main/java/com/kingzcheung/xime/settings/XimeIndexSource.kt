@@ -60,6 +60,7 @@ data class LayoutInstallResult(
  */
 object XimeIndexSource {
     private const val TAG = "XimeIndexSource"
+    private const val PLUGINS_INDEX_PATH = "plugins/v2/index.yaml"
     private val defaultBaseUrls = listOf("https://index.ximei.me/")
 
     private var baseUrls: List<String> = defaultBaseUrls
@@ -75,8 +76,9 @@ object XimeIndexSource {
         get() = url.substringAfterLast('/').takeIf { it.isNotBlank() }
             ?: "file.${url.substringAfterLast('.').takeIf { it.length in 1..6 } ?: "bin"}"
 
-    private val DownloadItem.sizeBytes: Long
-        get() = size?.removeSuffix(" MB")?.trim()?.toDoubleOrNull()
+    /** 下载总量：索引精确字节数（sizeBytes）优先，缺省回退 size 字符串估算（KB/MB 文本）。 */
+    private val DownloadItem.resolvedSizeBytes: Long
+        get() = sizeBytes ?: size?.removeSuffix(" MB")?.trim()?.toDoubleOrNull()
             ?.let { (it * 1024.0 * 1024.0).toLong() } ?: 0L
 
     private fun buildMirrors(userUrls: List<String>): List<String> = userUrls
@@ -138,8 +140,10 @@ object XimeIndexSource {
     }
 
     /**
-     * 获取插件列表：抓取 plugins/index.yaml（扁平索引，plugins 内联所有 MarketPlugin）。
-     * 遍历镜像直到成功；已安装版本表（id → versionName）用于派生 installed/hasUpdate 状态。
+     * 获取插件列表：抓取 plugins/v2/index.yaml（扁平索引，plugins 内联所有 MarketPlugin；
+     * 索引 v2 含 icon/activation/minHostVersion/platforms/capabilities/network 扩展字段）。
+     * 遍历镜像直到成功；非 android 平台条目不可见（[XimeIndexParser.isAvailableOnAndroid]）；
+     * 已安装版本表（id → versionName）用于派生 installed/hasUpdate 状态。
      */
     suspend fun fetchPlugins(
         context: Context,
@@ -151,9 +155,10 @@ object XimeIndexSource {
             for (base in mirrors) {
                 val host = hostOf(base)
                 try {
-                    val text = fetchTextSingle(base, "plugins/index.yaml") ?: continue
+                    val text = fetchTextSingle(base, PLUGINS_INDEX_PATH) ?: continue
                     val direct = XimeIndexParser.parsePluginsDirectIndex(text)
                     val plugins = direct.plugins.distinctBy { it.id }
+                        .filter { XimeIndexParser.isAvailableOnAndroid(it) }
                         .map { XimeIndexParser.toPluginItem(it, appVersion, installedVersions) }
                     if (plugins.isNotEmpty()) {
                         return@withContext Result.success(
@@ -501,7 +506,7 @@ object XimeIndexSource {
         }
 
         val items = v.downloadUrls.filter { it.url.isNotBlank() }
-        val totalBytesAll = items.sumOf { it.sizeBytes }
+        val totalBytesAll = items.sumOf { it.resolvedSizeBytes }
         var accumulatedBytes = 0L
         var anyVerified = false
 
@@ -513,7 +518,7 @@ object XimeIndexSource {
                     if (totalBytesAll > 0) onDownloadProgress(overall, totalBytesAll)
                 },
             )
-            accumulatedBytes += dl.sizeBytes
+            accumulatedBytes += dl.resolvedSizeBytes
             if (!result.success) {
                 val schemeDir = SchemaManager.getMarketDir(context, scheme.id)
                 if (schemeDir.exists()) schemeDir.deleteRecursively()

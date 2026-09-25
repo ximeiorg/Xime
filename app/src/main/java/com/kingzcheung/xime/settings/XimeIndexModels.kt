@@ -76,6 +76,8 @@ data class DownloadItem(
     val url: String = "",
     val sha256: String? = null,
     val size: String? = null,
+    /** 精确字节数（索引生成器提供；用于下载进度总量，缺省回退 size 字符串估算）。 */
+    @SerialName("sizeBytes") val sizeBytes: Long? = null,
 )
 
 @Serializable
@@ -122,6 +124,19 @@ data class MarketPlugin(
     val type: String = "remote",
     val tags: List<String> = emptyList(),
     @SerialName("pluginType") val pluginType: String = "",
+    /** 键面字符图标（manifest.icon，索引 v2 起提供；空 = 未声明，UI 回退分类图标）。 */
+    val icon: String = "",
+    /** 激活模式：single（单选激活，如语音）/ multi（多选，索引 v2 起提供；空 = 未声明）。 */
+    val activation: String = "",
+    /** 宿主最低版本（索引 v2 起提供；空 = 未声明，兼容性由 appVersion 约束承载）。 */
+    @SerialName("minHostVersion") val minHostVersion: String = "",
+    /** 目标平台（索引 v2 起提供；空 = 未声明，视为不限）。 */
+    val platforms: List<String> = emptyList(),
+    /** 能力声明（索引 v2 起提供）：已知类型见 [PluginCapabilities]，未知类型忽略；
+     *  安装后的运行时事实来源仍是包内 manifest.json。 */
+    val capabilities: PluginCapabilities = PluginCapabilities(),
+    /** 网络策略（索引 v2 起提供）：需联网域名 / 是否允许自定义接口地址。 */
+    val network: PluginNetworkPolicy = PluginNetworkPolicy(),
     @SerialName("appVersion") val appVersion: String = "",
     @SerialName("currentVersion") val currentVersion: String = "",
     val versions: List<PluginVersion> = emptyList(),
@@ -133,6 +148,40 @@ data class MarketPlugin(
     fun resolvedVersion(): PluginVersion? =
         versions.firstOrNull { it.version == currentVersion } ?: versions.firstOrNull()
 }
+
+/**
+ * 插件能力声明（索引 v2 capabilities）。
+ * 已知能力强类型建模；未知能力键（emoji/candidate_transform/events 等）由
+ * strictMode=false 忽略，后续需要时在此扩展字段即可。
+ */
+@Serializable
+data class PluginCapabilities(
+    val tool: PluginToolCapability? = null,
+    val speech: PluginSpeechCapability? = null,
+)
+
+@Serializable
+data class PluginToolCapability(
+    /** 面板展示方式：passive（被动展示）/ direct（直接调用）。 */
+    val display: String = "",
+)
+
+@Serializable
+data class PluginSpeechCapability(
+    /** 输入模式：streaming（流式）等。 */
+    @SerialName("inputMode") val inputMode: String = "",
+    /** 是否支持部分（中间）结果。 */
+    @SerialName("supportsPartialResults") val supportsPartialResults: Boolean = false,
+)
+
+/** 插件网络策略（索引 v2 network）。 */
+@Serializable
+data class PluginNetworkPolicy(
+    /** 需要联网的域名清单。 */
+    val hosts: List<String> = emptyList(),
+    /** 是否允许用户自定义接口地址（如 OpenAI 兼容端点）。 */
+    @SerialName("allowCustomHosts") val allowCustomHosts: Boolean = false,
+)
 
 @Serializable
 data class PluginVersion(

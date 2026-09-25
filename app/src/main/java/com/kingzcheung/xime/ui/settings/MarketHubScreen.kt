@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Info
@@ -739,6 +740,7 @@ private fun PluginsMarketTab(
                             val (iconContainer, iconContent) = pluginCategoryColors(item.plugin.pluginType)
                             MarketStoreCard(
                                 icon = icon,
+                                iconText = item.plugin.icon,
                                 iconContainerColor = iconContainer,
                                 iconContentColor = iconContent,
                                 title = item.plugin.name.ifEmpty { item.plugin.id },
@@ -878,6 +880,8 @@ private fun MarketStoreCard(
     onSelectVersion: (String) -> Unit,
     onCardClick: () -> Unit,
     trailing: @Composable () -> Unit,
+    /** 索引 v2 的 manifest.icon 字符图标：非空时优先于分类图标渲染。 */
+    iconText: String = "",
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -904,12 +908,22 @@ private fun MarketStoreCard(
                         .background(iconContainerColor),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = iconContentColor,
-                        modifier = Modifier.size(26.dp),
-                    )
+                    if (iconText.isNotEmpty()) {
+                        Text(
+                            iconText,
+                            color = iconContentColor,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    } else {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = iconContentColor,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -1820,6 +1834,7 @@ private fun pluginCategoryIcon(pluginType: String): ImageVector = when (pluginTy
     "prediction" -> Icons.Default.AutoAwesome
     "clipboard_sync" -> Icons.Default.Sync
     "tool" -> Icons.Default.AutoFixHigh
+    "backup" -> Icons.Default.CloudUpload
     else -> Icons.Default.Extension
 }
 
@@ -1841,7 +1856,38 @@ private fun pluginCategoryLabel(pluginType: String): String = when (pluginType) 
     "prediction" -> "智能预测"
     "clipboard_sync" -> "剪贴板同步"
     "tool" -> "工具"
+    "backup" -> "云备份"
     else -> "其他"
+}
+
+/** 激活方式显示文案（索引 v2 activation）：single=单选激活 / multi=多选激活；未声明返回空。 */
+private fun pluginActivationLabel(activation: String): String = when (activation) {
+    "single" -> "单选激活"
+    "multi" -> "多选激活"
+    else -> ""
+}
+
+/** 能力声明摘要（索引 v2 capabilities，已知能力拼接；无已知能力返回空）。 */
+internal fun pluginCapabilitiesSummary(plugin: MarketPlugin): String = buildString {
+    plugin.capabilities.speech?.let { speech ->
+        if (speech.inputMode == "streaming") append("流式识别")
+        if (speech.supportsPartialResults) {
+            if (isNotEmpty()) append("、")
+            append("支持部分结果")
+        }
+    }
+    plugin.capabilities.tool?.let { tool ->
+        when (tool.display) {
+            "direct" -> {
+                if (isNotEmpty()) append("、")
+                append("直接调用")
+            }
+            "passive" -> {
+                if (isNotEmpty()) append("、")
+                append("被动展示")
+            }
+        }
+    }
 }
 
 internal fun modelCategoryLabel(category: ModelCategory): String = when (category) {
@@ -1975,13 +2021,14 @@ private fun PluginDetailBody(
     }
     val context = LocalContext.current
     val declaredHosts = installedPlugin?.declaredHosts.orEmpty()
-    val networkHosts = remember(installedPlugin?.id) {
+    val networkHosts = remember(installedPlugin?.id, plugin.id, plugin.network) {
         if (installedPlugin != null) {
             (declaredHosts +
                 ExtensionManager.getConfiguredNetworkHosts(context, installedPlugin.id) +
                 SettingsPreferences.getPluginPendingHosts(context, installedPlugin.id)).distinct()
         } else {
-            declaredHosts
+            // 未安装：用索引 v2 声明的域名做联网预览
+            plugin.network.hosts
         }
     }
 
@@ -1999,12 +2046,22 @@ private fun PluginDetailBody(
                         .background(iconContainer),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        pluginCategoryIcon(plugin.pluginType),
-                        contentDescription = null,
-                        tint = iconContent,
-                        modifier = Modifier.size(36.dp),
-                    )
+                    if (plugin.icon.isNotEmpty()) {
+                        Text(
+                            plugin.icon,
+                            color = iconContent,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    } else {
+                        Icon(
+                            pluginCategoryIcon(plugin.pluginType),
+                            contentDescription = null,
+                            tint = iconContent,
+                            modifier = Modifier.size(36.dp),
+                        )
+                    }
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -2043,6 +2100,30 @@ private fun PluginDetailBody(
         if (typeLabel.isNotEmpty()) {
             item {
                 DetailMetaRow("类型", typeLabel)
+            }
+        }
+
+        // 索引 v2 元信息（旧索引无这些字段时各行为空串不渲染）
+        val activationLabel = pluginActivationLabel(plugin.activation)
+        if (activationLabel.isNotEmpty()) {
+            item {
+                DetailMetaRow("激活方式", activationLabel)
+            }
+        }
+        if (plugin.platforms.isNotEmpty()) {
+            item {
+                DetailMetaRow("平台", plugin.platforms.joinToString("、") { "Android" })
+            }
+        }
+        if (plugin.minHostVersion.isNotBlank()) {
+            item {
+                DetailMetaRow("需宿主版本", plugin.minHostVersion)
+            }
+        }
+        val capabilitiesSummary = pluginCapabilitiesSummary(plugin)
+        if (capabilitiesSummary.isNotEmpty()) {
+            item {
+                DetailMetaRow("能力", capabilitiesSummary)
             }
         }
 

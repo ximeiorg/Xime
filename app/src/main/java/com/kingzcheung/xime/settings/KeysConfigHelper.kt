@@ -449,11 +449,43 @@ data class KeyboardFontConfig(
 )
 
 /**
+ * 九键（T9）布局配置，从 xime.yaml keyboard.t9.layout 加载。
+ *
+ * 九键为三列结构：左列（候选面板占位 + 键）、主区（按行的按键网格）、右列（功能键列）。
+ * 键 id 分三类：
+ * - 数字 "0"~"9"：九键输入键（点按固定为九键数字输入；键面字母 keys.<id>.tap.label、
+ *   长按候选 keys.<id>.long_press、手势 keys.<id> 均可配置）；
+ * - [KeysConfigHelper.T9_FUNCTION_KEY_IDS] 中的功能键：渲染内置组件，位置可任意安排；
+ * - 其余 id：自定义键，行为在 keys.<id> 定义（无配置时键面为键名、点按提交键名）。
+ */
+data class KeyboardT9LayoutConfig(
+    /** 左列（自上而下）。candidates = 拼音候选面板占位（候选态显示音节，空闲态显示 side_symbols）。 */
+    val left: List<String> = DEFAULT_T9_LEFT,
+    /** 主区行：每个子列表一行，从左到右。 */
+    val rows: List<List<String>> = DEFAULT_T9_ROWS,
+    /** 右列（自上而下）。 */
+    val right: List<String> = DEFAULT_T9_RIGHT,
+) {
+    companion object {
+        val DEFAULT_T9_LEFT: List<String> = listOf("candidates", "symbol")
+        val DEFAULT_T9_ROWS: List<List<String>> = listOf(
+            listOf("1", "2", "3"),
+            listOf("4", "5", "6"),
+            listOf("7", "8", "9"),
+            listOf("number", "space", "earth"),
+        )
+        val DEFAULT_T9_RIGHT: List<String> = listOf("delete", "clear", "enter")
+    }
+}
+
+/**
  * 九键（T9）键盘配置，从 xime.yaml keyboard.t9 加载。
  */
 data class KeyboardT9Config(
     /** 左侧快捷符号栏（空闲态），列表长度不限，超过 4 个时键盘侧滚动显示。 */
     val sideSymbols: List<String>? = null,
+    /** 布局（左列/主区行/右列）。 */
+    val layout: KeyboardT9LayoutConfig = KeyboardT9LayoutConfig(),
 )
 
 /**
@@ -501,6 +533,13 @@ internal data class KeyboardKeyPartial(
 
 internal data class KeyboardT9Partial(
     val sideSymbols: List<String>? = null,
+    val layout: KeyboardT9LayoutPartial? = null,
+)
+
+internal data class KeyboardT9LayoutPartial(
+    val left: List<String>? = null,
+    val rows: List<List<String>>? = null,
+    val right: List<String>? = null,
 )
 
 internal data class KeyboardStrokePartial(
@@ -576,6 +615,16 @@ object KeysConfigHelper {
      */
     val FUNCTION_KEY_IDS: Set<String> = setOf(
         "shift", "delete", "enter", "space", "mode_change", "symbol", "emoji", "earth", "voice", "comma"
+    )
+
+    /**
+     * 九键布局的功能键 id（keyboard.t9.layout 可把任意 id 安排到任意位置）：
+     * candidates=拼音候选面板、symbol=符号、number=数字面板、space=空格、
+     * earth=中英切换、delete=退格、clear=重输、enter=回车。
+     * 组件与行为内置，不可经 keys.<id> 改绑；键在行/列中的相对宽度可用 keys.<id>.width 覆盖。
+     */
+    val T9_FUNCTION_KEY_IDS: Set<String> = setOf(
+        "candidates", "symbol", "number", "space", "earth", "delete", "clear", "enter"
     )
 
     /** 九键左侧快捷符号栏内置默认值（T9KeyboardLayout 硬编码的历史行为）。 */
@@ -654,7 +703,8 @@ object KeysConfigHelper {
 
     /**
      * 代码布局 section：由专属组件渲染（T9KeyboardLayout / StrokeKeyboardLayout /
-     * HandwritingKeyboardLayout），无 layout.rows。schemas 绑定到这些 section 的方案
+     * HandwritingKeyboardLayout）。t9 有专属 layout{left,rows,right} 由 t9 配置解析器处理，
+     * 不走通用 layout.rows；stroke/handwriting 无行数据。schemas 绑定到这些 section 的方案
      * 走 [codeLayoutForSchema] 查询，不进入合并键行布局缓存
      * （[mergedSectionForSchema] 对其返回 null）。
      */
@@ -1091,6 +1141,18 @@ object KeysConfigHelper {
         KeyboardT9Config(
             sideSymbols = tiered(custom?.sideSymbols?.takeIf { it.isNotEmpty() },
                 builtIn?.sideSymbols?.takeIf { it.isNotEmpty() }, DEFAULT_T9_SIDE_SYMBOLS),
+            layout = mergeT9Layouts(custom?.layout, builtIn?.layout),
+        )
+
+    /** 字段级一路 fallback 合并九键布局：custom → builtIn → 代码默认值（列表整段覆盖）。 */
+    internal fun mergeT9Layouts(custom: KeyboardT9LayoutPartial?, builtIn: KeyboardT9LayoutPartial?): KeyboardT9LayoutConfig =
+        KeyboardT9LayoutConfig(
+            left = tiered(custom?.left?.takeIf { it.isNotEmpty() },
+                builtIn?.left?.takeIf { it.isNotEmpty() }, KeyboardT9LayoutConfig.DEFAULT_T9_LEFT),
+            rows = tiered(custom?.rows?.takeIf { it.isNotEmpty() },
+                builtIn?.rows?.takeIf { it.isNotEmpty() }, KeyboardT9LayoutConfig.DEFAULT_T9_ROWS),
+            right = tiered(custom?.right?.takeIf { it.isNotEmpty() },
+                builtIn?.right?.takeIf { it.isNotEmpty() }, KeyboardT9LayoutConfig.DEFAULT_T9_RIGHT),
         )
 
     /** 从 YAML 文本中提取 keyboard.t9 段（仅显式字段非 null）。 */
@@ -1101,11 +1163,30 @@ object KeysConfigHelper {
             val t9Node = keyboardNode.opt<YamlMap>("t9") ?: return null
             val sideSymbols = t9Node.opt<YamlList>("side_symbols")
                 ?.items?.mapNotNull { (it as? YamlScalar)?.content }
-            KeyboardT9Partial(sideSymbols = sideSymbols?.ifEmpty { null })
+            val layout = t9Node.opt<YamlMap>("layout")?.let { parseT9LayoutNode(it) }
+            KeyboardT9Partial(
+                sideSymbols = sideSymbols?.ifEmpty { null },
+                layout = layout,
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse keyboard t9 config", e)
             null
         }
+    }
+
+    /** 解析 keyboard.t9.layout 节点（left/rows/right；rows 支持合并键嵌套与标量行兜底）。 */
+    private fun parseT9LayoutNode(layoutNode: YamlMap): KeyboardT9LayoutPartial? {
+        val left = layoutNode.opt<YamlList>("left")
+            ?.items?.mapNotNull { (it as? YamlScalar)?.content }?.filter { it.isNotBlank() }
+        val right = layoutNode.opt<YamlList>("right")
+            ?.items?.mapNotNull { (it as? YamlScalar)?.content }?.filter { it.isNotBlank() }
+        val rows = layoutNode.opt<YamlList>("rows")?.let { parseLayoutRowsNode(it) }
+        if (left.isNullOrEmpty() && right.isNullOrEmpty() && rows.isNullOrEmpty()) return null
+        return KeyboardT9LayoutPartial(
+            left = left?.takeIf { it.isNotEmpty() },
+            rows = rows?.takeIf { it.isNotEmpty() },
+            right = right?.takeIf { it.isNotEmpty() },
+        )
     }
 
     /** 从 xime.yaml + xime.custom.yaml 合并解析笔画键盘配置。 */
@@ -1281,22 +1362,27 @@ object KeysConfigHelper {
             val sectionNode = keyboardNode.opt<YamlMap>(section) ?: return null
             val layoutNode = sectionNode.opt<YamlMap>("layout") ?: return null
             val rowsNode = layoutNode.opt<YamlList>("rows") ?: return null
-            val rows = mutableListOf<List<String>>()
-            for (rowNode in rowsNode.items) {
-                val row = when (rowNode) {
-                    is YamlList -> rowListToKeyIds(rowNode)
-                    is YamlScalar -> scalarRowToKeyIds(rowNode.content)
-                    else -> emptyList()
-                }
-                if (row.isNotEmpty()) {
-                    rows.add(row)
-                }
-            }
-            rows.takeIf { it.isNotEmpty() }
+            parseLayoutRowsNode(rowsNode).takeIf { it.isNotEmpty() }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse keyboard layout config", e)
             null
         }
+    }
+
+    /** rows 节点 → 行列表：子数组为合并键（组内字母拼接为 ID），标量行手动拆分兜底。 */
+    private fun parseLayoutRowsNode(rowsNode: YamlList): List<List<String>> {
+        val rows = mutableListOf<List<String>>()
+        for (rowNode in rowsNode.items) {
+            val row = when (rowNode) {
+                is YamlList -> rowListToKeyIds(rowNode)
+                is YamlScalar -> scalarRowToKeyIds(rowNode.content)
+                else -> emptyList()
+            }
+            if (row.isNotEmpty()) {
+                rows.add(row)
+            }
+        }
+        return rows
     }
 
     /** 行节点 → 按键 ID 列表：子数组为合并键（组内字母拼接为 ID），标量为单字母键。 */
@@ -1587,6 +1673,20 @@ object KeysConfigHelper {
     /** 获取九键左侧快捷符号栏配置（xime.custom.yaml → xime.yaml → 内置默认值）。 */
     fun getT9SideSymbols(): List<String> =
         keyboardT9Config.sideSymbols ?: DEFAULT_T9_SIDE_SYMBOLS
+
+    /** 获取九键布局配置（keyboard.t9.layout，custom → builtIn → 内置默认，字段级 fallback）。 */
+    fun getT9Layout(): KeyboardT9LayoutConfig = keyboardT9Config.layout
+
+    /** 九键键面标签（keyboard.t9.keys.<id>.tap.label，未配置返回 null，由调用方回退内置默认）。 */
+    fun getT9KeyLabel(id: String): String? =
+        _t9GestureConfigs[id]?.tap?.label?.takeIf { it.isNotEmpty() }
+
+    /** 九键长按候选显示文本（keyboard.t9.keys.<id>.long_press.values 的 label，缺省 value；未配置返回 null）。 */
+    fun getT9KeyLongPressLabels(id: String): List<String>? =
+        _t9GestureConfigs[id]?.longPress?.values
+            ?.map { it.label.ifEmpty { it.value } }
+            ?.filter { it.isNotEmpty() }
+            ?.takeIf { it.isNotEmpty() }
 
     /** 获取九键数字键手势配置（xime.yaml keyboard.t9.keys，custom 键级覆盖）。
      *  键 id 为数字字符串 "1"~"9"；无配置返回 null（布局不启用滑动）。 */

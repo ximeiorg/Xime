@@ -91,7 +91,10 @@ class WirelessImportHelper(private val context: Context) {
         val ip = getLocalIpAddress() ?: return null
         val url = "http://$ip:$port"
 
-        server = embeddedServer(CIO, port = port) {
+        // watchPaths 置空：ktor 的 stop() 会无条件 cleanupWatcher()，访问 lazy watcher 会在
+        // Android 上凭空创建再销毁一个平台 WatchService（自动重载并未启用），其 finalizer
+        // 随 GC 抛 ClosedWatchServiceException 刷日志；置空后该路径完全不触发。
+        server = embeddedServer(CIO, port = port, watchPaths = emptyList()) {
             routing {
                 // React 前端：index.html 与静态资源打包在 assets/www/
                 get("/") {

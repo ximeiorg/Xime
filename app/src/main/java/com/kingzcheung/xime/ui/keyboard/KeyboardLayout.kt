@@ -441,7 +441,7 @@ fun KeyboardLayout(
  * - 其余动作（编辑/删除/回车/空格/清空/面板切换等）→ [onGestureAction]（UI 拦截层 → 服务层）
  * - NONE / null → 不触发
  */
-private fun invokeKeyAction(
+internal fun invokeKeyAction(
     action: KeyAction?,
     onKeyPress: (String) -> Unit,
     onCommitText: ((String) -> Unit)?,

@@ -258,6 +258,111 @@ class XimeIndexParserTest {
         assertEquals("2.1.0", kaomoji.resolvedVersion()?.version)
     }
 
+    /** 索引 v2 插件条目样例（取自 plugins/v2/index.yaml，含全部新增字段）。 */
+    private val v2Plugin = """
+        id: "com.kingzcheung.xime.plugin.funasr_asr"
+        name: "阿里百炼 FunAsr"
+        author: "Xime"
+        description: "在线语音识别"
+        type: "remote"
+        tags: ["语音", "ASR"]
+        pluginType: "speech"
+        icon: "🎤"
+        activation: "single"
+        minHostVersion: "3.0.0"
+        platforms:
+          - android
+        capabilities:
+          speech:
+            inputMode: "streaming"
+            supportsPartialResults: true
+        network:
+          hosts:
+            - dashscope.aliyuncs.com
+        homepage: "https://github.com/ximeiorg/Xime"
+        license: "GPL-3.0"
+        appVersion: ">=3.0.0"
+        currentVersion: "3.0.0"
+        versions:
+          - version: "3.0.0"
+            date: "2026-09-24"
+            changelog: "v3 重构"
+            downloadUrl:
+              - url: "https://github.com/ximeiorg/Xime/releases/download/v3.0.0-beta1/funasr-asr-3.0.0.xipk"
+                size: "11.4 KB"
+                sha256: "AAAA"
+                sizeBytes: 11673
+    """.trimIndent()
+
+    @Test
+    fun `parse v2 plugin entry with new fields`() {
+        // trimIndent 后 v2Plugin 各行顶格；拼入列表时首行接 "- "、其余行统一缩进 4 空格
+        val indexText = "index_version: 2\nupdated_at: '2026-09-25'\nplugins:\n" +
+            v2Plugin.lines().joinToString("\n") { line ->
+                when {
+                    v2Plugin.lines().first() == line -> "  - $line"
+                    line.isBlank() -> line
+                    else -> "    $line"
+                }
+            }
+        val idx = XimeIndexParser.parsePluginsDirectIndex(indexText)
+        val p = idx.plugins.single()
+        assertEquals("🎤", p.icon)
+        assertEquals("single", p.activation)
+        assertEquals("3.0.0", p.minHostVersion)
+        assertEquals(listOf("android"), p.platforms)
+        assertEquals("streaming", p.capabilities.speech?.inputMode)
+        assertTrue(p.capabilities.speech?.supportsPartialResults == true)
+        assertEquals(listOf("dashscope.aliyuncs.com"), p.network.hosts)
+        assertFalse(p.network.allowCustomHosts)
+        // 精确字节数解析（v1/v2 下载条目均带）
+        assertEquals(11673L, p.resolvedVersion()?.downloadUrls?.first()?.sizeBytes)
+    }
+
+    @Test
+    fun `parse v2 tool entry with allowCustomHosts`() {
+        val text = """
+            index_version: 2
+            plugins:
+              - id: "p.ai"
+                pluginType: "tool"
+                capabilities:
+                  tool:
+                    display: "passive"
+                  emoji:
+                    supportsSearch: true
+                    columns: 3
+                  candidate_transform: true
+                network:
+                  allowCustomHosts: true
+        """.trimIndent()
+        val p = XimeIndexParser.parsePluginsDirectIndex(text).plugins.single()
+        assertEquals("passive", p.capabilities.tool?.display)
+        // 未知能力键（emoji/candidate_transform）安全忽略
+        assertNull(p.capabilities.speech)
+        assertTrue(p.network.allowCustomHosts)
+    }
+
+    @Test
+    fun `toPluginItem gates on minHostVersion`() {
+        val plugin = XimeIndexParser.parsePlugin(v2Plugin)
+        assertTrue(XimeIndexParser.toPluginItem(plugin, "3.0.0-beta2", emptyMap()).compatible)
+        assertFalse(XimeIndexParser.toPluginItem(plugin, "2.9.0", emptyMap()).compatible)
+        val stricter = plugin.copy(minHostVersion = "3.1.0")
+        assertFalse(XimeIndexParser.toPluginItem(stricter, "3.0.0-beta2", emptyMap()).compatible)
+        // 未声明 minHostVersion 时仅 appVersion 约束生效
+        val legacy = plugin.copy(minHostVersion = "", appVersion = "")
+        assertTrue(XimeIndexParser.toPluginItem(legacy, "2.6.0", emptyMap()).compatible)
+    }
+
+    @Test
+    fun `isAvailableOnAndroid filters platforms`() {
+        val plugin = XimeIndexParser.parsePlugin(v2Plugin)
+        assertTrue(XimeIndexParser.isAvailableOnAndroid(plugin))
+        assertTrue(XimeIndexParser.isAvailableOnAndroid(plugin.copy(platforms = emptyList()))) // 未声明 = 不限
+        assertFalse(XimeIndexParser.isAvailableOnAndroid(plugin.copy(platforms = listOf("ios"))))
+    }
+
     @Test
     fun `toPluginItem computes compatibility and installed state`() {
         val idx = XimeIndexParser.parsePluginsDirectIndex(pluginsIndex)
