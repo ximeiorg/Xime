@@ -1660,6 +1660,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     /** 读取当前方案为指定物理修饰键配置的 ascii_composer 动作。 */
     private fun hardwareSwitchAction(keyCode: Int): String? {
         val keyName = when (keyCode) {
+            KeyEvent.KEYCODE_CAPS_LOCK -> "Caps_Lock"
             KeyEvent.KEYCODE_SHIFT_LEFT -> "Shift_L"
             KeyEvent.KEYCODE_SHIFT_RIGHT -> "Shift_R"
             KeyEvent.KEYCODE_CTRL_LEFT -> "Control_L"
@@ -1682,6 +1683,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val e = event ?: return super.onKeyDown(keyCode, event)
         when (keyCode) {
+            KeyEvent.KEYCODE_CAPS_LOCK,
             KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
             KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> {
                 // Rime 方案未将该修饰键配置为 ascii_composer 切换键时，保持系统默认行为。
@@ -1689,8 +1691,21 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     return super.onKeyDown(keyCode, event)
                 }
                 when (keyCode) {
+                    KeyEvent.KEYCODE_CAPS_LOCK -> {
+                        if (pendingHardwareShiftToggle) {
+                            pendingHardwareShiftToggle = false
+                            hardwareModifierCombo = true
+                        } else if (pendingHardwareCtrlToggle) {
+                            pendingHardwareCtrlToggle = false
+                            hardwareModifierCombo = true
+                        } else {
+                            pendingHardwareCapsToggle = true
+                            hardwareModifierCombo = false
+                        }
+                    }
                     KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> {
-                        if (pendingHardwareCtrlToggle) {
+                        if (pendingHardwareCtrlToggle || pendingHardwareCapsToggle) {
+                            pendingHardwareCapsToggle = false
                             pendingHardwareCtrlToggle = false
                             hardwareModifierCombo = true
                         } else {
@@ -1699,7 +1714,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                         }
                     }
                     else -> {
-                        if (pendingHardwareShiftToggle) {
+                        if (pendingHardwareShiftToggle || pendingHardwareCapsToggle) {
+                            pendingHardwareCapsToggle = false
                             pendingHardwareShiftToggle = false
                             hardwareModifierCombo = true
                         } else {
@@ -1711,8 +1727,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 return true
             }
         }
-        // Shift/Ctrl 参与了组合按键时不把其释放误判为独立切换；具体是否切换由当前方案配置决定。
-        if (pendingHardwareShiftToggle || pendingHardwareCtrlToggle) {
+        // Caps/Shift/Ctrl 参与了组合按键时不把其释放误判为独立切换；具体是否切换由当前方案配置决定。
+        if (pendingHardwareCapsToggle || pendingHardwareShiftToggle || pendingHardwareCtrlToggle) {
+            pendingHardwareCapsToggle = false
             pendingHardwareShiftToggle = false
             pendingHardwareCtrlToggle = false
             hardwareModifierCombo = true
@@ -1780,6 +1797,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
         when (keyCode) {
+            KeyEvent.KEYCODE_CAPS_LOCK -> {
+                if (!pendingHardwareCapsToggle && !hardwareModifierCombo) {
+                    return super.onKeyUp(keyCode, event)
+                }
+                if (pendingHardwareCapsToggle && !hardwareModifierCombo) {
+                    keyRouter.handleHardwareSwitchKey("Caps_Lock")
+                }
+                pendingHardwareCapsToggle = false
+                hardwareModifierCombo = false
+                return true
+            }
             KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> {
                 if (!pendingHardwareShiftToggle && !hardwareModifierCombo) {
                     return super.onKeyUp(keyCode, event)
@@ -2040,7 +2068,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private val highlightIndex = mutableIntStateOf(0)
-    /** 单独按下 Shift/Ctrl 时切换中英文；与其他键组成快捷键时不触发切换。 */
+    /** 单独按下 Caps/Shift/Ctrl 时切换中英文；与其他键组成快捷键时不触发切换。 */
+    private var pendingHardwareCapsToggle = false
     private var pendingHardwareShiftToggle = false
     private var pendingHardwareCtrlToggle = false
     private var hardwareModifierCombo = false
