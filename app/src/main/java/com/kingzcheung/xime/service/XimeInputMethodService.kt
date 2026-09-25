@@ -907,7 +907,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 打开面板前清理宿主输入框残留输入态（未上屏的拼音/英文），
         // 避免旧组合混入面板输入、或面板关闭后覆盖宿主输入框中段文字。
         val pending = candidateState.value
-        if (pending.isComposing || pending.inputText.isNotEmpty() || pending.pendingEnglishText.isNotEmpty()) {
+        if (pending.isComposing || pending.inputText.isNotEmpty() || pending.pendingEnglishText.isNotEmpty() || pending.isInlineAsciiActive) {
+            if (pending.isInlineAsciiActive) {
+                asciiModeController.cancelInlineAsciiForModeChange()
+            }
             rimeEngine.clearComposition()
             endComposingInputBox()
             candidateState.value = candidateState.value.copy(
@@ -915,6 +918,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 candidateComments = emptyList(),
                 associationCandidates = emptyList(),
                 pendingEnglishText = "",
+                isInlineAsciiActive = false,
+                inlineAsciiText = "",
                 inputText = "",
                 candidateActions = emptyList(),
                 preeditText = "",
@@ -2273,6 +2278,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private fun clearInputState() {
+        val wasInlineAscii = candidateState.value.isInlineAsciiActive
         closeToolPanel()
         // 输入会话结束：关闭残留的面板页面（表情/符号等 overlay），
         // 避免下次键盘弹出时在候选栏上方渲染上次的面板背景
@@ -2311,16 +2317,32 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             candidates = emptyList(),
             candidateComments = emptyList(),
             inputText = "",
+            preeditText = "",
             isComposing = false,
             isShowingRecentClipboard = false,
             associationCandidates = emptyList(),
             pendingEnglishText = "",
+            isInlineAsciiActive = false,
+            inlineAsciiText = "",
             hasNextPage = false,
             hasPrevPage = false,
             englishReplaceSupported = true,
             candidateActions = emptyList()
         )
         endComposingInputBox()
+        if (wasInlineAscii) {
+            uiState.value = uiState.value.copy(isAsciiMode = false)
+            if (RimeEngine.isInitialized()) {
+                keyboardViewModel.dispatch(
+                    com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
+                        false, rimeEngine.getCurrentSchema()
+                    )
+                )
+            }
+        }
+        if (RimeEngine.isInitialized() && rimeEngine.isAsciiMode()) {
+            rimeEngine.setOption("ascii_mode", false)
+        }
     }
 
     /**

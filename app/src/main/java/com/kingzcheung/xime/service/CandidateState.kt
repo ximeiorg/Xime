@@ -12,6 +12,9 @@ data class CandidateState(
     val hasPrevPage: Boolean = false,
     val associationCandidates: List<String> = emptyList(),
     val pendingEnglishText: String = "",
+    /** inline_ascii 临时英文编辑态；与逐字上屏英文态 [pendingEnglishText] 分离。 */
+    val isInlineAsciiActive: Boolean = false,
+    val inlineAsciiText: String = "",
     val isShowingRecentClipboard: Boolean = false,
     /** 当前宿主是否支持英文候选的"回删替换"（终端等受限宿主为 false，不展示英文候选）。 */
     val englishReplaceSupported: Boolean = true,

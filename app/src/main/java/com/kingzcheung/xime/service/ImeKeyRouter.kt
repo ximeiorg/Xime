@@ -221,7 +221,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // 输入态：只清输入态（等价于 clear_composition），并记录 lastClearedText 供下滑撤回。
                         // 需在 clearInputStateForKeys() 之前记录（该函数会清空 preeditText/inputText）。
                         val pendingEnglish = candState.pendingEnglishText
-                        if (pendingEnglish.isNotEmpty()) {
+                        if (candState.isInlineAsciiActive) {
+                            service.lastClearedText = candState.inlineAsciiText
+                            clearInputStateForKeys()
+                        } else if (pendingEnglish.isNotEmpty()) {
                             // 直接上屏模式：英文编码已逐字落盘，"清输入态"需回删屏上对应字符；
                             // 校验光标前文本一致才删除并记录撤回，否则只清状态不动已上屏文本。
                             val removed = withContext(Dispatchers.Main) {
@@ -303,7 +306,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 "enter" -> {
                     service.calculatorEngine.clear()
                     updateCalculatorCandidates()
-                    if (candState.isComposing) {
+                    if (candState.isInlineAsciiActive) {
+                        val committed = service.asciiModeController.finishInlineAscii(commitText = true)
+                        if (!committed) {
+                            withContext(Dispatchers.Main) { performEditorEnterAction() }
+                        }
+                        needsUIUpdate = true
+                    } else if (candState.isComposing) {
                         // T9 模式提交完整预编辑（含 partial commit 累积），非 T9 模式用 RIME input。
                         val isT9 = isT9Schema(state.currentSchemaId)
                         val input = if (isT9 && candState.preeditText.isNotEmpty()) {
@@ -364,7 +373,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 "space" -> {
                     val pendingEnglish = candState.pendingEnglishText
 
-                    if (pendingEnglish.isNotEmpty()) {
+                    if (candState.isInlineAsciiActive) {
+                        appendInlineAscii(" ")
+                    } else if (pendingEnglish.isNotEmpty()) {
                         // 直接上屏模式：词已逐字落盘，此处只提交空格并结束本轮英文输入。
                         withContext(Dispatchers.Main) {
                             service.commitText(" ")
@@ -430,7 +441,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     }
                 }
                 "word_separator" -> {
-                    if (candState.isComposing || candState.inputText.isNotEmpty()) {
+                    if (candState.isInlineAsciiActive) {
+                        appendInlineAscii("'")
+                    } else if (candState.isComposing || candState.inputText.isNotEmpty()) {
                         val result = service.rimeEngine.processKeyAndGetResult(0x27, 0)
                         if (result.processed) {
                             sendTransformedResult(result)
@@ -457,11 +470,21 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // Number/CommonSymbol 内部切换由 KeyboardView 的 key handler 处理
                 }
                 "emoji" -> {
+                    if (candState.isInlineAsciiActive) {
+                        service.asciiModeController.finishInlineAscii(commitText = true)
+                    }
                     withContext(Dispatchers.Main) {
                         service.commitText("😊")
                     }
                 }
                 else -> {
+                    if (candState.isInlineAsciiActive) {
+                        val inlineChar = if (key == "space") " " else key
+                        if (InlineAsciiBuffer.append(candState.inlineAsciiText, inlineChar) != null) {
+                            appendInlineAscii(if (isShifted && inlineChar.length == 1) inlineChar.uppercase() else inlineChar)
+                            return@launch
+                        }
+                    }
                     val isNumberKeyboard = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number
                     val isCommonSymbolKeyboard = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.CommonSymbol
 
@@ -659,6 +682,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         withContext(Dispatchers.Main) { service.commitText(textToCommit) }
                     }
                     service.uiEventChannel.trySend {
+                        if (service.candidateState.value.isInlineAsciiActive) return@trySend
                         val pendingEnglish = service.candidateState.value.pendingEnglishText
                         val (filteredTexts, filteredComments) = if (capturedIsAscii) {
                             val filtered = capturedCandidates.filterNot { candidate ->
@@ -718,7 +742,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             val action = service.rimeEngine.getCurrentSchemaSwitchKeyAction(keyName)
                 ?.lowercase()
                 ?.trim()
-            if (action in setOf("commit_code", "commit_text", "inline_ascii")) {
+            if (action == "inline_ascii") {
+                service.asciiModeController.startInlineAscii()
+            } else if (action in setOf("commit_code", "commit_text")) {
                 dispatchAsciiSwitch(persist = true, switchAction = action)
             }
         }
@@ -839,6 +865,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             }
         } else when {
+            candState.isInlineAsciiActive -> {
+                val newText = InlineAsciiBuffer.deleteLast(candState.inlineAsciiText)
+                service.sessionController.updateInlineAscii(newText)
+            }
             // 1. 英文待处理文本：逐个删除字符，重新加载联想
             candState.pendingEnglishText.isNotEmpty() -> {
                 val newPending = candState.pendingEnglishText.dropLast(1)
@@ -1168,6 +1198,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             candState.inputText.isNotEmpty() ||
             candState.preeditText.isNotEmpty() ||
             candState.pendingEnglishText.isNotEmpty() ||
+            candState.isInlineAsciiActive ||
             service.t9PartialSegments.isNotEmpty()
 
     /**
@@ -1182,11 +1213,24 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         updateCalculatorCandidates()
         service.t9PartialSegments.clear()
         service.rimeEngine.clearComposition()
+        if (service.candidateState.value.isInlineAsciiActive) {
+            service.rimeEngine.setOption("ascii_mode", false)
+            withContext(Dispatchers.Main) {
+                service.uiState.value = service.uiState.value.copy(isAsciiMode = false)
+                service.keyboardViewModel.dispatch(
+                    com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
+                        false, service.rimeEngine.getCurrentSchema()
+                    )
+                )
+            }
+        }
         service.candidateState.value = service.candidateState.value.copy(
             candidates = emptyList(),
             candidateComments = emptyList(),
             associationCandidates = emptyList(),
             pendingEnglishText = "",
+            isInlineAsciiActive = false,
+            inlineAsciiText = "",
             inputText = "",
             preeditText = "",
             isComposing = false,
@@ -1203,6 +1247,30 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 t9RightCandidateSelectedCount = 0,
                 t9SelectedCandidatePinyin = ""
             )
+        }
+    }
+
+    private suspend fun appendInlineAscii(text: String) {
+        val current = service.candidateState.value
+        if (!current.isInlineAsciiActive) return
+        InlineAsciiBuffer.append(current.inlineAsciiText, text)?.let {
+            service.sessionController.updateInlineAscii(it)
+        }
+    }
+
+    private fun performEditorEnterAction() {
+        val imeOptions = service.currentInputEditorInfo?.imeOptions ?: 0
+        val action = imeOptions and EditorInfo.IME_MASK_ACTION
+        val noEnterAction = imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0
+        when {
+            noEnterAction -> service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+            action == EditorInfo.IME_ACTION_GO ||
+                action == EditorInfo.IME_ACTION_SEARCH ||
+                action == EditorInfo.IME_ACTION_SEND ||
+                action == EditorInfo.IME_ACTION_NEXT ||
+                action == EditorInfo.IME_ACTION_DONE ->
+                service.currentInputConnection?.performEditorAction(action)
+            else -> service.sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
         }
     }
 
