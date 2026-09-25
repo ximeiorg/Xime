@@ -72,6 +72,7 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
                 if (input.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
                         service.commitText(input)
+                        service.t9PartialSegments.clear()
                         service.candidateState.value = service.candidateState.value.copy(
                             inputText = "",
                             preeditText = "",
