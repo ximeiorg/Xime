@@ -2307,6 +2307,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private fun clearInputState() {
+        pendingHardwareCapsToggle = false
+        pendingHardwareShiftToggle = false
+        pendingHardwareCtrlToggle = false
+        hardwareModifierCombo = false
         val wasInlineAscii = candidateState.value.isInlineAsciiActive
         closeToolPanel()
         // 输入会话结束：关闭残留的面板页面（表情/符号等 overlay），
