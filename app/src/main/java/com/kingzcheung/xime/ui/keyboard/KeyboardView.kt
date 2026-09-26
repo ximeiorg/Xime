@@ -306,7 +306,7 @@ fun KeyboardView(
             }
             val candidateBarState = remember(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
-                cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
+                cs.associationCandidates, cs.pendingEnglishText, cs.isInlineAsciiActive, cs.inlineAsciiText, cs.isShowingRecentClipboard, cs.hasNextPage,
                 state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
                 railExpanded, cs.preeditCaretPos,
             ) {

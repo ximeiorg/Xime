@@ -36,12 +36,22 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
      * （部署/维护持锁时排队，完成后自动切换），不静默失败、不阻塞主线程。
      * 返回 false 仅表示引擎不可用（session 创建失败）。
      */
-    internal suspend fun switchAscii(reason: Reason): Boolean {
+    internal suspend fun switchAscii(
+        reason: Reason,
+        switchAction: String? = null,
+    ): Boolean {
+        if (service.candidateState.value.isInlineAsciiActive) {
+            // 普通切换结束临时英文态；commit_* 随后继续执行其原有切换语义。
+            finishInlineAscii(commitText = true)
+            if (switchAction == null) return true
+            return switchAscii(reason, switchAction)
+        }
         val candState = service.candidateState.value
         val pendingEnglish = candState.pendingEnglishText
+        val hardwareCommitCode = switchAction == "commit_code"
         FileLogger.i(
             XimeInputMethodService.TAG,
-            "switchAscii[$reason]: start, pendingEnglish='${if (pendingEnglish.isEmpty()) "-" else pendingEnglish}', " +
+            "switchAscii[$reason]: action=${switchAction ?: "ui"}, pendingEnglish='${if (pendingEnglish.isEmpty()) "-" else pendingEnglish}', " +
                 "isComposing=${candState.isComposing}, candidates=${candState.candidates.size}"
         )
         if (pendingEnglish.isNotEmpty()) {
@@ -54,16 +64,28 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
                 )
             }
         } else if (candState.isComposing) {
-            if (candState.candidates.isNotEmpty()) {
+            if (candState.candidates.isNotEmpty() && !hardwareCommitCode) {
                 service.keyRouter.selectCandidateAsync(0)
             } else {
+                // commit_code 按方案语义提交原始编码，不要误选候选词。
                 val input = candState.inputText
                 if (input.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
                         service.commitText(input)
+                        service.t9PartialSegments.clear()
+                        service.candidateState.value = service.candidateState.value.copy(
+                            inputText = "",
+                            preeditText = "",
+                            pendingEnglishText = "",
+                            candidates = emptyList(),
+                            candidateComments = emptyList(),
+                            associationCandidates = emptyList(),
+                            isComposing = false,
+                            candidateActions = emptyList()
+                        )
                     }
-                    service.rimeEngine.clearComposition()
                 }
+                service.rimeEngine.clearComposition()
             }
         }
         val t0 = System.nanoTime()
@@ -93,6 +115,130 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
             )
         }
         return true
+    }
+
+    /** 进入独立的 inline_ascii 临时英文编辑态。 */
+    internal suspend fun startInlineAscii(): Boolean {
+        val current = service.candidateState.value
+        if (current.isInlineAsciiActive) return true
+
+        if (current.pendingEnglishText.isNotEmpty()) {
+            withContext(Dispatchers.Main) {
+                service.candidateState.value = service.candidateState.value.copy(
+                    pendingEnglishText = "",
+                    associationCandidates = emptyList()
+                )
+            }
+        } else if (current.isComposing) {
+            if (current.candidates.isNotEmpty()) {
+                service.keyRouter.selectCandidateAsync(0)
+            } else if (current.inputText.isNotEmpty()) {
+                withContext(Dispatchers.Main) { service.commitText(current.inputText) }
+                service.rimeEngine.clearComposition()
+            }
+        }
+
+        withContext(Dispatchers.Main) {
+            service.candidateState.value = service.candidateState.value.copy(
+                isInlineAsciiActive = true,
+                inlineAsciiText = "",
+                inputText = "",
+                preeditText = "",
+                candidates = emptyList(),
+                candidateComments = emptyList(),
+                associationCandidates = emptyList(),
+                isComposing = false,
+                candidateActions = emptyList()
+            )
+        }
+        service.rimeEngine.clearComposition()
+        service.rimeEngine.setOption("ascii_mode", true)
+        syncAsciiUi(true)
+        return true
+    }
+
+    /** 结束 inline_ascii；返回结束前是否有暂存文本。 */
+    internal suspend fun finishInlineAscii(commitText: Boolean): Boolean {
+        val current = service.candidateState.value
+        if (!current.isInlineAsciiActive) return false
+        val text = current.inlineAsciiText
+        if (commitText && text.isNotEmpty()) {
+            withContext(Dispatchers.Main) { service.commitText(text) }
+        }
+        service.rimeEngine.clearComposition()
+        service.rimeEngine.setOption("ascii_mode", false)
+        withContext(Dispatchers.Main) {
+            service.endComposingInputBox()
+            service.candidateState.value = service.candidateState.value.copy(
+                isInlineAsciiActive = false,
+                inlineAsciiText = "",
+                inputText = "",
+                preeditText = "",
+                candidates = emptyList(),
+                candidateComments = emptyList(),
+                associationCandidates = emptyList(),
+                isComposing = false,
+                candidateActions = emptyList()
+            )
+        }
+        syncAsciiUi(false)
+        return text.isNotEmpty()
+    }
+
+    internal suspend fun cancelInlineAscii() {
+        finishInlineAscii(commitText = false)
+    }
+
+    internal fun cancelInlineAsciiForModeChange() {
+        val current = service.candidateState.value
+        if (!current.isInlineAsciiActive) return
+        service.rimeEngine.clearComposition()
+        service.rimeEngine.setOption("ascii_mode", false)
+        service.endComposingInputBox()
+        service.candidateState.value = current.copy(
+            isInlineAsciiActive = false,
+            inlineAsciiText = "",
+            inputText = "",
+            preeditText = "",
+            candidates = emptyList(),
+            candidateComments = emptyList(),
+            associationCandidates = emptyList(),
+            isComposing = false,
+            candidateActions = emptyList()
+        )
+        service.uiState.value = service.uiState.value.copy(isAsciiMode = false)
+    }
+
+    /** UI 模式切换回调在主线程同步调用，不能等待协程。 */
+    internal fun finishInlineAsciiForModeChange() {
+        val current = service.candidateState.value
+        if (!current.isInlineAsciiActive) return
+        if (current.inlineAsciiText.isNotEmpty()) service.commitText(current.inlineAsciiText)
+        service.rimeEngine.clearComposition()
+        service.rimeEngine.setOption("ascii_mode", false)
+        service.endComposingInputBox()
+        service.candidateState.value = service.candidateState.value.copy(
+            isInlineAsciiActive = false,
+            inlineAsciiText = "",
+            inputText = "",
+            preeditText = "",
+            candidates = emptyList(),
+            candidateComments = emptyList(),
+            associationCandidates = emptyList(),
+            isComposing = false,
+            candidateActions = emptyList()
+        )
+        service.uiState.value = service.uiState.value.copy(isAsciiMode = false)
+    }
+
+    private suspend fun syncAsciiUi(ascii: Boolean) {
+        withContext(Dispatchers.Main) {
+            service.uiState.value = service.uiState.value.copy(isAsciiMode = ascii)
+            val schemaId = service.rimeEngine.getCurrentSchema()
+            service.keyboardViewModel.dispatch(
+                com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(ascii, schemaId)
+            )
+        }
     }
 
     /**

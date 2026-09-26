@@ -929,7 +929,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 打开面板前清理宿主输入框残留输入态（未上屏的拼音/英文），
         // 避免旧组合混入面板输入、或面板关闭后覆盖宿主输入框中段文字。
         val pending = candidateState.value
-        if (pending.isComposing || pending.inputText.isNotEmpty() || pending.pendingEnglishText.isNotEmpty()) {
+        if (pending.isComposing || pending.inputText.isNotEmpty() || pending.pendingEnglishText.isNotEmpty() || pending.isInlineAsciiActive) {
+            if (pending.isInlineAsciiActive) {
+                asciiModeController.cancelInlineAsciiForModeChange()
+            }
             rimeEngine.clearComposition()
             endComposingInputBox()
             candidateState.value = candidateState.value.copy(
@@ -937,6 +940,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 candidateComments = emptyList(),
                 associationCandidates = emptyList(),
                 pendingEnglishText = "",
+                isInlineAsciiActive = false,
+                inlineAsciiText = "",
                 inputText = "",
                 candidateActions = emptyList(),
                 preeditText = "",
@@ -1691,9 +1696,88 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         }
     }
 
+    /** 读取当前方案为指定物理修饰键配置的 ascii_composer 动作。 */
+    private fun hardwareSwitchAction(keyCode: Int): String? {
+        val keyName = when (keyCode) {
+            KeyEvent.KEYCODE_CAPS_LOCK -> "Caps_Lock"
+            KeyEvent.KEYCODE_SHIFT_LEFT -> "Shift_L"
+            KeyEvent.KEYCODE_SHIFT_RIGHT -> "Shift_R"
+            KeyEvent.KEYCODE_CTRL_LEFT -> "Control_L"
+            KeyEvent.KEYCODE_CTRL_RIGHT -> "Control_R"
+            else -> return null
+        }
+        return rimeEngine.getCurrentSchemaSwitchKeyAction(keyName)
+            ?.lowercase()
+            ?.trim()
+    }
+
+    private fun isHardwareSwitchKeyConfigured(keyCode: Int): Boolean {
+        return hardwareSwitchAction(keyCode) in setOf(
+            "commit_code",
+            "commit_text",
+            "inline_ascii",
+        )
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val e = event ?: return super.onKeyDown(keyCode, event)
-        if (hasHardwareKeyboard && candidateState.value.candidates.isNotEmpty()) {
+        when (keyCode) {
+            KeyEvent.KEYCODE_CAPS_LOCK,
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT,
+            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> {
+                // Rime 方案未将该修饰键配置为 ascii_composer 切换键时，保持系统默认行为。
+                if (!isHardwareSwitchKeyConfigured(keyCode)) {
+                    return super.onKeyDown(keyCode, event)
+                }
+                when (keyCode) {
+                    KeyEvent.KEYCODE_CAPS_LOCK -> {
+                        if (pendingHardwareShiftToggle) {
+                            pendingHardwareShiftToggle = false
+                            hardwareModifierCombo = true
+                        } else if (pendingHardwareCtrlToggle) {
+                            pendingHardwareCtrlToggle = false
+                            hardwareModifierCombo = true
+                        } else {
+                            pendingHardwareCapsToggle = true
+                            hardwareModifierCombo = false
+                        }
+                    }
+                    KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> {
+                        if (pendingHardwareCtrlToggle || pendingHardwareCapsToggle) {
+                            pendingHardwareCapsToggle = false
+                            pendingHardwareCtrlToggle = false
+                            hardwareModifierCombo = true
+                        } else {
+                            pendingHardwareShiftToggle = true
+                            hardwareModifierCombo = false
+                        }
+                    }
+                    else -> {
+                        if (pendingHardwareShiftToggle || pendingHardwareCapsToggle) {
+                            pendingHardwareCapsToggle = false
+                            pendingHardwareShiftToggle = false
+                            hardwareModifierCombo = true
+                        } else {
+                            pendingHardwareCtrlToggle = true
+                            hardwareModifierCombo = false
+                        }
+                    }
+                }
+                return true
+            }
+        }
+        // Caps/Shift/Ctrl 参与了组合按键时不把其释放误判为独立切换；具体是否切换由当前方案配置决定。
+        if (pendingHardwareCapsToggle || pendingHardwareShiftToggle || pendingHardwareCtrlToggle) {
+            pendingHardwareCapsToggle = false
+            pendingHardwareShiftToggle = false
+            pendingHardwareCtrlToggle = false
+            hardwareModifierCombo = true
+        }
+        // Ctrl/Alt/Meta 组合键交还系统/编辑器（其是否用于切换由当前 Rime 方案决定）。
+        if (e.isCtrlPressed || e.isAltPressed || e.isMetaPressed) {
+            return super.onKeyDown(keyCode, event)
+        }
+        if (hasHardwareKeyboard && !e.isShiftPressed && candidateState.value.candidates.isNotEmpty()) {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (keyboardViewModel.candidatePageExpanded.value) {
@@ -1735,13 +1819,60 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 KeyEvent.KEYCODE_0 -> { keyRouter.selectCandidate(9); highlightIndex.intValue = 0; return true }
             }
         }
-        val isShifted = e.isShiftPressed
-        val key = keyCodeToKey(keyCode, isShifted)
+        // Caps Lock is an alphabetic modifier. Keep symbols unchanged and let
+        // Shift+Caps Lock produce lowercase letters, matching hardware keyboards.
+        val isCapsLockOn = (e.metaState and KeyEvent.META_CAPS_LOCK_ON) != 0
+        val isShifted = e.isShiftPressed.xor(
+            isCapsLockOn && keyCode in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z
+        )
+        val unicodeChar = e.getUnicodeChar(e.metaState)
+        val key = keyCodeToKey(keyCode, isShifted, unicodeChar)
         if (key != null) {
             keyRouter.handleKeyPress(key, isShifted)
             return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_CAPS_LOCK -> {
+                if (!pendingHardwareCapsToggle && !hardwareModifierCombo) {
+                    return super.onKeyUp(keyCode, event)
+                }
+                if (pendingHardwareCapsToggle && !hardwareModifierCombo) {
+                    keyRouter.handleHardwareSwitchKey("Caps_Lock")
+                }
+                pendingHardwareCapsToggle = false
+                hardwareModifierCombo = false
+                return true
+            }
+            KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> {
+                if (!pendingHardwareShiftToggle && !hardwareModifierCombo) {
+                    return super.onKeyUp(keyCode, event)
+                }
+                val keyName = if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT) "Shift_L" else "Shift_R"
+                if (pendingHardwareShiftToggle && !hardwareModifierCombo) {
+                    keyRouter.handleHardwareSwitchKey(keyName)
+                }
+                pendingHardwareShiftToggle = false
+                hardwareModifierCombo = false
+                return true
+            }
+            KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_CTRL_RIGHT -> {
+                if (!pendingHardwareCtrlToggle && !hardwareModifierCombo) {
+                    return super.onKeyUp(keyCode, event)
+                }
+                val keyName = if (keyCode == KeyEvent.KEYCODE_CTRL_LEFT) "Control_L" else "Control_R"
+                if (pendingHardwareCtrlToggle && !hardwareModifierCombo) {
+                    keyRouter.handleHardwareSwitchKey(keyName)
+                }
+                pendingHardwareCtrlToggle = false
+                hardwareModifierCombo = false
+                return true
+            }
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun sendKeyEvent(keyCode: Int) {
@@ -1976,6 +2107,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private val highlightIndex = mutableIntStateOf(0)
+    /** 单独按下 Caps/Shift/Ctrl 时切换中英文；与其他键组成快捷键时不触发切换。 */
+    private var pendingHardwareCapsToggle = false
+    private var pendingHardwareShiftToggle = false
+    private var pendingHardwareCtrlToggle = false
+    private var hardwareModifierCombo = false
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
@@ -2210,6 +2346,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
     
     private fun clearInputState() {
+        pendingHardwareCapsToggle = false
+        pendingHardwareShiftToggle = false
+        pendingHardwareCtrlToggle = false
+        hardwareModifierCombo = false
+        val wasInlineAscii = candidateState.value.isInlineAsciiActive
         closeToolPanel()
         // 输入会话结束：关闭残留的面板页面（表情/符号等 overlay），
         // 避免下次键盘弹出时在候选栏上方渲染上次的面板背景
@@ -2248,16 +2389,32 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             candidates = emptyList(),
             candidateComments = emptyList(),
             inputText = "",
+            preeditText = "",
             isComposing = false,
             isShowingRecentClipboard = false,
             associationCandidates = emptyList(),
             pendingEnglishText = "",
+            isInlineAsciiActive = false,
+            inlineAsciiText = "",
             hasNextPage = false,
             hasPrevPage = false,
             englishReplaceSupported = true,
             candidateActions = emptyList()
         )
         endComposingInputBox()
+        if (wasInlineAscii) {
+            uiState.value = uiState.value.copy(isAsciiMode = false)
+            if (RimeEngine.isInitialized()) {
+                keyboardViewModel.dispatch(
+                    com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
+                        false, rimeEngine.getCurrentSchema()
+                    )
+                )
+            }
+        }
+        if (RimeEngine.isInitialized() && rimeEngine.isAsciiMode()) {
+            rimeEngine.setOption("ascii_mode", false)
+        }
     }
 
     /**

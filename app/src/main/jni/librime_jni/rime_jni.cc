@@ -952,6 +952,25 @@ public:
         return value;
     }
 
+    // 读取部署后的全局 default.yaml（含 default.custom.yaml patch）字符串项。
+    std::string getDefaultConfigString(const char* key) {
+        if (!rime || !initialized_) {
+            LOGE("getDefaultConfigString: rime not initialized");
+            return "";
+        }
+        RimeConfig config;
+        if (!rime->config_open("default", &config)) {
+            return "";
+        }
+        std::string value;
+        const char* str = rime->config_get_cstring(&config, key);
+        if (str) {
+            value = str;
+        }
+        rime->config_close(&config);
+        return value;
+    }
+
     // 读取方案配置中的列表项（schema + custom.yaml patch 合并后的最终值）
     std::vector<std::string> getSchemaList(const char* schema_id, const char* key) {
         std::vector<std::string> items;
@@ -1928,6 +1947,20 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetSchemaString(
     }
     std::string value = Rime::Instance().getSchemaString(schema, key_ptr);
     env->ReleaseStringUTFChars(schema_id, schema);
+    env->ReleaseStringUTFChars(key, key_ptr);
+    return value.empty() ? nullptr : env->NewStringUTF(value.c_str());
+}
+
+// 读取部署后的全局 default.yaml（含 default.custom.yaml patch）字符串项
+JNIEXPORT jstring JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetDefaultConfigString(
+    JNIEnv* env,
+    jobject thiz,
+    jstring key
+) {
+    const char* key_ptr = env->GetStringUTFChars(key, nullptr);
+    if (!key_ptr) return nullptr;
+    std::string value = Rime::Instance().getDefaultConfigString(key_ptr);
     env->ReleaseStringUTFChars(key, key_ptr);
     return value.empty() ? nullptr : env->NewStringUTF(value.c_str());
 }

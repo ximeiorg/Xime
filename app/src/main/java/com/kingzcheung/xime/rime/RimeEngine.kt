@@ -606,6 +606,23 @@ class RimeEngine {
         return nativeGetSchemaString(schemaId, key)
     }
 
+    /**
+     * 读取当前活动方案的中英文切换键配置（schema + custom.yaml patch 合并后的最终值）。
+     * keyName 使用 Rime 配置名，如 Shift_L、Control_R；未配置时返回 null。
+     */
+    fun getCurrentSchemaSwitchKeyAction(keyName: String): String? {
+        if (!isInitialized || keyName.isBlank()) return null
+        return tryLocked(null) {
+            val schemaId = nativeGetCurrentSchema()?.takeIf { it.isNotBlank() }
+                ?: return@tryLocked null
+            // ascii_composer 通常来自 default.yaml；方案自身配置仍优先支持覆盖。
+            (nativeGetSchemaString(schemaId, "ascii_composer/switch_key/$keyName")
+                ?: nativeGetDefaultConfigString("ascii_composer/switch_key/$keyName"))
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+        }
+    }
+
     /** 读取方案配置列表项（librime 解析，含 custom.yaml patch 合并后的最终值）。 */
     fun getSchemaList(schemaId: String, key: String): List<String> {
         if (!isInitialized) return emptyList()
@@ -778,6 +795,7 @@ class RimeEngine {
     private external fun nativeGetAvailableSchemas(): Array<String>?
     private external fun nativeGetSchemaList(schemaId: String, key: String): Array<String>?
     private external fun nativeGetSchemaString(schemaId: String, key: String): String?
+    private external fun nativeGetDefaultConfigString(key: String): String?
     private external fun nativeGetUserConfigString(key: String): String?
     private external fun nativeGetUserConfigBool(key: String): Boolean
     private external fun nativeSetUserConfigString(key: String, value: String): Boolean

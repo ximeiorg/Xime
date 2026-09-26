@@ -20,11 +20,37 @@ import kotlinx.coroutines.withContext
  * 方案名称/开关刷新与切换、T9 切离提交等逻辑。共享状态通过 service 引用访问。
  */
 internal class ImeSessionController(private val service: XimeInputMethodService) {
+    internal suspend fun updateInlineAscii(text: String) {
+        withContext(Dispatchers.Main) {
+            service.candidateState.value = service.candidateState.value.copy(
+                inlineAsciiText = text,
+                inputText = text,
+                preeditText = text,
+                isComposing = text.isNotEmpty(),
+                candidates = emptyList(),
+                candidateComments = emptyList(),
+                associationCandidates = emptyList(),
+                candidateActions = emptyList(),
+                isShowingRecentClipboard = false,
+            )
+            service.pluginEvents.dispatchInputChanged(text)
+            if (SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
+                if (text.isNotEmpty()) {
+                    showInputBoxComposition(service.currentInputConnection, text)
+                } else {
+                    service.endComposingInputBox()
+                }
+            }
+        }
+    }
+
     internal fun applyComposition(
         composition: com.kingzcheung.xime.rime.RimeComposition,
         pluginActions: List<CandidateAction> = emptyList(),
         t9PluginInjections: List<T9CandidateInjection> = emptyList(),
     ) {
+        // Rime 的迟到结果不能覆盖 inline_ascii 的本地预编辑文本。
+        if (service.candidateState.value.isInlineAsciiActive) return
         val inputText = composition.input
         val codeInInputBox = SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX
         val preeditText = composition.preedit
@@ -233,6 +259,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         result: com.kingzcheung.xime.rime.RimeProcessResult,
         pluginActions: List<CandidateAction> = emptyList(),
     ) {
+        if (service.candidateState.value.isInlineAsciiActive) return
         val isAsciiMode = result.isAsciiMode
         val candidatesWithComments = result.candidates
 
