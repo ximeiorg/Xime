@@ -128,7 +128,7 @@ class JsAsrPluginTest {
             val runTask = mock.sentTexts[0]
             assertTrue("run-task 含 action", runTask.contains("\"action\":\"run-task\""))
             assertTrue("payload 含 task_group", runTask.contains("\"task_group\":\"audio\""))
-            assertTrue("payload 含 model", runTask.contains("\"model\":\"qwen-audio-3.0-asr-flash-streaming\""))
+            assertTrue("payload 含 model", runTask.contains("\"model\":\"qwen-audio-3.1-asr-flash-streaming\""))
             assertTrue("payload 含 function", runTask.contains("\"function\":\"recognition\""))
             assertTrue("payload 含 sample_rate", runTask.contains("\"sample_rate\":16000"))
 

@@ -11,11 +11,23 @@
 // 沙箱约束：无 URL/Intl；JSON.parse 非法输入抛异常，须 try/catch。
 // TS 范式：host.ws 为 async 服务（await；失败 throw XimeError，try/catch 后 emitError 上报）。
 
-const MODEL = 'qwen-audio-3.0-asr-flash-streaming';
 const WS_URL = 'wss://dashscope.aliyuncs.com/api-ws/v1/inference/';
 const SAMPLE_RATE = 16000;
 const FORMAT = 'pcm';
 const KEY_API_KEY = 'apiKey';
+const KEY_MODEL = 'model';
+const KEY_CUSTOM_MODEL = 'customModel';
+
+// 预设模型（百炼实时语音识别 WebSocket run-task 协议，与旧版 3.0 协议一致）：
+//   3.1 系列识别效果与价格均优于 3.0；streaming 为实时流式，message 为同类新模型。
+const MODEL_PRESETS = [
+  'qwen-audio-3.1-asr-flash-streaming',
+  'qwen-audio-3.1-asr-flash-message',
+  'qwen-audio-3.0-asr-flash-streaming',
+];
+const DEFAULT_MODEL = MODEL_PRESETS[0];
+// 下拉中的“自定义”哨兵值：选中后改用 customModel 字段填写的模型名
+const CUSTOM_MODEL = '自定义';
 
 let taskId = '';
 let audioReady = false;
@@ -25,7 +37,22 @@ let prebuffer: Uint8Array[] = [];
 
 function isConfigured(): boolean {
   const v = host.config.get(KEY_API_KEY);
-  return v !== null && v !== undefined && v !== '';
+  if (v === null || v === undefined || v === '') return false;
+  // 已选“自定义”但未填写模型名 → 视为未就绪，避免发出空 model 请求
+  if ((host.config.get(KEY_MODEL) || '') === CUSTOM_MODEL) {
+    return (host.config.get(KEY_CUSTOM_MODEL) || '').trim() !== '';
+  }
+  return true;
+}
+
+/** 解析当前生效模型：预设直用；选“自定义”时取 customModel；空/非法回退默认。 */
+function currentModel(): string {
+  const selected = host.config.get(KEY_MODEL) || '';
+  if (selected === CUSTOM_MODEL) {
+    const custom = (host.config.get(KEY_CUSTOM_MODEL) || '').trim();
+    return custom !== '' ? custom : DEFAULT_MODEL;
+  }
+  return MODEL_PRESETS.indexOf(selected) >= 0 ? selected : DEFAULT_MODEL;
 }
 
 function getSettingsSchema(): XimeUiNode[] {
@@ -36,6 +63,21 @@ function getSettingsSchema(): XimeUiNode[] {
       type: 'secret',
       placeholder: '输入阿里百炼 API Key',
       helpText: '访问阿里云百炼平台获取 API Key',
+    },
+    {
+      key: KEY_MODEL,
+      label: '识别模型',
+      type: 'select',
+      defaultValue: DEFAULT_MODEL,
+      options: MODEL_PRESETS.concat([CUSTOM_MODEL]),
+      helpText: '推荐 3.1 系列（比 3.0 更好用、更便宜）；选“自定义”后在下一项填写模型名',
+    },
+    {
+      key: KEY_CUSTOM_MODEL,
+      label: '自定义模型名',
+      type: 'text',
+      placeholder: '如 qwen-audio-3.1-asr-flash-streaming',
+      helpText: '仅“识别模型”选“自定义”时生效；填写百炼实时语音识别模型名',
     },
   ];
 }
@@ -159,7 +201,7 @@ async function sendRunTask(): Promise<void> {
         task_group: 'audio',
         task: 'asr',
         'function': 'recognition',
-        model: MODEL,
+        model: currentModel(),
         parameters: {
           format: FORMAT,
           sample_rate: SAMPLE_RATE,

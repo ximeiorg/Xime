@@ -12,7 +12,7 @@
   "description": "阿里百炼 FunAsr 在线语音识别，使用阿里云控制台获取的 API Key，可参考 快速入门（https://www.aliyun.com/product/bailian）",
 
   // 插件版本（字符串）
-  "version": "3.0.0",
+  "version": "3.1.0",
 
   // 插件分类：speech 语音识别（单选激活）
   "type": "speech",
