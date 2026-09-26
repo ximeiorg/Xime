@@ -209,13 +209,15 @@ fun SettingsScreen(
         composable(SettingsRoutes.ClipboardSync) {
             ClipboardSyncSettingsContent(
                 onBack = { navController.popBackStack() },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
+                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
+                onNavigateToMarket = { navController.navigate(SettingsRoutes.MarketPlugins) }
             )
         }
         composable(SettingsRoutes.Backup) {
             BackupSettingsContent(
                 onBack = { navController.popBackStack() },
-                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) }
+                onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
+                onNavigateToMarket = { navController.navigate(SettingsRoutes.MarketPlugins) }
             )
         }
         composable(SettingsRoutes.About) {
@@ -258,6 +260,26 @@ fun SettingsScreen(
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
                 initialTab = 1,
+            )
+        }
+        composable(SettingsRoutes.MarketPlugins) {
+            MarketHubContent(
+                onBack = { navController.popBackStack() },
+                onNavigateToDetail = { schemeId ->
+                    navController.navigate("schema_market_detail/$schemeId")
+                },
+                onNavigateToModelDetail = { modelId ->
+                    navController.navigate("model_market_detail/$modelId")
+                },
+                onNavigateToPluginDetail = { pluginId ->
+                    navController.navigate("plugin_market_detail/$pluginId")
+                },
+                onNavigateToLayoutDetail = { layoutId ->
+                    navController.navigate("layout_market_detail/$layoutId")
+                },
+                onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
+                onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
+                initialTab = 2,
             )
         }
         composable(SettingsRoutes.LogViewer) {

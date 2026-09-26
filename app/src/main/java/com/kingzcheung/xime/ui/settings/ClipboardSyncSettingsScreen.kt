@@ -40,7 +40,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ClipboardSyncSettingsContent(
     onBack: () -> Unit,
-    onNavigateToPlugins: () -> Unit
+    onNavigateToPlugins: () -> Unit,
+    onNavigateToMarket: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -123,7 +124,7 @@ fun ClipboardSyncSettingsContent(
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Text(
-                                    text = "未启用剪贴板同步插件，请先在插件中心启用后再配置。",
+                                    text = "未启用剪贴板同步插件，请先在插件管理启用后再配置。",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -131,7 +132,7 @@ fun ClipboardSyncSettingsContent(
                                     onClick = onNavigateToPlugins,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("前往插件中心")
+                                    Text("前往插件管理")
                                 }
                             }
                         }
@@ -148,15 +149,15 @@ fun ClipboardSyncSettingsContent(
                             ) {
                                 if (clipboardPlugins.isEmpty()) {
                                     Text(
-                                        text = "未安装剪贴板同步插件，请先在插件中心安装后再配置。",
+                                        text = "未安装剪贴板同步插件，请先在扩展商店安装后再配置。",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Button(
-                                        onClick = onNavigateToPlugins,
+                                        onClick = onNavigateToMarket,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("前往插件中心")
+                                        Text("前往扩展商店")
                                     }
                                 } else {
                                     clipboardPlugins.forEach { plugin ->
