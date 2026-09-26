@@ -589,6 +589,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         runBlocking(Dispatchers.IO) {
             KeysConfigHelper.loadConfig(this@XimeInputMethodService)
         }
+
+        // 引擎异步就绪前先以持久化方案填充 UI 状态：键盘首帧事件链（InputSessionStarted/
+        // AsciiModeChanged）即携带正确 schemaId 推导布局，避免弹出时先渲染全键盘、
+        // 引擎就绪后才切九键/笔画的闪烁。引擎实际方案随后由 updateSchemaName 权威覆盖
+        uiState.value = uiState.value.copy(
+            currentSchemaId = SettingsPreferences.getCurrentSchema(this)
+        )
         
         RimeEngine.setDeploymentCallback { isDeploying, message ->
             serviceScope.launch(Dispatchers.Main) {

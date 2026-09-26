@@ -774,7 +774,20 @@ object KeysConfigHelper {
         return config
     }
     
+    // 进程内配置缓存戳（xime.custom.yaml 的 mtime+size）：全量 YAML 解析真机实测可阻塞
+    // 主线程 ~1.8s，而输入法服务重建时配置通常未变。内置 xime.yaml 随 APK 更新（进程重启）
+    // 天然失效；外部改动 custom 文件经 mtime 感知穿透；解析失败不缓存下次重试。
+    private var _loadedCustomStamp: Pair<Long, Long>? = null
+
     private fun loadXimeConfig(context: Context) {
+        val customFile = File(context.filesDir, "rime/$XIME_CUSTOM_CONFIG_FILE")
+        val customStamp = if (customFile.exists()) {
+            customFile.lastModified() to customFile.length()
+        } else {
+            0L to 0L
+        }
+        if (_loadedCustomStamp == customStamp) return
+        _loadedCustomStamp = customStamp
         try {
             // 键盘手势（从原始 YAML 手动解析）
             val parsed = parseKeyboardFromAssets(context)
@@ -839,6 +852,7 @@ object KeysConfigHelper {
             }
             _configVersion.value++
         } catch (e: Exception) {
+            _loadedCustomStamp = null
             Log.w(TAG, "Failed to load xime config", e)
         }
     }

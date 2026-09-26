@@ -660,7 +660,7 @@ keyboard:
   # schemas 声明使用九键布局的方案，未声明的方案一律全键盘；
   # 第三方九键方案在 xime.custom.yaml 的 t9.schemas 追加即可，无需改代码。
   t9:
-    schemas: [t9_pinyin, t9, wanxiang_t9]
+    schemas: [t9_pinyin, t9, wanxiang_t9, rime_frost_t9]
     # ── 布局（三列结构，可完全自定义；未配置时为以下内置默认，与历史布局一致）──
     # left：左列（自上而下）。candidates = 拼音候选面板占位（候选态显示音节，
     #   空闲态显示下方 side_symbols）；也可放功能键或自定义键。
