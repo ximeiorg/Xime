@@ -23,7 +23,11 @@ data class RimeComposition(
     val candidates: Array<RimeCandidate>,
     val hasNextPage: Boolean,
     val hasPrevPage: Boolean,
-    val isAsciiMode: Boolean
+    val isAsciiMode: Boolean,
+    /** native 快照：组合内光标（raw input 字符偏移）。当前显示层由宿主编辑光标驱动，此字段仅随快照返回。 */
+    val caretPos: Int = 0,
+    /** native 快照：preedit 中的光标（UTF-8 字节偏移）。 */
+    val preeditCursorPos: Int = 0,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -34,7 +38,9 @@ data class RimeComposition(
                 candidates.contentEquals(other.candidates) &&
                 hasNextPage == other.hasNextPage &&
                 hasPrevPage == other.hasPrevPage &&
-                isAsciiMode == other.isAsciiMode
+                isAsciiMode == other.isAsciiMode &&
+                caretPos == other.caretPos &&
+                preeditCursorPos == other.preeditCursorPos
     }
 
     override fun hashCode(): Int {
@@ -45,6 +51,8 @@ data class RimeComposition(
         result = 31 * result + hasNextPage.hashCode()
         result = 31 * result + hasPrevPage.hashCode()
         result = 31 * result + isAsciiMode.hashCode()
+        result = 31 * result + caretPos
+        result = 31 * result + preeditCursorPos
         return result
     }
 }
@@ -68,6 +76,10 @@ data class RimeProcessResult(
      * 由 JNI 一次计算，避免 Kotlin 侧重复取数。
      */
     val t9SyllableOptions: String = "",
+    /** native 快照：组合内光标（raw input 字符偏移）。当前显示层由宿主编辑光标驱动，此字段仅随快照返回。 */
+    val caretPos: Int = 0,
+    /** native 快照：preedit 中的光标（UTF-8 字节偏移）。 */
+    val preeditCursorPos: Int = 0,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -81,7 +93,9 @@ data class RimeProcessResult(
                 hasNextPage == other.hasNextPage &&
                 hasPrevPage == other.hasPrevPage &&
                 t9PanelState == other.t9PanelState &&
-                t9SyllableOptions == other.t9SyllableOptions
+                t9SyllableOptions == other.t9SyllableOptions &&
+                caretPos == other.caretPos &&
+                preeditCursorPos == other.preeditCursorPos
     }
 
     override fun hashCode(): Int {
@@ -95,6 +109,8 @@ data class RimeProcessResult(
         result = 31 * result + hasPrevPage.hashCode()
         result = 31 * result + t9PanelState.hashCode()
         result = 31 * result + t9SyllableOptions.hashCode()
+        result = 31 * result + caretPos
+        result = 31 * result + preeditCursorPos
         return result
     }
 }
@@ -109,6 +125,8 @@ fun RimeProcessResult.toComposition(): RimeComposition {
         hasNextPage = hasNextPage,
         hasPrevPage = hasPrevPage,
         isAsciiMode = isAsciiMode,
+        caretPos = caretPos,
+        preeditCursorPos = preeditCursorPos,
     )
 }
 

@@ -259,6 +259,9 @@ fun CandidateBar(
         mutableStateOf((state as? CandidateBarState.ChineseCandidates)?.preeditText
             ?: (state as? CandidateBarState.ChineseCandidates)?.inputText ?: "")
     }
+    var preeditBubbleCaret by remember(state) {
+        mutableStateOf((state as? CandidateBarState.ChineseCandidates)?.preeditCaretPos ?: -1)
+    }
     val showPreeditBubble = showInputTextRow && preeditBubbleText.isNotEmpty() && !showInputBoxStyle
 
     Column(
@@ -267,6 +270,7 @@ fun CandidateBar(
             .height(44.dp)
             .drawPreeditBubble(
                 text = preeditBubbleText,
+                caretOffset = preeditBubbleCaret,
                 enabled = showPreeditBubble,
                 bubbleColor = visuals.backgroundColor,
                 textColor = visuals.textColor
@@ -321,6 +325,7 @@ fun CandidateBar(
         // 编码显示已改为候选栏顶部的悬浮气泡（drawBehind 绘制，见 drawPreeditBubble），
         // 栏内不再为编码保留布局空间——打字态与联想态的候选行共用同一垂直位置。
         preeditBubbleText = displayText
+        preeditBubbleCaret = (state as? CandidateBarState.ChineseCandidates)?.preeditCaretPos ?: -1
 
         Row(
             modifier = Modifier
@@ -703,7 +708,8 @@ private fun Modifier.drawPreeditBubble(
     text: String,
     enabled: Boolean,
     bubbleColor: Color,
-    textColor: Color
+    textColor: Color,
+    caretOffset: Int = -1
 ): Modifier = composed {
     val density = LocalDensity.current
     val cornerRadiusPx = with(density) { 4.dp.toPx() }
@@ -712,6 +718,7 @@ private fun Modifier.drawPreeditBubble(
     val bubbleBottomGapPx = with(density) { 2.dp.toPx() }
     val screenMarginPx = with(density) { 4.dp.toPx() }
     val textSizePx = with(density) { 12.sp.toPx() }
+    val caretWidthPx = with(density) { 1.5.dp.toPx() }
 
     // 气泡基色：优先用传入的主题背景色；其为全透明（CandidateBarVisuals 传
     // Color.Transparent，真实背景由外层绘制）时按候选文字亮度推导，
@@ -764,6 +771,20 @@ private fun Modifier.drawPreeditBubble(
         drawIntoCanvas { composeCanvas ->
             val baselineY = top + (bubbleHeight - (fontMetrics.ascent + fontMetrics.descent)) / 2f
             composeCanvas.nativeCanvas.drawText(text, clampedLeft + horizontalPaddingPx, baselineY, bubbleTextPaint)
+        }
+
+        // 编码编辑光标：caret 在中间（offset < 文本长度）时在对应字符边界画竖线；
+        // 末尾/未知（-1）不画——默认打字态光标恒在编码末尾，保持观感不变
+        if (caretOffset in 0 until text.length) {
+            val caretCharIndex = caretOffset.coerceIn(0, text.length)
+            val caretX = clampedLeft + horizontalPaddingPx +
+                bubbleTextPaint.measureText(text, 0, caretCharIndex)
+            drawLine(
+                color = textColor,
+                start = Offset(caretX, top + verticalPaddingPx),
+                end = Offset(caretX, top + bubbleHeight - verticalPaddingPx),
+                strokeWidth = caretWidthPx
+            )
         }
     }
 }

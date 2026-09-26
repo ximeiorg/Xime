@@ -11,6 +11,8 @@ sealed interface CandidateBarState {
         val preeditText: String = "",
         val hasMore: Boolean = false,
         val associationCandidates: List<String> = emptyList(),
+        /** 编码显示串中的光标偏移（字符，-1 = 末尾/不适用），编码编辑光标可视化用。 */
+        val preeditCaretPos: Int = -1,
     ) : CandidateBarState
 
     data class AssociationOnly(
@@ -48,6 +50,7 @@ sealed interface CandidateBarState {
             isShowingRecentClipboard: Boolean,
             hasNextPage: Boolean,
             isCalculatorActive: Boolean = false,
+            preeditCaretPos: Int = -1,
         ): CandidateBarState {
             val hasCandidates = candidates.isNotEmpty()
             val hasAssociations = associationCandidates.isNotEmpty()
@@ -65,6 +68,7 @@ sealed interface CandidateBarState {
                         preeditText = preeditText,
                         hasMore = hasCandidates && hasNextPage,
                         associationCandidates = associationCandidates,
+                        preeditCaretPos = preeditCaretPos,
                     )
                 !isComposing && !hasInput && hasAssociations && !hasCandidates ->
                     AssociationOnly(
@@ -78,6 +82,7 @@ sealed interface CandidateBarState {
                         inputText = inputText,
                         preeditText = preeditText,
                         hasMore = hasCandidates && hasNextPage,
+                        preeditCaretPos = preeditCaretPos,
                     )
                 else -> Idle
             }

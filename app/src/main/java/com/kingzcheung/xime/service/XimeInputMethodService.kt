@@ -265,6 +265,19 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal var lastClearedText: String = ""
     /** 累积的 partial commit 段列表（多段选词场景下逐段追加，文本+拼音同源，供调频/回滚） */
     internal val t9PartialSegments = mutableListOf<T9PartialSegment>()
+    /**
+     * 组合态编码编辑光标（raw input 字符偏移，-1 = 位于末尾/非编辑态）。
+     * 仅全键盘（非 T9）使用：滑动移动此位置，退格/字母键在编辑态由宿主直接改
+     * 编码串后 setInput 整串重建——librime caret 恒在编码末尾，候选始终针对
+     * 整个编码转换，编辑位置只影响插入/删除点。
+     * 主线程（滑动）写、key-processing 线程（编辑拦截）读写，人手操作天然串行。
+     */
+    @Volatile
+    internal var editingCaretPos: Int = -1
+    /** 编辑态建立时的编码快照：displayCaretOffset 比对检测非编辑路径的编码变化
+     *  （Shift+字母清组合、选词、外部清空等），不一致即复位编辑态（失同步自愈）。 */
+    @Volatile
+    internal var editingCaretInput: String = ""
     /** 键盘回调引用，用于在 RIME selectCandidate 前同步通知 T9 控制器 */
     internal var keyboardCallbacks: KeyboardCallbacks? = null
     internal var isChineseMode = true

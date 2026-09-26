@@ -308,7 +308,7 @@ fun KeyboardView(
                 cs.candidates, cs.candidateComments, cs.inputText, cs.preeditText, cs.isComposing,
                 cs.associationCandidates, cs.pendingEnglishText, cs.isShowingRecentClipboard, cs.hasNextPage,
                 state.isCalculatorMode, handwritingCandidates, handwritingComments, showHandwritingCandidates,
-                railExpanded,
+                railExpanded, cs.preeditCaretPos,
             ) {
                 if (showHandwritingCandidates) {
                     CandidateBarState.AssociationOnly(
@@ -331,6 +331,7 @@ fun KeyboardView(
                         isShowingRecentClipboard = cs.isShowingRecentClipboard,
                         hasNextPage = cs.hasNextPage,
                         isCalculatorActive = state.isCalculatorMode,
+                        preeditCaretPos = cs.preeditCaretPos,
                     )
                 }
             }

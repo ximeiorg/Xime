@@ -210,37 +210,44 @@ internal fun rememberImeKeyboardCallbacks(
             },
             onRequestExpandedCandidates = { service.refreshExpandedCandidates() },
             onCursorMove = { direction ->
-                val ic = service.currentInputConnection
-                if (ic != null && direction != 0) {
-                    if (SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX &&
-                        service.candidateState.value.isComposing
+                if (direction != 0) {
+                    if (service.candidateState.value.isComposing &&
+                        !isT9Schema(service.uiState.value.currentSchemaId)
                     ) {
-                        // 输入框模式：移动光标前先结束 composing 并清空 RIME 组成，
-                        // 避免再次输入时 composing 区域与光标位置错乱
-                        ic.finishComposingText()
-                        service.keyRouter.postRimeJob {
-                            service.rimeEngine.clearComposition()
-                            withContext(Dispatchers.Main) {
-                                service.mainHandler.post { service.updateUI() }
+                        // 组合态（仅全键盘）：滑动 = 移动编码编辑光标。光标由宿主维护、
+                        // 仅是插入/删除位置——librime caret 恒在编码末尾，候选始终针对
+                        // 整个编码转换；编辑操作（退格/字母）由路由层按此位置拦截处理。
+                        // 上屏（空闲态）后滑动走下方编辑器光标逻辑
+                        val input = service.rimeEngine.getInput()
+                        if (input.isNotEmpty()) {
+                            val base = if (service.editingCaretPos < 0) input.length else service.editingCaretPos
+                            val target = (base + direction).coerceIn(0, input.length)
+                            service.editingCaretPos = if (target >= input.length) -1 else target
+                            // 编码快照供 displayCaretOffset 失同步自愈比对
+                            service.editingCaretInput = if (service.editingCaretPos >= 0) input else ""
+                            service.updateUI()
+                        }
+                    } else {
+                        val ic = service.currentInputConnection
+                        if (ic != null) {
+                            var movedBySelection = false
+                            try {
+                                val req = android.view.inputmethod.ExtractedTextRequest()
+                                val extracted = ic.getExtractedText(req, 0)
+                                if (extracted != null && extracted.selectionStart >= 0) {
+                                    val newPos = (extracted.selectionStart + direction)
+                                        .coerceIn(0, extracted.text?.length ?: 0)
+                                    ic.setSelection(newPos, newPos)
+                                    movedBySelection = true
+                                }
+                            } catch (_: Exception) {}
+                            if (!movedBySelection) {
+                                val keyCode = if (direction < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+                                repeat(abs(direction)) {
+                                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                                }
                             }
-                        }
-                    }
-                    var movedBySelection = false
-                    try {
-                        val req = android.view.inputmethod.ExtractedTextRequest()
-                        val extracted = ic.getExtractedText(req, 0)
-                        if (extracted != null && extracted.selectionStart >= 0) {
-                            val newPos = (extracted.selectionStart + direction)
-                                .coerceIn(0, extracted.text?.length ?: 0)
-                            ic.setSelection(newPos, newPos)
-                            movedBySelection = true
-                        }
-                    } catch (_: Exception) {}
-                    if (!movedBySelection) {
-                        val keyCode = if (direction < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
-                        repeat(abs(direction)) {
-                            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-                            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
                         }
                     }
                 }

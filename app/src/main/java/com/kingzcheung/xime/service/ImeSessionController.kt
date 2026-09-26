@@ -132,7 +132,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             hasNextPage = hasNextPage,
             hasPrevPage = hasPrevPage,
             // 候选词变换映射（全键盘 pluginActions / T9 平行 actions；防御空）
-            candidateActions = if (isT9Schema) t9CandidateActions else pluginActions
+            candidateActions = if (isT9Schema) t9CandidateActions else pluginActions,
+            preeditCaretPos = displayCaretOffset(displayText, inputText)
         )
         if (isAsciiMode != service.uiState.value.isAsciiMode) {
             FileLogger.i(XimeInputMethodService.TAG, "applyComposition: ascii ${service.uiState.value.isAsciiMode}->$isAsciiMode")
@@ -159,7 +160,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (codeInInputBox && !service.uiState.value.toolPanelInputFocused) {
             val ic = service.currentInputConnection
             if (isComposing && displayText.isNotEmpty()) {
-                showInputBoxComposition(ic, displayText)
+                showInputBoxComposition(ic, displayText, preeditCaretOffsetForInputBox(displayText))
             } else {
                 service.endComposingInputBox()
             }
@@ -167,18 +168,65 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
     }
 
     /** 在输入框模式向编辑器写入编码文本。 */
-    private fun showInputBoxComposition(ic: android.view.inputmethod.InputConnection, displayText: String) {
-        // 第二参数为 1：光标相对编码起始偏移 1 个字符，使光标落在编码末尾，
-        // 避免传 displayText.length 时被 AOSP 钳制到整段文本末尾（光标跑到最右边）。
+    private fun showInputBoxComposition(
+        ic: android.view.inputmethod.InputConnection,
+        displayText: String,
+        caretOffset: Int = -1,
+    ) {
+        // 第二参数：末尾/未知时传 1（光标紧跟编码末尾，避免传 displayText.length 时被 AOSP
+        // 钳制到整段文本末尾）；编码编辑态（caret 在中间）传 offset+1，光标落在编码
+        // 第 offset 个字符之后。
         // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
         // 否则该调用会在光标处插入空串，光标处有选中文字时等于删除选区。
         service.markInputBoxComposing()
         ic.beginBatchEdit()
         try {
-            ic.setComposingText(displayText, 1)
+            val cursorArg = if (caretOffset < 0 || caretOffset >= displayText.length) 1 else caretOffset + 1
+            ic.setComposingText(displayText, cursorArg)
         } finally {
             ic.endBatchEdit()
         }
+    }
+
+    /** 取刚组装进 candidateState 的显示光标偏移（输入框 composing 光标用）。 */
+    private fun preeditCaretOffsetForInputBox(displayText: String): Int {
+        return service.candidateState.value.preeditCaretPos.takeIf { displayText.isNotEmpty() } ?: -1
+    }
+
+    /**
+     * 计算编码显示串中的光标偏移（字符，-1 = 末尾/非编辑态）。
+     *
+     * 编辑光标由宿主维护（service.editingCaretPos，相对 raw input）；librime caret
+     * 恒在编码末尾，引擎返回的光标信息不反映编辑位置。此处把 raw 偏移映射到显示串：
+     * 逐字符对应、跳过音节分隔符（' 或空格）——全拼的音节分隔回显可精确对应；
+     * 显示格式差异大的方案（双拼展开等）仅影响竖线视觉位置，编辑位置仍按 raw input。
+     *
+     * 失同步自愈：编码为空、光标越界，或编码与编辑态快照不一致（Shift+字母清组合、
+     * 选词、外部 clearComposition 等非编辑路径改动过编码）时复位编辑态，
+     * 防止残留位置导致竖线错位或编辑拦截在错误位置删除/插入。
+     */
+    private fun displayCaretOffset(displayText: String, inputText: String): Int {
+        val editingCaret = service.editingCaretPos
+        if (editingCaret < 0 || inputText.isEmpty() || displayText.isEmpty() ||
+            editingCaret >= inputText.length || service.editingCaretInput != inputText
+        ) {
+            service.editingCaretPos = -1
+            service.editingCaretInput = ""
+            return -1
+        }
+        if (displayText == inputText) return editingCaret
+        var raw = 0
+        var disp = 0
+        while (disp < displayText.length && raw < editingCaret) {
+            val ch = displayText[disp]
+            if (ch == '\'' || ch == ' ') {
+                disp++
+                continue
+            }
+            raw++
+            disp++
+        }
+        return if (disp >= displayText.length) -1 else disp
     }
 
     internal fun updateUIWithResult(
@@ -253,7 +301,8 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
             hasNextPage = result.hasNextPage,
             hasPrevPage = result.hasPrevPage,
             // 候选词变换映射（T9 不接入变换，防御清空；ascii 时调用方不产生 actions）
-            candidateActions = if (isT9Schema) emptyList() else pluginActions
+            candidateActions = if (isT9Schema) emptyList() else pluginActions,
+            preeditCaretPos = displayCaretOffset(displayText, result.inputText)
         )
         service.uiState.value = service.uiState.value.copy(isAsciiMode = isAsciiMode)
         // 展开态时刷新跨页全量候选并重置页码（编码已变化）
@@ -279,7 +328,7 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         if (SettingsPreferences.getInputTextLocation(service) == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
             val ic = service.currentInputConnection
             if (isComposing && displayText.isNotEmpty()) {
-                showInputBoxComposition(ic, displayText)
+                showInputBoxComposition(ic, displayText, preeditCaretOffsetForInputBox(displayText))
             } else {
                 service.endComposingInputBox()
             }

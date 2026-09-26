@@ -64,6 +64,9 @@ struct ProcessResult {
     std::string committedText;
     std::string inputText;
     std::string preeditText;
+    // raw input 内的光标位置（字符）；preedit 中的光标位置（UTF-8 字节偏移）
+    int caretPos = 0;
+    int preeditCursorPos = 0;
     std::vector<std::pair<std::string, std::string>> candidates;
     bool isAsciiMode = false;
     bool hasNextPage = false;
@@ -77,6 +80,9 @@ struct ProcessResult {
 struct CompositionResult {
     std::string input;
     std::string preedit;
+    // raw input 内的光标位置（字符）；preedit 中的光标位置（UTF-8 字节偏移）
+    int caretPos = 0;
+    int preeditCursorPos = 0;
     std::string committedText;
     std::vector<std::pair<std::string, std::string>> candidates;
     bool isAsciiMode = false;
@@ -237,6 +243,8 @@ public:
         result.inputText = input ? input : "";
         result.preeditText = context.composition.preedit ?
             context.composition.preedit : "";
+        result.caretPos = static_cast<int>(rime->get_caret_pos(session_id_));
+        result.preeditCursorPos = context.composition.cursor_pos;
         LOGI("readCurrentState: input='%s' preedit='%s' num_candidates=%d", result.inputText.c_str(), result.preeditText.c_str(), context.menu.num_candidates);
         if (context.menu.num_candidates > 0) {
             for (int i = 0; i < context.menu.num_candidates; ++i) {
@@ -323,6 +331,7 @@ public:
         // 1. raw input
         const char* input = rime->get_input(session_id_);
         result.input = input ? input : "";
+        result.caretPos = static_cast<int>(rime->get_caret_pos(session_id_));
 
         // 2. context: preedit + candidates + pagination
         RIME_STRUCT(RimeContext, context);
@@ -330,6 +339,7 @@ public:
             if (context.composition.preedit) {
                 result.preedit = context.composition.preedit;
             }
+            result.preeditCursorPos = context.composition.cursor_pos;
             LOGI("getComposition: input='%s' num_candidates=%d", result.input.c_str(), context.menu.num_candidates);
             for (int i = 0; i < context.menu.num_candidates; ++i) {
                 const char* text = context.menu.candidates[i].text;
@@ -1056,14 +1066,14 @@ static void ensureJniCache(JNIEnv* env) {
         jclass cls = env->FindClass("com/kingzcheung/xime/rime/RimeProcessResult");
         gRimeProcessResultClass = (jclass)env->NewGlobalRef(cls);
         gRimeProcessResultCtor = env->GetMethodID(gRimeProcessResultClass, "<init>",
-            "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;[Lcom/kingzcheung/xime/rime/RimeCandidate;ZZZLjava/lang/String;Ljava/lang/String;)V");
+            "(ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;[Lcom/kingzcheung/xime/rime/RimeCandidate;ZZZLjava/lang/String;Ljava/lang/String;II)V");
         env->DeleteLocalRef(cls);
     }
     if (!gRimeCompositionClass) {
         jclass cls = env->FindClass("com/kingzcheung/xime/rime/RimeComposition");
         gRimeCompositionClass = (jclass)env->NewGlobalRef(cls);
         gRimeCompositionCtor = env->GetMethodID(gRimeCompositionClass, "<init>",
-            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Lcom/kingzcheung/xime/rime/RimeCandidate;ZZZ)V");
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;[Lcom/kingzcheung/xime/rime/RimeCandidate;ZZZII)V");
         env->DeleteLocalRef(cls);
     }
 }
@@ -1201,7 +1211,9 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeProcessKeyAndGetResult(
         result.hasNextPage ? JNI_TRUE : JNI_FALSE,
         result.hasPrevPage ? JNI_TRUE : JNI_FALSE,
         jT9Panel,
-        jT9Options);
+        jT9Options,
+        result.caretPos,
+        result.preeditCursorPos);
 
     env->DeleteLocalRef(jCommitted);
     env->DeleteLocalRef(jInput);
@@ -1252,7 +1264,9 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetProcessResult(
         result.hasNextPage ? JNI_TRUE : JNI_FALSE,
         result.hasPrevPage ? JNI_TRUE : JNI_FALSE,
         jT9Panel,
-        jT9Options);
+        jT9Options,
+        result.caretPos,
+        result.preeditCursorPos);
 
     env->DeleteLocalRef(jCommitted);
     env->DeleteLocalRef(jInput);
@@ -1316,7 +1330,9 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetComposition(
         candidateArray,
         result.hasNextPage ? JNI_TRUE : JNI_FALSE,
         result.hasPrevPage ? JNI_TRUE : JNI_FALSE,
-        result.isAsciiMode ? JNI_TRUE : JNI_FALSE);
+        result.isAsciiMode ? JNI_TRUE : JNI_FALSE,
+        result.caretPos,
+        result.preeditCursorPos);
 
     env->DeleteLocalRef(jInput);
     env->DeleteLocalRef(jPreedit);

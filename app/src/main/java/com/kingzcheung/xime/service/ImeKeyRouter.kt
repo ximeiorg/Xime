@@ -564,7 +564,25 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         } else {
                             // 注：T9 数字键不经过此处（T9KeyboardLayout 直接调
                             // controller.onDigitPressed → applyComposition）。
-                            val result = service.rimeEngine.processKeyAndGetResult(keyCode, mask)
+                            // 编码编辑态：宿主把字母插入光标处并 setInput 整串重建——
+                            // librime caret 恒在编码末尾，候选始终针对整个编码转换。
+                            val editingCaret = service.editingCaretPos
+                            val editingInput = if (editingCaret >= 0) service.rimeEngine.getInput() else ""
+                            if (!state.isAsciiMode && candState.isComposing && !isShifted &&
+                                editingCaret in 0..editingInput.length && editingInput.isNotEmpty()
+                            ) {
+                                val ch = key.lowercase()[0]
+                                val newInput = editingInput.substring(0, editingCaret) + ch +
+                                    editingInput.substring(editingCaret)
+                                service.editingCaretPos = editingCaret + 1
+                                service.editingCaretInput = newInput
+                                service.rimeEngine.setInput(newInput)
+                                sendTransformedResult(service.rimeEngine.getProcessResult(true)) {
+                                    if (service.calculatorEngine.isActive()) updateCalculatorCandidates()
+                                }
+                                return@launch
+                            } else {
+                                val result = service.rimeEngine.processKeyAndGetResult(keyCode, mask)
                             if (result.processed) {
                                 if (isShiftedChinese && result.committedText != char) {
                                     service.rimeEngine.clearComposition()
@@ -620,6 +638,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     committedText = candidateText + char
                                     needsUIUpdate = true
                                 }
+                            }
                             }
                         }
                     }
@@ -865,31 +884,48 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
 
             // 2. Rime 编码中：让 Rime 处理退格，更新候选
             candState.isComposing || candState.inputText.isNotEmpty() -> {
-                service.rimeEngine.processKey(0xff08, 0)
-                val result = service.rimeEngine.getProcessResult(true)
-                if (result.inputText.isEmpty()) {
-                    service.rimeEngine.clearComposition()
-                    // T9 部分提交：剩余编码删完后，已上屏/ composing 的部分候选词无法用
-                    // RIME 退格删除，会一直卡在候选栏。这里撤销最近一次部分提交：
-                    // 清空 composing 区域（或删除上屏文本）并从累积列表移除。
-                    if (service.t9PartialSegments.isNotEmpty()) {
-                        val len = service.t9PartialSegments.last().text.length
-                        withContext(Dispatchers.Main) {
-                            if (SettingsPreferences.getInputTextLocation(service)
-                                == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
-                                service.endComposingInputBox()
-                            } else {
-                                service.deleteBeforeCursor(len)
+                val editingCaret = service.editingCaretPos
+                val editingInput = if (editingCaret > 0) service.rimeEngine.getInput() else ""
+                if (editingCaret > 0 && editingInput.length >= editingCaret) {
+                    // 编码编辑态：宿主删除光标前字符并 setInput 整串重建——librime caret
+                    // 恒在编码末尾，候选始终针对整个编码转换（光标只是编辑位置）
+                    val newInput = editingInput.removeRange(editingCaret - 1, editingCaret)
+                    service.editingCaretPos = if (newInput.isEmpty()) -1 else editingCaret - 1
+                    service.editingCaretInput = newInput
+                    service.rimeEngine.setInput(newInput)
+                    val result = service.rimeEngine.getProcessResult(true)
+                    if (result.inputText.isEmpty()) {
+                        service.rimeEngine.clearComposition()
+                        service.editingCaretPos = -1
+                    }
+                    sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
+                } else {
+                    service.rimeEngine.processKey(0xff08, 0)
+                    val result = service.rimeEngine.getProcessResult(true)
+                    if (result.inputText.isEmpty()) {
+                        service.rimeEngine.clearComposition()
+                        // T9 部分提交：剩余编码删完后，已上屏/ composing 的部分候选词无法用
+                        // RIME 退格删除，会一直卡在候选栏。这里撤销最近一次部分提交：
+                        // 清空 composing 区域（或删除上屏文本）并从累积列表移除。
+                        if (service.t9PartialSegments.isNotEmpty()) {
+                            val len = service.t9PartialSegments.last().text.length
+                            withContext(Dispatchers.Main) {
+                                if (SettingsPreferences.getInputTextLocation(service)
+                                    == SettingsPreferences.INPUT_TEXT_INPUT_BOX) {
+                                    service.endComposingInputBox()
+                                } else {
+                                    service.deleteBeforeCursor(len)
+                                }
+                            }
+                            // undo 联动：撤销段时回滚用户词典调频。
+                            val undone = service.t9PartialSegments.removeLastOrNull()
+                            if (undone != null) {
+                                service.rimeEngine.t9Forget(undone.text, undone.pinyin)
                             }
                         }
-                        // undo 联动：撤销段时回滚用户词典调频。
-                        val undone = service.t9PartialSegments.removeLastOrNull()
-                        if (undone != null) {
-                            service.rimeEngine.t9Forget(undone.text, undone.pinyin)
-                        }
                     }
+                    sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                 }
-                sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
             }
 
             // 3. 联想词或剪贴板：仅清空候选栏，不回删已上屏字符
@@ -1060,6 +1096,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             withContext(Dispatchers.Main) {
                 service.commitText(fullCommitText)
                 service.t9PartialSegments.clear()
+                // 编码已随候选整串上屏：退出编码编辑态（光标复位到末尾语义）
+                service.editingCaretPos = -1
+                service.editingCaretInput = ""
                 service.candidateState.value = service.candidateState.value.copy(
                     inputText = "",
                     preeditText = "",
@@ -1101,6 +1140,10 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     // 否则与 refreshOnBackground 竞争 rimeLock，空数据覆盖候选栏。
                     service.keyboardCallbacks?.onT9ForceSendToRime?.invoke()
                 } else {
+                    // 非 T9 非 full commit（确认段未覆盖全部输入）：选词动作已结束
+                    // 编辑会话，复位编码编辑态（displayCaretOffset 亦会失同步自愈兜底）
+                    service.editingCaretPos = -1
+                    service.editingCaretInput = ""
                     service.updateUI()
                 }
             }
