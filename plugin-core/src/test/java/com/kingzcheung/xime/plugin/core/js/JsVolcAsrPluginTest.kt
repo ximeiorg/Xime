@@ -47,7 +47,18 @@ class JsVolcAsrPluginTest {
         var hostListener: WsHostListener? = null
         var closed = false
 
+        /**
+         * 建立独立 mock 会话并清除上一会话的关闭标记。
+         *
+         * Args:
+         *   url: 新会话地址。
+         *   headers: 鉴权与资源请求头。
+         *   listener: 新会话事件回调。
+         * Returns:
+         *   已登记连接请求时为 true。
+         */
         override fun connect(url: String, headers: Map<String, String>, listener: WsHostListener): Boolean {
+            closed = false
             connectedUrl = url
             connectedHeaders = headers
             hostListener = listener
@@ -194,6 +205,7 @@ class JsVolcAsrPluginTest {
 
             // audioReady 后音频直发（0x2, POS_SEQUENCE, raw, gzip）
             runtime.callAsync("speech.feed", byteArrayOf(1, 2, 3, 4))
+            awaitUntil { mock.sentBinaries.size == 2 }
             assertEquals("audioReady 后直发音频帧", 2, mock.sentBinaries.size)
             val audio = mock.sentBinaries[1]
             assertEquals("音频帧消息类型 0x2", (0x2 shl 4) or 0x1, audio[1].toInt() and 0xFF)
@@ -208,6 +220,13 @@ class JsVolcAsrPluginTest {
             assertEquals("partial 结果", "你好", collector.partialText)
             assertTrue("partial 不应关闭连接", !mock.closed)
 
+            // stop 在当前会话仍存活时发送末包，随后才接收服务端 final。
+            runtime.callAsync("speech.stop")
+            awaitUntil { mock.sentBinaries.size == 3 }
+            val last = mock.sentBinaries.last()
+            assertEquals("最后一包 flags=0x3", (0x2 shl 4) or 0x3, last[1].toInt() and 0xFF)
+            assertTrue("最后一包 seq 应为负", readInt32(last, 4) < 0)
+
             // final 结果（flags=0x3 带 seq + 末包）→ emitFinal 并关闭连接
             mock.hostListener?.onBinary(serverResp("""{"result":{"text":"你好世界"}}""", flags = 0x3))
             awaitUntil { collector.finalText == "你好世界" }
@@ -215,19 +234,23 @@ class JsVolcAsrPluginTest {
             awaitUntil { mock.closed }
             assertTrue("final 后应关闭连接", mock.closed)
 
-            // 服务端错误帧 → emitError
+            // 服务端错误帧属于独立的新会话，配置发送完成后再注入错误。
+            collector.error = null
+            val sentBeforeReconnect = mock.sentBinaries.size
+            assertTrue("错误测试的新会话应能启动", runtime.callAsync("speech.start") == true)
+            assertFalse("新连接应重置 closed 标记", mock.closed)
+            mock.hostListener?.onOpen()
+            awaitUntil { mock.sentBinaries.size == sentBeforeReconnect + 1 }
+            assertEquals(
+                "错误会话应先发送 full client request",
+                (0x1 shl 4) or 0x1,
+                mock.sentBinaries.last()[1].toInt() and 0xFF
+            )
             mock.hostListener?.onBinary(serverError(45000001, "auth failed"))
             awaitUntil { (collector.error ?: "").contains("45000001") }
             assertTrue("错误应上报", (collector.error ?: "").contains("45000001"))
-
-            // stop → 发送最后一包标记（flags=0x3 NEG_WITH_SEQUENCE，seq 取负）
-            mock.hostListener?.onOpen()
-            mock.sentBinaries.clear()
-            runtime.callAsync("speech.stop")
-            awaitUntil { mock.sentBinaries.isNotEmpty() }
-            val last = mock.sentBinaries.last()
-            assertEquals("最后一包 flags=0x3", (0x2 shl 4) or 0x3, last[1].toInt() and 0xFF)
-            assertTrue("最后一包 seq 应为负", readInt32(last, 4) < 0)
+            awaitUntil { mock.closed }
+            assertTrue("服务端错误后应关闭新会话", mock.closed)
         } finally {
             runtime.close()
         }
