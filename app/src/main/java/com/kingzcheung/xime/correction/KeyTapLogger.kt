@@ -84,50 +84,21 @@ object KeyTapLogger {
                 put("d", density)
             }
         }
-        // 影子模式/智能纠错（独立开关）：字母键喂几何模型
-        if ((CorrectorShadow.enabled || CorrectorShadow.active) && key.length == 1) {
+        // 邻键纠错（librime 插件版）：把按键几何作为先验送入插件（off 用同口径）
+        if (CorrectionPriors.enabled && key.length == 1) {
             val ch = key[0].lowercaseChar()
-            if (ch in 'a'..'z' && kb.width > 0f && kb.height > 0f &&
-                buttonBounds.width > 0f && buttonBounds.height > 0f
-            ) {
-                val tapX = buttonBounds.left + localX
-                val tapY = buttonBounds.top + localY
-                val cx = buttonBounds.left + buttonBounds.width / 2f
-                val cy = buttonBounds.top + buttonBounds.height / 2f
-                CorrectorShadow.onTapLetter(
+            if (ch in 'a'..'z') {
+                val hasGeom = kb.width > 0f && kb.height > 0f &&
+                    buttonBounds.width > 0f && buttonBounds.height > 0f
+                val offX = if (hasGeom) (localX - buttonBounds.width / 2f) / buttonBounds.width else null
+                val offY = if (hasGeom) (localY - buttonBounds.height / 2f) / buttonBounds.height else null
+                CorrectionPriors.onTapLetter(
                     pressedIdx = ch - 'a',
-                    x = (tapX - kb.left) / kb.width,
-                    y = (tapY - kb.top) / kb.height,
-                    offX = (tapX - cx) / buttonBounds.width,
-                    offY = (tapY - cy) / buttonBounds.height,
+                    offXValue = offX,
+                    offYValue = offY,
                     schema = runCatching { schemaProvider?.invoke() ?: "" }.getOrDefault(""),
                 )
             }
-        }
-    }
-
-    /** 影子记录：模型对某个字母键"会改成什么" + 解码判定（不改行为）。schema 由公共字段 `s` 携带。 */
-    fun recordShadow(
-        pressed: String,
-        top: String,
-        probs: String,
-        offX: Float,
-        offY: Float,
-        act: Boolean,
-        dec: String,
-        sIn: Float,
-        sOut: Float,
-    ) {
-        write("shadow") {
-            put("pressed", pressed)
-            put("top", top)
-            put("probs", probs)
-            put("ox", offX)
-            put("oy", offY)
-            put("act", act)
-            if (dec.isNotEmpty()) put("dec", dec)
-            put("sin", sIn)
-            if (sOut.isFinite()) put("sout", sOut)
         }
     }
 
@@ -158,7 +129,7 @@ object KeyTapLogger {
 
     /** 记录一次退格（`input` 为退格前输入串，`pendingEnglish` 为英文待上屏文本）。 */
     fun recordDelete(input: String, pendingEnglish: String) {
-        CorrectorShadow.reset()  // 退格改变编码边界：清影子上下文，避免跨码污染
+        CorrectionPriors.clear()  // 邻键纠错：退格后按键序列与编码不再对应，先验作废
         if (!enabled) return
         write("del") {
             put("in", input.take(MAX_TEXT))
@@ -168,7 +139,7 @@ object KeyTapLogger {
 
     /** 记录一次上屏。 */
     fun recordCommit(text: String, isPaste: Boolean) {
-        CorrectorShadow.reset()  // 上屏后编码重新开始：清影子上下文
+        CorrectionPriors.clear()  // 邻键纠错：上屏后按键序列重新开始
         if (!enabled || text.isEmpty()) return
         write("commit") {
             put("tx", text.take(256))

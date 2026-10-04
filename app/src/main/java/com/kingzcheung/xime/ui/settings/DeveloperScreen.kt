@@ -31,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.kingzcheung.xime.correction.CorrectorShadow
 import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.settings.SettingsPreferences
 
@@ -51,9 +50,6 @@ fun DeveloperContent(
     }
     var keyTapLogEnabled by remember {
         mutableStateOf(SettingsPreferences.isKeyTapLogEnabled(context))
-    }
-    var correctorShadowEnabled by remember {
-        mutableStateOf(SettingsPreferences.isCorrectorShadowEnabled(context))
     }
 
     Scaffold(
@@ -160,40 +156,6 @@ fun DeveloperContent(
                         Text(
                             text = "开启后记录每次按键的触摸坐标到本地日志，用于训练相邻键纠错模型。" +
                                 "不上传、不含输入内容，日志位于 files/logs/key_tap.jsonl。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 72.dp, end = 16.dp, top = 2.dp, bottom = 12.dp)
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = 72.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                        )
-                        SettingsItem(
-                            icon = Icons.Default.Code,
-                            title = "纠错模型影子模式",
-                            onClick = {},
-                            trailing = {
-                                Switch(
-                                    checked = correctorShadowEnabled,
-                                    onCheckedChange = { enabled ->
-                                        correctorShadowEnabled = enabled
-                                        SettingsPreferences.setCorrectorShadowEnabled(context, enabled)
-                                        if (enabled) CorrectorShadow.init(context)
-                                        CorrectorShadow.enabled = enabled
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            if (enabled) "已开启：只记录模型「会怎么改」，不改输入"
-                                            else "已关闭",
-                                            android.widget.Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                )
-                            }
-                        )
-                        Text(
-                            text = "影子模式：每次字母按键跑一次几何模型，仅把「模型会怎么改 + 置信度」记到 " +
-                                "files/logs/key_tap.jsonl（e=shadow），不影响候选与上屏。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 72.dp, end = 16.dp, top = 2.dp, bottom = 12.dp)

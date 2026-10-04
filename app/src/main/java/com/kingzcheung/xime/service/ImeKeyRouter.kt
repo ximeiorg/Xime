@@ -4,7 +4,8 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import com.kingzcheung.xime.association.AssociationManager
-import com.kingzcheung.xime.correction.CorrectorShadow
+import com.kingzcheung.xime.service.CandidateAction
+import com.kingzcheung.xime.correction.CorrectionPriors
 import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.rime.RimeCandidate
@@ -26,6 +27,11 @@ import kotlinx.coroutines.withContext
  * 所有共享状态通过 service 引用访问（同模块 internal 成员）。
  */
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
+    private companion object {
+        /** 纠错插件产出候选的标注（correction_translator 的 SimpleCandidate comment）。 */
+        const val CORRECTION_COMMENT = "纠错"
+    }
+
 
     /**
      * 候选词变换（hotPath 插件能力）+ 发送 UI 更新。
@@ -43,27 +49,44 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             result.candidates.map { it.text to it.comment }
         )
 
-        // 智能纠错：把判定出的修正词条（Rime 旁路出词）作为辅助候选并入候选栏末尾
-        // （plugin 动作 = 点击直接上屏并清空引擎组合）。原候选顺序与索引不动，用户不选即无感。
+        // 邻键误触纠错：把按键几何先验与当前组合编码对齐后送入 librime 插件
+        // （候选生成/打分/出词/排序都在插件内完成，用同一份词典与用户词典）。
+        // 编码为空/不一致时清空先验，插件拿不到对齐先验会直接返回空 → 结构性不误纠。
+        CorrectionPriors.syncWithComposition(result.inputText)
+
+        // 纠错候选升位：引擎把纠错候选排在末尾（插件 quality=-1000），展示层把它提到
+        // 首选之后（二选起）。语义：首选必须留给正常候选（无法确认用户真的按错了），
+        // 但纠错埋到几十名开外就失去了意义。
         val baseCandidates = transformed?.candidates ?: result.candidates.toList()
-        val corrections = CorrectorShadow.correctionsFor(result.inputText, result.isAsciiMode)
-            .filter { c -> baseCandidates.none { it.text == c.text } }
-        val finalCandidates = if (corrections.isEmpty()) baseCandidates
-            else baseCandidates + corrections.map { RimeCandidate(it.text, it.comment) }
-        val finalActions = if (corrections.isEmpty()) {
-            transformed?.actions ?: emptyList()
-        } else {
-            (transformed?.actions ?: baseCandidates.indices.map { CandidateAction.engine(it) })
-                .toMutableList().apply { corrections.forEach { c -> add(CandidateAction.plugin(c.text)) } }
-        }
+        val baseActions = transformed?.actions ?: emptyList()
+        val promoted = promoteCorrectionCandidates(baseCandidates, baseActions)
 
         service.uiEventChannel.trySend {
             service.sessionController.updateUIWithResult(
-                result.copy(candidates = finalCandidates.toTypedArray()),
-                finalActions
+                result.copy(candidates = (promoted?.first?.toList() ?: baseCandidates).toTypedArray()),
+                promoted?.second ?: baseActions
             )
             if (afterUpdate != null) afterUpdate()
         }
+    }
+
+    /**
+     * 把带「纠错」标注的候选整体插到首个正常候选之后；其余正常候选顺延。
+     * 动作列表逐位映射回引擎原始索引（actions 为空 = 引擎语义即位置索引）。
+     * 仅当正常候选与纠错候选同时存在时才重排；空码救回（只有纠错候选）保持原样。
+     */
+    private fun promoteCorrectionCandidates(
+        candidates: List<RimeCandidate>,
+        actions: List<CandidateAction>,
+    ): Pair<Array<RimeCandidate>, List<CandidateAction>>? {
+        val correctionIdx = candidates.indices.filter { candidates[it].comment == CORRECTION_COMMENT }
+        if (correctionIdx.isEmpty()) return null
+        val normalIdx = candidates.indices.filter { candidates[it].comment != CORRECTION_COMMENT }
+        if (normalIdx.isEmpty()) return null
+        val order = listOf(normalIdx.first()) + correctionIdx + normalIdx.drop(1)
+        val newCandidates = order.map { candidates[it] }.toTypedArray()
+        val newActions = order.map { if (actions.isEmpty()) CandidateAction.engine(it) else actions[it] }
+        return newCandidates to newActions
     }
 
     internal fun handleKeyPress(key: String, isShifted: Boolean) {

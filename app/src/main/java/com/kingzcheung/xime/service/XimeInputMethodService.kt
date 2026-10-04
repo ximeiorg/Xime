@@ -99,7 +99,6 @@ import com.kingzcheung.xime.rime.buildT9DisplayState
 import com.kingzcheung.xime.rime.RimeCandidate
 import com.kingzcheung.xime.rime.resolveRimeCandidateIndex
 
-import com.kingzcheung.xime.correction.CorrectorShadow
 import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.settings.SchemaConfigHelper
 import com.kingzcheung.xime.settings.SchemaManager
@@ -367,24 +366,16 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
             return
         }
         val perfT0 = android.os.SystemClock.elapsedRealtime()
+        // 纠错候选由 librime 插件（correction_translator）直接产出并参与引擎排序，
+        // 展开页只需拉取引擎的跨页全量候选，不再在 Kotlin 侧合成候选。
         val all = rimeEngine.getAllCandidates().toList()
-        // 智能纠错候选并入展开页末尾（只读缓存，避免在主线程查 Rime）；原引擎候选
-        // 全局索引 0..n-1 不变，纠错项接在其后并用 plugin 动作标记来源。
-        val corrections = CorrectorShadow.cachedCorrections(
-            candidateState.value.inputText, uiState.value.isAsciiMode
-        ).filter { c -> all.none { it.text == c.text } }
-        val merged = if (corrections.isEmpty()) all
-            else all + corrections.map { RimeCandidate(it.text, it.comment) }
-        val actions = if (corrections.isEmpty()) emptyList()
-            else all.indices.map { CandidateAction.engine(it) } +
-                corrections.map { CandidateAction.plugin(it.text) }
         candidateState.value = candidateState.value.copy(
-            expandedCandidates = merged,
-            expandedActions = actions
+            expandedCandidates = all,
+            expandedActions = emptyList()
         )
         android.util.Log.d(
             "CandidatePerf",
-            "refreshExpandedCandidates: count=${merged.size} cost=${android.os.SystemClock.elapsedRealtime() - perfT0}ms"
+            "refreshExpandedCandidates: count=${all.size} cost=${android.os.SystemClock.elapsedRealtime() - perfT0}ms"
         )
     }
 

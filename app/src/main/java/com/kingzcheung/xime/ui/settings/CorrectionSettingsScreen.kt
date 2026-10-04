@@ -25,7 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.kingzcheung.xime.correction.CorrectorShadow
+import com.kingzcheung.xime.correction.CorrectionPriors
 import com.kingzcheung.xime.settings.SettingsPreferences
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,7 +72,8 @@ fun CorrectionSettingsContent(onBack: () -> Unit) {
                         onCheckedChange = {
                             enabled = it
                             SettingsPreferences.setCorrectorEnabled(context, it)
-                            CorrectorShadow.active = it
+                            // 插件版：开/关先验推送器（立即生效，无需重启）
+                            CorrectionPriors.enabled = it
                         }
                     )
                 })
@@ -82,12 +83,12 @@ fun CorrectionSettingsContent(onBack: () -> Unit) {
                 SettingsSection(title = "说明", content = {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "• 目前支持「五笔86」「五笔拼音」方案，仅在你刚按下的那个键可能按错时给出纠正。",
+                            text = "• 默认支持「五笔86」「五笔拼音」：对整条编码做邻键误触解码，任一位按偏都可能被纠正。其他五笔方案可在 rime/xime.custom.yaml 的 correction.schemas 中追加（与内置列表合并）。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "• 纠正候选会附加在候选栏末尾，标注「纠错」，点选即上屏纠正后的词。",
+                            text = "• 纠正候选标注「纠错」，排在原有候选之后（不抢占正常候选），点选即上屏纠正后的词。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)

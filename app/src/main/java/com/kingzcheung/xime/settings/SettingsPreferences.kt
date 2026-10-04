@@ -21,7 +21,6 @@ object SettingsPreferences {
     /** 按键坐标日志开关（相邻键纠错数据采集，默认关闭）。 */
     private const val KEY_KEY_TAP_LOG = "key_tap_log"
     /** 纠错模型影子模式（只记录"会怎么改"，不改行为，默认关闭）。 */
-    private const val KEY_CORRECTOR_SHADOW = "corrector_shadow"
 
     private const val KEY_CORRECTOR_ENABLED = "corrector_enabled"
     
@@ -265,15 +264,6 @@ object SettingsPreferences {
 
     fun setKeyTapLogEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_KEY_TAP_LOG, enabled).apply()
-    }
-
-    /** 纠错模型影子模式，默认关闭。 */
-    fun isCorrectorShadowEnabled(context: Context): Boolean {
-        return getPrefs(context).getBoolean(KEY_CORRECTOR_SHADOW, false)
-    }
-
-    fun setCorrectorShadowEnabled(context: Context, enabled: Boolean) {
-        getPrefs(context).edit().putBoolean(KEY_CORRECTOR_SHADOW, enabled).apply()
     }
 
     /** 智能纠错（相邻键纠错候选，默认关闭）。 */

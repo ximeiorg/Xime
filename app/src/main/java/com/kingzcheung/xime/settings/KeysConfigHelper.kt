@@ -789,6 +789,45 @@ object KeysConfigHelper {
     // 天然失效；外部改动 custom 文件经 mtime 感知穿透；解析失败不缓存下次重试。
     private var _loadedCustomStamp: Pair<Long, Long>? = null
 
+    // 纠错绑定列表及其缓存戳（correction.schemas，独立于全量解析——该查询在按键
+    // 热路径调用，只解析顶层一个列表，开销远小于 loadXimeConfig 全量解析）。
+    private var _correctionSchemas: Set<String> = emptySet()
+    private var _correctionSchemasStamp: Pair<Long, Long>? = null
+
+    /**
+     * 启用邻键误触纠错的方案 id 集合（xime.yaml 顶层 correction.schemas，
+     * xime.custom.yaml 同路径追加，与内置取并集）。解析失败/未配置时为空集。
+     */
+    fun correctionSchemas(context: Context): Set<String> {
+        val customFile = File(context.filesDir, "rime/$XIME_CUSTOM_CONFIG_FILE")
+        val stamp = if (customFile.exists()) {
+            customFile.lastModified() to customFile.length()
+        } else {
+            0L to 0L
+        }
+        if (_correctionSchemasStamp == stamp) return _correctionSchemas
+        _correctionSchemasStamp = stamp
+        val builtIn = readAssetText(context, XIME_CONFIG_FILE)
+            ?.let { parseTopLevelSchemasYamlText(it, "correction") } ?: emptySet()
+        val custom = readCustomText(context)
+            ?.let { parseTopLevelSchemasYamlText(it, "correction") } ?: emptySet()
+        _correctionSchemas = builtIn + custom
+        return _correctionSchemas
+    }
+
+    /** 从 YAML 文本提取顶层 `<section>.schemas` 列表（如 correction.schemas）。 */
+    internal fun parseTopLevelSchemasYamlText(yamlText: String, section: String): Set<String> {
+        return try {
+            val root = yaml.parseToYamlNode(yamlText) as? YamlMap ?: return emptySet()
+            val sectionNode = root.opt<YamlMap>(section) ?: return emptySet()
+            val schemas = sectionNode.opt<YamlList>("schemas") ?: return emptySet()
+            schemas.items.mapNotNull { (it as? YamlScalar)?.content?.trim()?.takeIf(String::isNotEmpty) }.toSet()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse $section schemas", e)
+            emptySet()
+        }
+    }
+
     private fun loadXimeConfig(context: Context) {
         val customFile = File(context.filesDir, "rime/$XIME_CUSTOM_CONFIG_FILE")
         val customStamp = if (customFile.exists()) {

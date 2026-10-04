@@ -182,6 +182,10 @@ object FileLogger {
         }
     }
     
+    /** 纠错插件（C++ 侧）内部日志的落盘路径；kime_ 前缀使其纳入轮转/清理与日志查看器。 */
+    fun correctionSinkPath(): String =
+        logsDir?.let { File(it, "kime_correction.log").absolutePath } ?: ""
+
     fun getCurrentLogFile(): File? = logFile
     
     fun getAllLogFiles(): List<File> {

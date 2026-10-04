@@ -217,19 +217,6 @@ target_link_libraries(handwriting_jni
 
 target_link_options(handwriting_jni PRIVATE "-Wl,-z,max-page-size=16384")
 
-# 相邻键纠错几何模型（独立 C++ 前向，无第三方依赖）
-add_library(jiucuo_corrector SHARED
-    jiucuo/corrector.cpp
-    jiucuo/corrector_jni.cpp
-)
-target_include_directories(jiucuo_corrector PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/jiucuo
-)
-target_link_libraries(jiucuo_corrector
-    log
-)
-target_link_options(jiucuo_corrector PRIVATE "-Wl,-z,max-page-size=16384")
-
 # 离线语音识别（zipformer2）：已集成进主版本，始终编译
 set(ASR_SRC_DIR "${CMAKE_SOURCE_DIR}")
 set(KNF_ROOT "${ASR_SRC_DIR}/third_party/knf")

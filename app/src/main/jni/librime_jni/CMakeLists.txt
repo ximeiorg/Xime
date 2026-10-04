@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.18.0)
 # librime JNI 库
 add_library(rime_jni SHARED
     rime_jni.cc
+    correction_jni.cc
 )
 
 # 日志开关：Debug 构建保留 verbose 日志（支持运行时切换），
@@ -19,6 +20,7 @@ target_include_directories(rime_jni PRIVATE
     ${CMAKE_SOURCE_DIR}/librime/src
     ${CMAKE_BINARY_DIR}/librime/src
     ${CMAKE_SOURCE_DIR}/librime-t9/src
+    ${CMAKE_SOURCE_DIR}/librime-correction/src
 )
 
 # 链接 librime 和其他依赖库

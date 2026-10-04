@@ -827,6 +827,14 @@ class RimeEngine {
             } catch (_: Throwable) {
                 // 单个方案补丁失败不阻断引擎初始化
             }
+            // 邻键误触纠错：把 correction_translator 注入配置声明的方案
+            // （xime.yaml correction.schemas，含 xime.custom.yaml 扩展；幂等，未声明跳过）
+            try {
+                if (com.kingzcheung.xime.correction.CorrectionPriors.isCorrectionSchema(schemaId)) {
+                    com.kingzcheung.xime.correction.CorrectionNative.ensureSchemaPatch(schemaId, userDataDir)
+                }
+            } catch (_: Throwable) {
+            }
         }
     }
     private external fun nativeStartMaintenance(full: Boolean): Boolean
