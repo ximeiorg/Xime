@@ -90,6 +90,8 @@ object CorrectionPriors {
             FileLogger.e(TAG, "channel model unavailable")
             return false
         }
+        // 语言分与出词均来自各方案自己的 rime 词典（wubi86 词典已补 weight 列），
+        // 无独立码表资产。
         FileLogger.i(TAG, "channel=$modelPath")
         CorrectionNative.setModelPaths(modelPath)
         CorrectionNative.setEnabled(true)

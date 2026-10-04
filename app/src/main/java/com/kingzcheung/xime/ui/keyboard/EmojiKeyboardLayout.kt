@@ -87,13 +87,14 @@ fun EmojiKeyboardLayout(
     val pluginCategories = allCategories.filter { it.isPlugin }
     val builtinCategories = allCategories.filter { !it.isPlugin }
 
-    // 最近使用（LRU）：作为内置分区的第一个子分类页。该页内点按不重排 UI（保持位置稳定），
-    // 只有其它分类页点按 emoji 时才记录使用并置顶，切入最近使用页即为最新顺序。
-    var recentEmojis by remember {
-        mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_EMOJIS))
+    // 最近使用（LRU）：惰性排序——面板打开期间点按任何 emoji 只持久化使用记录，
+    // 不重排当前 UI（最近使用页位置稳定，便于连续输入）；面板关闭后组合状态丢弃，
+    // 下次打开重新读取持久化结果，即为最新顺序。
+    val recentEmojis = remember {
+        RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_EMOJIS)
     }
     val recentCategory = EmojiCategory(name = "最近使用", icon = "🕘", emojis = recentEmojis)
-    val displayBuiltinCategories = remember(builtinCategories, recentEmojis) {
+    val displayBuiltinCategories = remember(builtinCategories) {
         listOf(recentCategory) + builtinCategories
     }
 
@@ -387,13 +388,12 @@ fun EmojiKeyboardLayout(
                                 EmojiButton(
                                     emoji = emoji,
                                     onClick = {
-                                        // 最近使用页（第 0 页）内的点按不参与排序：保持位置稳定，
-                                        // 便于在同一位置连续输入；仅其它分类页点按才记录使用并置顶。
-                                        if (pageIndex != 0) {
-                                            recentEmojis = RecentUsageStore.record(
-                                                context, RecentUsageStore.KEY_RECENT_EMOJIS, emoji
-                                            )
-                                        }
+                                        // 惰性排序：任何页（含最近使用页）点按都只持久化使用记录、
+                                        // 不重排当前 UI（最近使用页位置稳定，便于连续输入）；
+                                        // 面板关闭后下次打开重新读取 store，即为最新顺序。
+                                        RecentUsageStore.record(
+                                            context, RecentUsageStore.KEY_RECENT_EMOJIS, emoji
+                                        )
                                         onEmojiSelect(emoji)
                                     },
                                     modifier = Modifier.weight(1f)

@@ -30,10 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,12 +59,13 @@ fun SymbolKeyboardLayout(
     onHapticFeedback: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    // 最近使用（LRU）：作为第一个分类页。该页内点按不重排 UI（保持位置稳定，便于连续输入同一符号）；
-    // 只有在其它分类页点按符号时才记录使用并置顶，切入最近使用页即为最新顺序。
-    var recentSymbols by remember {
-        mutableStateOf(RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_SYMBOLS))
+    // 最近使用（LRU）：惰性排序——面板打开期间点按任何符号只持久化使用记录，
+    // 不重排当前 UI（最近使用页位置稳定，便于连续输入同一符号）；面板关闭后
+    // 组合状态丢弃，下次打开重新读取持久化结果，即为最新顺序。
+    val recentSymbols = remember {
+        RecentUsageStore.get(context, RecentUsageStore.KEY_RECENT_SYMBOLS)
     }
-    val displayCategories = remember(recentSymbols) {
+    val displayCategories = remember {
         listOf(SymbolCategory(name = "最近使用", id = "recentSymbols", symbols = recentSymbols)) +
             SymbolData.categories
     }
@@ -164,14 +163,12 @@ fun SymbolKeyboardLayout(
                                 SymbolButton(
                                     symbol = symbol,
                                     onClick = {
-                                        // 最近使用页（第 0 页）内的点按不参与排序：保持位置稳定，
-                                        // 便于在同一位置连续输入同一符号（如英文三种引号）。
-                                        // 仅其它分类页的点按才记录使用并置顶，切入最近使用页即为最新顺序。
-                                        if (page != 0) {
-                                            recentSymbols = RecentUsageStore.record(
-                                                context, RecentUsageStore.KEY_RECENT_SYMBOLS, symbol
-                                            )
-                                        }
+                                        // 惰性排序：任何页（含最近使用页）点按都只持久化使用记录、
+                                        // 不重排当前 UI（最近使用页位置稳定，便于连续输入同一符号）；
+                                        // 面板关闭后下次打开重新读取 store，即为最新顺序。
+                                        RecentUsageStore.record(
+                                            context, RecentUsageStore.KEY_RECENT_SYMBOLS, symbol
+                                        )
                                         onSelect(symbol)
                                     },
                                     modifier = Modifier.weight(1f),

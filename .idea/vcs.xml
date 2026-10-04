@@ -16,8 +16,6 @@
     <mapping directory="$PROJECT_DIR$/app/src/main/jni/librime/deps/marisa-trie" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/app/src/main/jni/librime/deps/opencc" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/app/src/main/jni/librime/deps/yaml-cpp" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/jni/librime/plugins/lua" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/jni/librime/plugins/lua/thirdparty" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/app/src/main/jni/snappy" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/app/src/main/jni/snappy/third_party/benchmark" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/app/src/main/jni/snappy/third_party/googletest" vcs="Git" />

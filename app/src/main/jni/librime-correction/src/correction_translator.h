@@ -59,7 +59,7 @@ class CorrectionPriors {
   void SetTaps(const std::vector<TapInfo>& taps);
   void Clear();
 
-  // 信道模型文件路径（语言侧证据来自 schema 自己的词典，见 dict_；无独立码表）
+  // 信道模型路径（语言分与出词均来自 schema 自己的词典，见 dict_）
   void SetModelPaths(const std::string& channel_path);
   bool LoadModels();
 

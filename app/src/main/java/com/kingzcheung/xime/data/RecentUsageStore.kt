@@ -4,9 +4,12 @@ import android.content.Context
 import org.json.JSONArray
 
 /**
- * 最近使用记录（LRU）：点击即置顶去重，最久未用的排末尾，超出上限截断。
+ * 最近使用记录（LRU）：置顶去重，最久未用的排末尾，超出上限截断。
  * emoji 与符号面板各自独立记录（key 区分），持久化到 SharedPreferences（JSON 数组，
  * 兼容 emoji ZWJ 组合序列与任意符号字符）。
+ *
+ * UI 侧采用惰性刷新：面板打开期间点按只调用 [record] 持久化、不重排当前列表
+ * （位置稳定，便于连续输入）；面板关闭后组合状态丢弃，重新打开时再读取最新顺序。
  */
 object RecentUsageStore {
     const val MAX_COUNT = 32
