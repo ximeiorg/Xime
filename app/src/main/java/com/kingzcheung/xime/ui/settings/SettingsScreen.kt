@@ -42,6 +42,7 @@ fun SettingsScreen(
                 onNavigateToPlugins = { navController.navigate(SettingsRoutes.Plugins) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
                 onNavigateToSmartPrediction = { navController.navigate(SettingsRoutes.SmartPrediction) },
+                onNavigateToCorrection = { navController.navigate(SettingsRoutes.Correction) },
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
                 onNavigateToClipboard = { navController.navigate(SettingsRoutes.Clipboard) },
@@ -181,6 +182,11 @@ fun SettingsScreen(
                 onNavigateToModelDetail = { modelId ->
                     navController.navigate("model_market_detail/$modelId")
                 }
+            )
+        }
+        composable(SettingsRoutes.Correction) {
+            CorrectionSettingsContent(
+                onBack = { navController.popBackStack() }
             )
         }
         composable(SettingsRoutes.SpeechToText) {

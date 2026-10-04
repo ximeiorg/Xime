@@ -18,6 +18,12 @@ object SettingsPreferences {
     private const val KEY_DARK_MODE = "dark_mode"
     private const val KEY_VERBOSE_LOGGING = "verbose_logging"
     private const val KEY_PLUGIN_DEV_MODE = "plugin_dev_mode"
+    /** 按键坐标日志开关（相邻键纠错数据采集，默认关闭）。 */
+    private const val KEY_KEY_TAP_LOG = "key_tap_log"
+    /** 纠错模型影子模式（只记录"会怎么改"，不改行为，默认关闭）。 */
+    private const val KEY_CORRECTOR_SHADOW = "corrector_shadow"
+
+    private const val KEY_CORRECTOR_ENABLED = "corrector_enabled"
     
     private const val KEY_SOUND_ENABLED = "sound_enabled"
     private const val KEY_SOUND_VOLUME = "sound_volume"
@@ -250,6 +256,33 @@ object SettingsPreferences {
 
     fun setPluginDevModeEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_PLUGIN_DEV_MODE, enabled).apply()
+    }
+
+    /** 按键坐标日志（相邻键纠错采集），默认关闭。 */
+    fun isKeyTapLogEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_KEY_TAP_LOG, false)
+    }
+
+    fun setKeyTapLogEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_KEY_TAP_LOG, enabled).apply()
+    }
+
+    /** 纠错模型影子模式，默认关闭。 */
+    fun isCorrectorShadowEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_CORRECTOR_SHADOW, false)
+    }
+
+    fun setCorrectorShadowEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CORRECTOR_SHADOW, enabled).apply()
+    }
+
+    /** 智能纠错（相邻键纠错候选，默认关闭）。 */
+    fun isCorrectorEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_CORRECTOR_ENABLED, false)
+    }
+
+    fun setCorrectorEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CORRECTOR_ENABLED, enabled).apply()
     }
 
     fun isSetupCompleted(context: Context): Boolean {

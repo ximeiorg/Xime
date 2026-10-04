@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.settings.ButtonLayout
 import com.kingzcheung.xime.util.CharInfo
 import androidx.compose.ui.Modifier
@@ -485,6 +486,8 @@ fun SwipeableKeyButton(
     var isSwipeDown by remember { mutableStateOf(false) }
     var buttonBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
     var dragActivated by remember { mutableStateOf(false) }
+    // 按键坐标日志：记录本次按下的局部坐标（相邻键纠错数据采集，关闭时零开销）
+    var lastPressOffset by remember { mutableStateOf(Offset.Zero) }
     
     val currentText by rememberUpdatedState(text)
     val currentSwipeText by rememberUpdatedState(swipeText)
@@ -659,7 +662,8 @@ fun SwipeableKeyButton(
             .pointerInput(text, currentLongPressItems.isNullOrEmpty()) {
                 if (currentLongPressItems.isNullOrEmpty()) {
                     detectTapGestures(
-                        onPress = {
+                        onPress = { offset ->
+                            lastPressOffset = offset
                             isPressed = true
                             currentOnSwipeStateChange?.invoke(SwipeState(isPressed = true, pressedText = currentPressText), buttonBounds)
                             currentOnPress?.invoke()
@@ -671,7 +675,13 @@ fun SwipeableKeyButton(
                             }
                         },
                         onTap = {
-                            if (!dragActivated && !hasTriggeredSwipeUp && !hasTriggeredSwipeDown) currentOnClick()
+                            if (!dragActivated && !hasTriggeredSwipeUp && !hasTriggeredSwipeDown) {
+                                KeyTapLogger.recordTap(
+                                    currentText, lastPressOffset.x, lastPressOffset.y,
+                                    buttonBounds, density.density
+                                )
+                                currentOnClick()
+                            }
                         }
                     )
                     return@pointerInput
@@ -755,6 +765,7 @@ fun SwipeableKeyButton(
                                 if (localLongPressTriggered) {
                                     val selected = items.getOrNull(selectedIdx)
                                     if (selected != null) {
+                                        KeyTapLogger.recordTap(selected, downX, downY, buttonBounds, density.density)
                                         currentOnLongPressSelect?.invoke(selected)
                                     }
                                 } else if (!dragActivated) {
@@ -762,6 +773,7 @@ fun SwipeableKeyButton(
                                     // 而 dragActivated 由 touch slop（更大）触发。两者之间的位移区间
                                     // （5dp~touchSlop）若被 swipeDetected 吞掉点击，且 drag 未激活无 dragEnd
                                     // 兜底，会造成快速打字漏键（吃键）。5dp 位移只用于取消长按（longPressJob）。
+                                    KeyTapLogger.recordTap(currentText, downX, downY, buttonBounds, density.density)
                                     currentOnClick()
                                 }
                             }

@@ -4,6 +4,8 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import com.kingzcheung.xime.association.AssociationManager
+import com.kingzcheung.xime.correction.CorrectorShadow
+import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.keyboard.OverlayRoute
 import com.kingzcheung.xime.rime.RimeCandidate
 import com.kingzcheung.xime.rime.resolveRimeCandidateIndex
@@ -35,10 +37,30 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         afterUpdate: (suspend () -> Unit)? = null,
     ) {
         val transformed = service.candidateTransform.transformFor(result)
+        // 会话日志：记录本键处理后的组合快照（输入串/候选/上屏增量），供离线重建纠错标签
+        KeyTapLogger.recordComposition(
+            result.inputText, result.preeditText, result.committedText, result.isAsciiMode,
+            result.candidates.map { it.text to it.comment }
+        )
+
+        // 智能纠错：把判定出的修正词条（Rime 旁路出词）作为辅助候选并入候选栏末尾
+        // （plugin 动作 = 点击直接上屏并清空引擎组合）。原候选顺序与索引不动，用户不选即无感。
+        val baseCandidates = transformed?.candidates ?: result.candidates.toList()
+        val corrections = CorrectorShadow.correctionsFor(result.inputText, result.isAsciiMode)
+            .filter { c -> baseCandidates.none { it.text == c.text } }
+        val finalCandidates = if (corrections.isEmpty()) baseCandidates
+            else baseCandidates + corrections.map { RimeCandidate(it.text, it.comment) }
+        val finalActions = if (corrections.isEmpty()) {
+            transformed?.actions ?: emptyList()
+        } else {
+            (transformed?.actions ?: baseCandidates.indices.map { CandidateAction.engine(it) })
+                .toMutableList().apply { corrections.forEach { c -> add(CandidateAction.plugin(c.text)) } }
+        }
+
         service.uiEventChannel.trySend {
             service.sessionController.updateUIWithResult(
-                transformed?.let { result.copy(candidates = it.candidates.toTypedArray()) } ?: result,
-                transformed?.actions ?: emptyList()
+                result.copy(candidates = finalCandidates.toTypedArray()),
+                finalActions
             )
             if (afterUpdate != null) afterUpdate()
         }
@@ -876,6 +898,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             return
         }
         val candState = service.candidateState.value
+        // 会话日志：退格前输入串（用于识别"回删重打"纠错对）
+        KeyTapLogger.recordDelete(candState.inputText, candState.pendingEnglishText)
         // 退格改变输入上下文：使在途的联想预测结果失效，防止过期结果迟到回填
         // associationCandidates，导致长按退格删除时候选栏在"联想词↔空"之间闪动。
         service.predictionManager.invalidatePendingPredictions()
@@ -1375,11 +1399,25 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      */
     internal fun deleteCandidate(displayIndex: Int) {
         postRimeJob {
-            val text = service.candidateState.value.candidates.getOrNull(displayIndex)
+            val state = service.candidateState.value
+            val text = state.candidates.getOrNull(displayIndex)
             if (text.isNullOrEmpty()) return@postRimeJob
-            val engineIndex = resolveRimeCandidateIndex(
-                displayIndex, text, service.rimeEngine.getCandidates().toList()
-            )
+            val action = state.candidateActions.getOrNull(displayIndex)
+            // 外部候选（插件变换 / 智能纠错）：不属于实时会话候选页，按显示索引删除会因
+            // resolveRimeCandidateIndex 的"找不到即回退 uiIndex"删到同序号的真实候选，
+            // 故直接跳过（只读建议不可删）。
+            if (action != null && action.isPluginCandidate) {
+                FileLogger.i(
+                    XimeInputMethodService.TAG,
+                    "DeleteCandidate: skip external candidate '$text' display=$displayIndex"
+                )
+                return@postRimeJob
+            }
+            val engineIndex = if (action != null && action.engineIndex >= 0) {
+                action.engineIndex
+            } else {
+                resolveRimeCandidateIndex(displayIndex, text, service.rimeEngine.getCandidates().toList())
+            }
             val ok = service.rimeEngine.deleteCandidateOnCurrentPage(engineIndex)
             FileLogger.i(
                 XimeInputMethodService.TAG,
@@ -1424,7 +1462,15 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         service.composeViewRef?.let { service.feedbackManager.performKeyPressEffect(view = it) }
         // 入队前先按全局索引取全量候选：调用线程读到的 expandedCandidates 正是
         // UI 渲染的同一份列表；入队后再取可能被编码刷新清空/重建而扑空
-        val expandedCandidate = service.candidateState.value.expandedCandidates.getOrNull(globalIndex)
+        val state = service.candidateState.value
+        val expandedCandidate = state.expandedCandidates.getOrNull(globalIndex)
+        // 外部候选（智能纠错）：不属于实时会话候选页，直接上屏其文本并清空组合，
+        // 不能走 select_candidate(globalIndex)（会选到引擎侧同序号候选）。
+        val action = state.expandedActions.getOrNull(globalIndex)
+        if (action != null && action.isPluginCandidate) {
+            postRimeJob { commitPluginCandidate(action.commitText) }
+            return
+        }
         postRimeJob {
             // T9 方案的选词消费由 t9_processor 独立完成，直接调引擎 select 会
             // 遗留 [confirmed, phony] 残留组合态（见 selectCandidateAsync 注释），
@@ -1461,7 +1507,8 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         hasNextPage = false,
                         hasPrevPage = false,
                         isShowingRecentClipboard = false,
-                        expandedCandidates = emptyList()
+                        expandedCandidates = emptyList(),
+                        expandedActions = emptyList()
                     )
                 }
             } else {
@@ -1476,7 +1523,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     /** 候选展开页长按删除自造词：按跨页全局索引删除，删除后重拉全量候选 */
     internal fun deleteCandidateGlobal(globalIndex: Int) {
         postRimeJob {
-            val text = service.candidateState.value.expandedCandidates.getOrNull(globalIndex)?.text
+            val state = service.candidateState.value
+            // 外部候选（智能纠错）：非实时会话词条，禁止按全局索引删除
+            val action = state.expandedActions.getOrNull(globalIndex)
+            if (action != null && action.isPluginCandidate) {
+                FileLogger.i("ImeKeyRouter", "deleteCandidateGlobal: skip external index=$globalIndex")
+                return@postRimeJob
+            }
+            val text = state.expandedCandidates.getOrNull(globalIndex)?.text
             if (text.isNullOrEmpty()) return@postRimeJob
             val ok = service.rimeEngine.deleteCandidateByGlobalIndex(globalIndex)
             FileLogger.i(

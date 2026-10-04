@@ -321,6 +321,24 @@ class RimeEngine {
         }
     }
 
+    /**
+     * 旁路会话只读查询：给定编码返回候选（含注释）。
+     * 使用独立 Rime 会话，不改变主会话组合/候选/分页状态；拿不到锁或引擎未就绪返回空。
+     * 供智能纠错"码→词"出词用（不污染实时输入）。
+     */
+    fun bypassLookup(input: String, maxCount: Int = 8): Array<RimeCandidate> {
+        if (!isInitialized || input.isEmpty()) return emptyArray()
+        return tryLocked(emptyArray()) {
+            if (!nativeHasSession()) return@tryLocked emptyArray()
+            nativeBypassLookup(input, maxCount)?.map { pair ->
+                RimeCandidate(
+                    text = pair.getOrElse(0) { "" },
+                    comment = pair.getOrElse(1) { "" }
+                )
+            }?.filter { it.text.isNotEmpty() }?.toTypedArray() ?: emptyArray()
+        }
+    }
+
     fun getCandidatesWithComments(): Array<RimeCandidate> {
         return tryLocked(emptyArray()) {
             if (!nativeHasSession()) return@tryLocked emptyArray()
@@ -768,6 +786,7 @@ class RimeEngine {
     private external fun nativeGetCandidates(): Array<String>?
     private external fun nativeGetCandidatesWithComments(): Array<Array<String>>?
     private external fun nativeGetAllCandidates(maxCount: Int): Array<Array<String>>?
+    private external fun nativeBypassLookup(input: String, maxCount: Int): Array<Array<String>>?
     private external fun nativeGetInput(): String?
     private external fun nativeGetComposition(): RimeComposition
     private external fun nativeSelectCandidate(index: Int): Boolean

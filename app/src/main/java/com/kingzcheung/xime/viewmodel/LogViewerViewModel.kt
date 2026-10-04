@@ -72,7 +72,8 @@ class LogViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 }
                 
                 val logFiles = allFiles
-                    .filter { it.isFile && it.name.endsWith(".log") }
+                    // .jsonl：按键坐标日志（key_tap.jsonl）等结构化采集文件，复用日志查看/导出
+                    .filter { it.isFile && (it.name.endsWith(".log") || it.name.endsWith(".jsonl")) }
                     .sortedByDescending { it.lastModified() }
                 
                 _uiState.update { it.copy(

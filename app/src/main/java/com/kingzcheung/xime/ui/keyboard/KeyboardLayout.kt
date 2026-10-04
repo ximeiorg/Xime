@@ -47,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.isTablet
 import com.kingzcheung.xime.settings.DisplayMode
@@ -265,6 +266,8 @@ fun KeyboardLayout(
         modifier = modifier
             .onGloballyPositioned { coordinates ->
                 keyboardBounds = coordinates.boundsInRoot()
+                // 按键坐标日志需要键盘矩形做跨设备归一化
+                KeyTapLogger.keyboardBounds = keyboardBounds
             }
             .drawWithContent {
                 drawContent()

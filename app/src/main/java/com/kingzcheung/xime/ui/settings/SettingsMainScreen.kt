@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.twotone.LibraryBooks
 import androidx.compose.material.icons.twotone.AutoAwesome
+import androidx.compose.material.icons.twotone.AutoFixHigh
 import androidx.compose.material.icons.twotone.Backup
 import androidx.compose.material.icons.twotone.Ballot
 
@@ -77,6 +78,7 @@ fun SettingsMainContent(
     onNavigateToPlugins: () -> Unit,
     onNavigateToModelLocal: () -> Unit = {},
     onNavigateToSmartPrediction: () -> Unit,
+    onNavigateToCorrection: () -> Unit = {},
     onNavigateToSpeechToText: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToClipboard: () -> Unit = {},
@@ -306,6 +308,18 @@ fun SettingsMainContent(
                         title = "智能联想",
                         subtitle = "基于 AI 模型的智能联想词预测",
                         onClick = onNavigateToSmartPrediction,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.AutoFixHigh,
+                        title = "智能纠错",
+                        subtitle = "按错相邻键时给出纠正候选",
+                        onClick = onNavigateToCorrection,
                         showArrow = true
                     )
                     HorizontalDivider(

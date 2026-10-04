@@ -478,11 +478,55 @@ public:
         return result;
     }
     
+    // ---- 旁路会话：只读查询任意编码的候选，不干扰主会话组合 ----
+    void destroyBypassSession() {
+        if (bypass_session_id_ && rime) {
+            rime->destroy_session(bypass_session_id_);
+        }
+        bypass_session_id_ = 0;
+        bypass_schema_.clear();
+    }
+
+    // 在独立会话上 set_input(input) 后按 candidate_list 跨页遍历候选，
+    // 只读、结束即清组合；maxCount 防御超大列表。
+    void bypassLookup(const std::string& input,
+                      std::vector<std::pair<std::string, std::string>>& out,
+                      size_t maxCount) {
+        if (!rime || input.empty()) return;
+        if (bypass_session_id_ == 0) {
+            bypass_session_id_ = rime->create_session();
+            if (bypass_session_id_ == 0) {
+                LOGD("bypassLookup: create_session failed");
+                return;
+            }
+        }
+        // 与主会话方案对齐（方案切换后重选）
+        std::string schema = getCurrentSchema();
+        if (!schema.empty() && schema != bypass_schema_) {
+            rime->select_schema(bypass_session_id_, schema.c_str());
+            bypass_schema_ = schema;
+        }
+        if (!rime->set_input(bypass_session_id_, input.c_str())) {
+            LOGD("bypassLookup: set_input('%s') failed", input.c_str());
+            return;
+        }
+        RimeCandidateListIterator iterator;
+        if (rime->candidate_list_begin(bypass_session_id_, &iterator)) {
+            while (out.size() < maxCount && rime->candidate_list_next(&iterator)) {
+                out.push_back(std::make_pair(
+                    iterator.candidate.text ? iterator.candidate.text : "",
+                    iterator.candidate.comment ? iterator.candidate.comment : ""));
+            }
+            rime->candidate_list_end(&iterator);
+        }
+        rime->clear_composition(bypass_session_id_);
+    }
+
     bool pageDown() {
         if (!rime || !session_id_) return false;
         return rime->process_key(session_id_, 0xFF56, 0);
     }
-    
+
     bool pageUp() {
         if (!rime || !session_id_) return false;
         return rime->process_key(session_id_, 0xFF55, 0);
@@ -687,6 +731,7 @@ public:
         LOGI("Starting deployment...");
         
         // 先销毁旧session
+        destroyBypassSession();
         if (session_id_) {
             LOGI("Destroying old session before deployment");
             rime->destroy_session(session_id_);
@@ -753,6 +798,7 @@ public:
         LOGI("Syncing user data, sync_dir=%s/sync", user_data_dir_.c_str());
 
         // 与 deploy() 一致先销毁旧会话；同步任务内部亦会清理全部会话
+        destroyBypassSession();
         if (session_id_) {
             rime->destroy_session(session_id_);
             session_id_ = 0;
@@ -956,6 +1002,7 @@ public:
         LOGI("Deploying single schema: %s", schemaPath.c_str());
         
         // 先销毁旧session
+        destroyBypassSession();
         if (session_id_) {
             rime->destroy_session(session_id_);
             session_id_ = 0;
@@ -1060,6 +1107,7 @@ public:
 
     void destroy() {
         if (rime) {
+            destroyBypassSession();
             if (session_id_) {
                 rime->destroy_session(session_id_);
                 session_id_ = 0;
@@ -1173,6 +1221,9 @@ public:
 private:
     RimeApi* rime;
     RimeSessionId session_id_ = 0;
+    // 旁路会话（只读查询编码→候选，供智能纠错），与主会话独立
+    RimeSessionId bypass_session_id_ = 0;
+    std::string bypass_schema_;
     std::string user_data_dir_;
     std::string shared_data_dir_;
     bool initialized_ = false;
@@ -1574,6 +1625,38 @@ Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetAllCandidates(
         env->DeleteLocalRef(pair);
     }
 
+    return result;
+}
+
+// 旁路会话只读查询：给定编码 input，返回候选 [[text,comment],...]（不干扰主会话）
+JNIEXPORT jobjectArray JNICALL
+Java_com_kingzcheung_xime_rime_RimeEngine_nativeBypassLookup(
+    JNIEnv* env,
+    jobject thiz,
+    jstring input,
+    jint maxCount
+) {
+    std::vector<std::pair<std::string, std::string>> candidates;
+    if (input != nullptr) {
+        const char* in = env->GetStringUTFChars(input, nullptr);
+        Rime::Instance().bypassLookup(in ? in : "", candidates, static_cast<size_t>(maxCount));
+        if (in) env->ReleaseStringUTFChars(input, in);
+    }
+
+    jclass stringClass = env->FindClass("java/lang/String");
+    jclass stringArrayClass = env->FindClass("[Ljava/lang/String;");
+    jobjectArray result = env->NewObjectArray(candidates.size(), stringArrayClass, nullptr);
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        jobjectArray pair = env->NewObjectArray(2, stringClass, nullptr);
+        jstring text = env->NewStringUTF(candidates[i].first.c_str());
+        jstring comment = env->NewStringUTF(candidates[i].second.c_str());
+        env->SetObjectArrayElement(pair, 0, text);
+        env->SetObjectArrayElement(pair, 1, comment);
+        env->SetObjectArrayElement(result, i, pair);
+        env->DeleteLocalRef(text);
+        env->DeleteLocalRef(comment);
+        env->DeleteLocalRef(pair);
+    }
     return result;
 }
 

@@ -6,6 +6,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.kingzcheung.xime.correction.CorrectorShadow
+import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.PluginConfigStoreImpl
 import com.kingzcheung.xime.util.FileLogger
@@ -50,6 +52,11 @@ class XimeApplication : Application(), ImageLoaderFactory {
         super.onCreate()
 
         FileLogger.init(this)
+        KeyTapLogger.init(this)
+        KeyTapLogger.enabled = SettingsPreferences.isKeyTapLogEnabled(this)
+        CorrectorShadow.init(this)
+        CorrectorShadow.enabled = SettingsPreferences.isCorrectorShadowEnabled(this)
+        CorrectorShadow.active = SettingsPreferences.isCorrectorEnabled(this)
         AppFonts.initialize(this)
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
