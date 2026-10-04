@@ -1,8 +1,6 @@
 #include "correction_geometry.h"
 
-#include <algorithm>
 #include <cmath>
-#include <cstring>
 
 namespace rime {
 namespace correction {
@@ -57,91 +55,6 @@ float NeighborTable::Distance(int a, int b) const {
   const float dx = (kKeyCenters[a].x - kKeyCenters[b].x) / kKeyW;
   const float dy = (kKeyCenters[a].y - kKeyCenters[b].y) / kKeyH;
   return std::sqrt(dx * dx + dy * dy);
-}
-
-// ---------------------------------------------------------------- CodeTable
-
-CodeTable& CodeTable::Instance() {
-  static CodeTable table;
-  return table;
-}
-
-size_t CodeTable::LowerBound(const std::string& code) const {
-  size_t lo = 0, hi = codes_.size();
-  while (lo < hi) {
-    size_t mid = (lo + hi) / 2;
-    if (codes_[mid] < code)
-      lo = mid + 1;
-    else
-      hi = mid;
-  }
-  return lo;
-}
-
-bool CodeTable::LoadFromMemory(const void* data, size_t size) {
-  if (loaded_)
-    return true;
-  const uint8_t* p = static_cast<const uint8_t*>(data);
-  const uint8_t* end = p + size;
-  if (size < 8 || std::memcmp(p, "JWC2", 4) != 0)
-    return false;
-  p += 4;
-  uint32_t count = 0;
-  std::memcpy(&count, p, 4);
-  p += 4;
-  codes_.clear();
-  texts_.clear();
-  logw_.clear();
-  codes_.reserve(count);
-  texts_.reserve(count);
-  logw_.reserve(count);
-  for (uint32_t i = 0; i < count; ++i) {
-    if (p + 1 > end)
-      return false;
-    uint8_t clen = *p++;
-    if (p + clen > end)
-      return false;
-    codes_.emplace_back(reinterpret_cast<const char*>(p), clen);
-    p += clen;
-    if (p + 1 > end)
-      return false;
-    uint8_t tlen = *p++;
-    if (p + tlen > end)
-      return false;
-    texts_.emplace_back(reinterpret_cast<const char*>(p), tlen);
-    p += tlen;
-    if (p + 4 > end)
-      return false;
-    float w = 0.0f;
-    std::memcpy(&w, p, 4);
-    p += 4;
-    logw_.push_back(w);
-  }
-  loaded_ = true;
-  return true;
-}
-
-float CodeTable::Score(const std::string& code) const {
-  if (!loaded_ || code.empty())
-    return kInvalidScore;
-  const size_t i = LowerBound(code);
-  if (i >= codes_.size())
-    return kInvalidScore;
-  if (codes_[i] == code)
-    return logw_[i];
-  if (codes_[i].compare(0, code.size(), code) == 0)
-    return kPrefixScore;
-  return kInvalidScore;
-}
-
-const std::string& CodeTable::TopText(const std::string& code) const {
-  static const std::string kEmpty;
-  if (!loaded_ || code.empty())
-    return kEmpty;
-  const size_t i = LowerBound(code);
-  if (i < codes_.size() && codes_[i] == code)
-    return texts_[i];
-  return kEmpty;
 }
 
 }  // namespace correction

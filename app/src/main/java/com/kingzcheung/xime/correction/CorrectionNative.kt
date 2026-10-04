@@ -14,7 +14,6 @@ import java.io.File
 object CorrectionNative {
     private const val TAG = "CorrectionNative"
     private const val ASSET = "corrector/channel.onnx"
-    private const val ASSET_CODES = "corrector/wubi_codes.bin"
 
     private val loaded: Boolean by lazy {
         try {
@@ -54,27 +53,10 @@ object CorrectionNative {
         }
     }
 
-    /** 码表（JWC2）解出到 filesDir 供插件直接读取。 */
-    fun ensureCodeTable(context: Context): String? {
-        return try {
-            val dst = File(context.filesDir, "corrector/wubi_codes.bin")
-            if (!dst.exists() || dst.length() == 0L) {
-                dst.parentFile?.mkdirs()
-                context.assets.open(ASSET_CODES).use { input ->
-                    dst.outputStream().use { output -> input.copyTo(output) }
-                }
-            }
-            dst.absolutePath
-        } catch (e: Exception) {
-            Log.e(TAG, "extract code table failed", e)
-            null
-        }
-    }
-
-    fun setModelPaths(channelPath: String, codeTablePath: String) {
+    fun setModelPaths(channelPath: String) {
         if (!loaded) return
         try {
-            nativeSetModelPaths(channelPath, codeTablePath)
+            nativeSetModelPaths(channelPath, "")
         } catch (e: Throwable) {
             Log.e(TAG, "nativeSetModelPaths failed", e)
         }

@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
+#include <unordered_map>
 #include <unordered_set>
 
+#include <rime/algo/syllabifier.h>
 #include <rime/candidate.h>
 #include <rime/segmentation.h>
 #include <rime/config.h>
@@ -25,24 +27,6 @@
 namespace rime {
 
 namespace {
-
-bool ReadWholeFile(const std::string& path, std::string* out) {
-  FILE* f = fopen(path.c_str(), "rb");
-  if (!f)
-    return false;
-  fseek(f, 0, SEEK_END);
-  long n = ftell(f);
-  fseek(f, 0, SEEK_SET);
-  if (n <= 0) {
-    fclose(f);
-    return false;
-  }
-  out->resize(static_cast<size_t>(n));
-  size_t got = fread(&(*out)[0], 1, static_cast<size_t>(n), f);
-  fclose(f);
-  out->resize(got);
-  return got > 0;
-}
 
 inline int LetterIndex(char c) {
   if (c >= 'a' && c <= 'z')
@@ -66,6 +50,69 @@ void EmitLog(const std::string& msg) {
   }
 }
 
+// ── 完整码词典查询（拼音多音节/五笔统一走音节图）──
+// 为什么不用 Dictionary::LookupWords(exact)：script（拼音）词典的 prism 键只有
+// 单音节形态（音节及简拼派生），"baidu" 这类多音节串 GetValue 永远落空——只有
+// 单音节码（"bai"）查得到。正确路径与 ScriptTranslator 同款：Syllabifier 切出
+// SyllableGraph，再 LookupAll 取「起点 0、终点=全长」的完整匹配桶。
+// 五笔整码本身就是一个 syllable（无 algebra 时词码整体入 syllabary），
+// 同一路径天然覆盖，行为与旧 LookupWords 等价。
+struct ExactLookup {
+  float best_weight = -30.0f;  // 完整匹配最优词条的 weight（log 词频域）；无 → -30（空码语义）
+  std::vector<an<DictEntry>> entries;  // 出词用词条（用户词在前，共至多 max_entries 个）
+};
+
+ExactLookup LookupExactCode(Dictionary* dict, UserDictionary* user_dict,
+                            const std::string& code,
+                            const hash_set<std::string>* blacklist,
+                            size_t max_entries,
+                            bool use_user_dict = true) {
+  ExactLookup r;
+  if (code.empty() || !dict || !dict->loaded())
+    return r;
+  // 用户词典：userdb 键即完整输入串，直接查（用户词优先出、优先计分）
+  if (use_user_dict && user_dict && user_dict->loaded()) {
+    UserDictEntryIterator uter;
+    user_dict->LookupWords(&uter, code, false);
+    for (; !uter.exhausted() && r.entries.size() < max_entries; uter.Next()) {
+      const an<DictEntry>& e = uter.Peek();
+      if (!e || e->text.empty())
+        continue;
+      if (r.best_weight == -30.0f)
+        r.best_weight = static_cast<float>(e->weight) + 0.5f;  // 与 table_translator 的用户词加成同口径
+      r.entries.push_back(e);
+    }
+  }
+  // 静态词典：音节图 + 完整匹配桶
+  Syllabifier syllabifier;
+  SyllableGraph graph;
+  if (syllabifier.BuildSyllableGraph(code, *dict->prism(), &graph) <
+      static_cast<int>(code.size()))
+    return r;  // 无法完整切分（该方案下非法码）：无静态语言证据
+  auto buckets = dict->LookupAll(graph, {0}, blacklist);
+  const auto start_it = buckets.find(0);
+  if (start_it == buckets.end() || !start_it->second)
+    return r;
+  const auto full = start_it->second->find(code.size());
+  if (full == start_it->second->end())
+    return r;  // 有切分但无「全长」词条（纯前缀）：按无完整词处理
+  DictEntryIterator& iter = full->second;
+  bool first = true;
+  for (; !iter.exhausted() && r.entries.size() < max_entries; iter.Next()) {
+    const an<DictEntry>& e = iter.Peek();
+    if (!e || e->text.empty())
+      continue;
+    if (first) {
+      // 静态词条与用户词同现时取更优权重
+      const float w = static_cast<float>(e->weight);
+      r.best_weight = (r.best_weight == -30.0f) ? w : std::max(r.best_weight, w);
+      first = false;
+    }
+    r.entries.push_back(e);
+  }
+  return r;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------- 侧信道
@@ -87,33 +134,24 @@ void CorrectionPriors::Clear() {
   taps_.clear();
 }
 
-void CorrectionPriors::SetModelPaths(const std::string& channel_path,
-                                     const std::string& code_table_path) {
+void CorrectionPriors::SetModelPaths(const std::string& channel_path) {
   std::lock_guard<std::mutex> lock(mutex_);
   channel_path_ = channel_path;
-  code_table_path_ = code_table_path;
   models_requested_ = true;
 }
 
 bool CorrectionPriors::LoadModels() {
-  std::string channel_path, table_path;
+  std::string channel_path;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!models_requested_)
       return false;
     channel_path = channel_path_;
-    table_path = code_table_path_;
   }
   auto& channel = correction::ChannelModel::Instance();
-  auto& table = correction::CodeTable::Instance();
   if (!channel.loaded() && !channel_path.empty())
     channel.Load(channel_path);
-  if (!table.loaded() && !table_path.empty()) {
-    std::string blob;
-    if (ReadWholeFile(table_path, &blob))
-      table.LoadFromMemory(blob.data(), blob.size());
-  }
-  return channel.loaded() && table.loaded();
+  return channel.loaded();
 }
 
 bool CorrectionPriors::TapsFor(const std::string& code,
@@ -193,7 +231,7 @@ an<Translation> CorrectionTranslator::Query(const string& input,
       return nullptr;
   }
 
-  priors.LoadModels();  // 幂等：首次查询时加载信道与码表
+  priors.LoadModels();  // 幂等：首次查询时加载信道模型
 
   std::vector<TapInfo> taps;
   if (!priors.TapsFor(code, &taps))
@@ -201,15 +239,12 @@ an<Translation> CorrectionTranslator::Query(const string& input,
 
   const int L = static_cast<int>(code.size());
   auto& channel = correction::ChannelModel::Instance();
-  auto& table = correction::CodeTable::Instance();
   auto& neighbors = correction::NeighborTable::Instance();
-  if (!channel.loaded() || !table.loaded()) {
+  if (!channel.loaded()) {
     static bool warned = false;
     if (!warned) {
       warned = true;
-      EmitLog(std::string("models not ready: channel=") +
-                          (channel.loaded() ? "ok" : "missing") +
-                          " table=" + (table.loaded() ? "ok" : "missing"));
+      EmitLog("models not ready: channel missing");
     }
     return nullptr;
   }
@@ -255,11 +290,28 @@ an<Translation> CorrectionTranslator::Query(const string& input,
     return std::log(std::max(p, 1e-9f));
   };
 
+  // 语言分：当前方案自己的词典/用户词典中该完整码的匹配结果（音节图完整匹配，
+  // 拼音多音节/五笔统一）。五笔查五笔词典、拼音查拼音词典，绝不跨码制；
+  // 查无词条返回 -30（空码语义：该码在该方案下无语言证据）。
+  // memo：每个候选码只查一次词典（打分与出词共用；查询含音节图构建，避免重复）。
+  std::unordered_map<std::string, ExactLookup> lookup_memo;
+  auto lookup = [&](const std::string& c) -> ExactLookup {
+    auto it = lookup_memo.find(c);
+    if (it == lookup_memo.end()) {
+      it = lookup_memo
+               .emplace(c, LookupExactCode(dict_.get(), user_dict_.get(), c,
+                                           &blacklist(), 2,
+                                           !IsUserDictDisabledFor(c)))
+               .first;
+    }
+    return it->second;  // 值返回：unordered_map rehash 会使引用失效
+  };
+
   auto score = [&](const std::string& c) -> float {
     float s = 0.0f;
     for (int i = 0; i < L; ++i)
       s += geo_logp(i, c[i]);
-    s += config_.lambda * table.Score(c);
+    s += config_.lambda * lookup(c).best_weight;
     return s;
   };
 
@@ -307,21 +359,10 @@ an<Translation> CorrectionTranslator::Query(const string& input,
   // initial_quality）查原码的参照质量，把纠错压在其下方一点：引擎序紧随首选之后
   // （二选起、仍在首页内），又不抢占首选。
   double reference = 0.0;
-  if (dict_ && dict_->loaded()) {
-    DictEntryIterator ref;
-    dict_->LookupWords(&ref, code, false, 0, &blacklist());
-    if (!ref.exhausted()) {
-      if (const auto& e = ref.Peek())
-        reference = std::exp(e->weight);
-    }
-  }
-  if (user_dict_ && user_dict_->loaded()) {
-    UserDictEntryIterator uref;
-    user_dict_->LookupWords(&uref, code, false);
-    if (!uref.exhausted()) {
-      if (const auto& e = uref.Peek())
-        reference = std::max(reference, std::exp(e->weight) + 0.5);
-    }
+  {
+    const ExactLookup base_lookup = lookup(code);
+    if (base_lookup.best_weight > -30.0f)
+      reference = std::exp(base_lookup.best_weight);
   }
   // 无正常候选（空码救回）：纠错即全部候选，序值无所谓，取 -1000 表达"垫底"语义。
   const double correction_quality =
@@ -333,19 +374,9 @@ an<Translation> CorrectionTranslator::Query(const string& input,
     if (produced >= config_.max_candidates)
       break;
     const std::string& corrected = *code_ptr;
-    DictEntryIterator iter;
-    Dictionary* pydict = dict_.get();
-    if (pydict && pydict->loaded())
-      pydict->LookupWords(&iter, corrected, false, 0, &blacklist());
-    UserDictEntryIterator uter;
-    UserDictionary* pyuser = user_dict_.get();
-    const bool enable_user_dict = pyuser && pyuser->loaded() &&
-                                  !IsUserDictDisabledFor(corrected);
-    if (enable_user_dict)
-      pyuser->LookupWords(&uter, corrected, false);
+    const ExactLookup lk = lookup(corrected);
     int taken = 0;
-    for (; !iter.exhausted() && taken < 2; iter.Next()) {
-      const an<DictEntry>& e = iter.Peek();
+    for (const auto& e : lk.entries) {
       if (!e || e->text.empty() || !seen.insert(e->text).second)
         continue;
       auto cand = New<SimpleCandidate>("correction", segment.start,
@@ -355,28 +386,8 @@ an<Translation> CorrectionTranslator::Query(const string& input,
       ++taken;
       ++produced;
     }
-    for (; !uter.exhausted() && taken < 2; uter.Next()) {
-      const an<DictEntry>& e = uter.Peek();
-      if (!e || e->text.empty() || !seen.insert(e->text).second)
-        continue;
-      auto cand = New<SimpleCandidate>("correction", segment.start,
-                                       segment.end, e->text, "纠错");
-      cand->set_quality(correction_quality);
-      translation->Append(cand);
-      ++taken;
-      ++produced;
-    }
-    // 字典无词条时的兜底：码表最高频词条
-    if (taken == 0) {
-      const std::string& t = table.TopText(corrected);
-      if (!t.empty() && seen.insert(t).second) {
-        auto cand = New<SimpleCandidate>("correction", segment.start,
-                                         segment.end, t, "纠错");
-        cand->set_quality(correction_quality);
-        translation->Append(cand);
-        ++produced;
-      }
-    }
+    // 词典与用户词典都无完整词条时不出词：纠错的词必须来自当前方案自己的语言
+    // 证据，不做任何跨方案/跨码表的兜底（词典没有的码，纠错也不该替用户猜词）。
   }
   if (produced == 0)
     return nullptr;
@@ -429,8 +440,10 @@ void correction_clear_taps() {
 }
 
 void correction_set_model_paths(const char* channel_path, const char* code_table_path) {
+  // code_table_path 已退役（语言侧证据改用 schema 自己的词典）；参数保留为 ABI 兼容。
+  (void)code_table_path;
   rime::CorrectionPriors::Instance().SetModelPaths(
-      channel_path ? channel_path : "", code_table_path ? code_table_path : "");
+      channel_path ? channel_path : "");
 }
 
 void correction_set_log_file(const char* path) {

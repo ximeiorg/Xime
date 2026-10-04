@@ -59,8 +59,8 @@ class CorrectionPriors {
   void SetTaps(const std::vector<TapInfo>& taps);
   void Clear();
 
-  // 模型/码表文件路径（由 Kotlin 侧在初始化时送入）
-  void SetModelPaths(const std::string& channel_path, const std::string& code_table_path);
+  // 信道模型文件路径（语言侧证据来自 schema 自己的词典，见 dict_；无独立码表）
+  void SetModelPaths(const std::string& channel_path);
   bool LoadModels();
 
   // 取与给定编码长度匹配的 tap 序列；不匹配返回 false（宁可不用先验，不用错位的）
@@ -73,7 +73,6 @@ class CorrectionPriors {
   bool enabled_ = false;
   std::vector<TapInfo> taps_;
   std::string channel_path_;
-  std::string code_table_path_;
   bool models_requested_ = false;
 };
 
@@ -90,8 +89,7 @@ class CorrectionTranslator : public Translator, public TranslatorOptions {
  private:
   CorrectionConfig config_;
   // 与 table_translator 用同一套组件加载同一份词典 / 用户词典（配置里指定 dictionary:）
-  the<Dictionary> dict_;
-  the<UserDictionary> user_dict_;
+  the<Dictionary> dict_;  the<UserDictionary> user_dict_;
 };
 
 class CorrectionTranslatorComponent : public CorrectionTranslator::Component {

@@ -83,7 +83,7 @@ fun CorrectionSettingsContent(onBack: () -> Unit) {
                 SettingsSection(title = "说明", content = {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "• 默认支持「五笔86」「五笔拼音」：对整条编码做邻键误触解码，任一位按偏都可能被纠正。其他五笔方案可在 rime/xime.custom.yaml 的 correction.schemas 中追加（与内置列表合并）。",
+                            text = "• 默认支持「五笔86」「五笔拼音」「全拼」：对整条编码做邻键误触解码，任一位按偏都可能被纠正；纠正用词始终来自当前方案自己的词典。其他方案可在 rime/xime.custom.yaml 的 correction.schemas 中追加（双拼/九键不适用）。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

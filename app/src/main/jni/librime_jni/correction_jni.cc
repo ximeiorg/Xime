@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -46,6 +47,41 @@ bool WriteFile(const std::string& path, const std::string& content) {
   fwrite(content.c_str(), 1, content.size(), f);
   fclose(f);
   return true;
+}
+
+// 从 schema 文本提取主 translator 的词典名（translator: 段下的 dictionary: 键）。
+// 纠错插件复用该词典做语言打分与出词——语言侧永远用当前方案自己的词典，
+// 五笔出五笔词、拼音出拼音词，绝不跨码制（空/解析失败返回空串，注入方跳过）。
+std::string PrimaryDictionaryOf(const std::string& schema_content) {
+  std::istringstream in(schema_content);
+  std::string line;
+  size_t translator_indent = std::string::npos;
+  while (std::getline(in, line)) {
+    const size_t indent = line.find_first_not_of(" \t");
+    if (indent == std::string::npos || line[indent] == '#')
+      continue;
+    const size_t end = line.size();
+    if (line.compare(indent, end - indent, "translator:") == 0) {
+      translator_indent = indent;
+      continue;
+    }
+    if (translator_indent != std::string::npos) {
+      if (indent <= translator_indent)
+        break;  // 离开 translator: 段
+      const std::string key = "dictionary:";
+      const size_t pos = line.find(key);
+      if (pos != std::string::npos) {
+        std::string value = line.substr(pos + key.size());
+        // 去空白与行内注释
+        const size_t hash = value.find('#');
+        if (hash != std::string::npos) value.resize(hash);
+        value.erase(0, value.find_first_not_of(" \t"));
+        value.erase(value.find_last_not_of(" \t\r\"'") + 1);
+        if (!value.empty()) return value;
+      }
+    }
+  }
+  return "";
 }
 
 }  // namespace
@@ -100,7 +136,7 @@ Java_com_kingzcheung_xime_correction_CorrectionNative_nativeSetEnabled(JNIEnv*,
   correction_set_enabled(on ? 1 : 0);
 }
 
-// 信道模型（channel.onnx）与码表（wubi_codes.bin）的文件路径
+// 信道模型（channel.onnx）文件路径；语言侧证据用 schema 自己的词典（见注入补丁）
 JNIEXPORT void JNICALL
 Java_com_kingzcheung_xime_correction_CorrectionNative_nativeSetModelPaths(
     JNIEnv* env, jclass, jstring j_channel, jstring j_codes) {
@@ -113,7 +149,7 @@ Java_com_kingzcheung_xime_correction_CorrectionNative_nativeSetModelPaths(
 }
 
 // ---- 2) schema 补丁注入（幂等） ----
-// 需要注入的组件与配置行；schema 或 custom.yaml 已含则跳过。
+// 目标方案由 Kotlin 侧按配置筛选；本函数注入组件行与词典键，两者都在时跳过。
 JNIEXPORT jboolean JNICALL
 Java_com_kingzcheung_xime_correction_CorrectionNative_nativeEnsureCorrectedSchemaPatch(
     JNIEnv* env, jclass, jstring j_schema, jstring j_user_data_dir) {
@@ -129,26 +165,39 @@ Java_com_kingzcheung_xime_correction_CorrectionNative_nativeEnsureCorrectedSchem
     LOGI("schema file not found: %s", schema_path.c_str());
     return JNI_FALSE;
   }
+  const std::string dict_name = PrimaryDictionaryOf(schema_content);
+  if (dict_name.empty()) {
+    LOGI("no translator/dictionary in schema, skip: %s", schema.c_str());
+    return JNI_FALSE;  // 无主词典的方案（纯 reverse_lookup 等）不纠错
+  }
+  const std::string dict_key = "\"correction_translator/dictionary\": " + dict_name;
   const std::string custom_path = dir + "/" + schema + ".custom.yaml";
   std::string custom;
   ReadFile(custom_path, &custom);
 
-  // 目标方案由 Kotlin 侧按配置筛选（xime.yaml correction.schemas），
-  // 这里只做幂等检查：schema 或 custom.yaml 已含 correction_translator 则跳过。
-  if (schema_content.find("correction_translator") != std::string::npos ||
-      custom.find("correction_translator") != std::string::npos) {
-    return JNI_FALSE;  // 已注入
-  }
+  // 目标方案由 Kotlin 侧按配置筛选（xime.yaml correction.schemas）。
+  // 幂等分两级：组件行与词典键都在才跳过（老补丁缺词典键 → 只补该键）。
+  const bool has_component =
+      schema_content.find("correction_translator") != std::string::npos ||
+      custom.find("correction_translator") != std::string::npos;
+  const bool has_dict_key = custom.find(dict_key) != std::string::npos;
+  if (has_component && has_dict_key)
+    return JNI_FALSE;  // 完整注入过
 
-  std::vector<std::string> patch_lines = {
-      "  \"engine/translators/@before 0\": correction_translator",
-      "  \"correction/enable\": true",
-      "  \"correction/mode\": append",
-      "  \"correction/lambda\": 1.0",
-      "  \"correction/margin\": 2.0",
-      "  \"correction/max_candidates\": 3",
-      "  \"correction/min_code_length\": 2",
-  };
+  std::vector<std::string> patch_lines;
+  if (!has_component) {
+    patch_lines = {
+        "  \"engine/translators/@before 0\": correction_translator",
+        "  \"correction/enable\": true",
+        "  \"correction/mode\": append",
+        "  \"correction/lambda\": 1.0",
+        "  \"correction/margin\": 2.0",
+        "  \"correction/max_candidates\": 3",
+        "  \"correction/min_code_length\": 2",
+    };
+  }
+  // 词典键总要确保存在（老补丁升级 / 新注入都写）
+  patch_lines.push_back("  " + dict_key);
 
   std::string base = custom;
   while (!base.empty() && (base.back() == '\n' || base.back() == '\r' || base.back() == ' '))

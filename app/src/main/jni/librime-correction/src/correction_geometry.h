@@ -1,15 +1,14 @@
-// 邻键误触纠错：几何邻键表 + 码表词频评分（纯 C++，零外部依赖）。
+// 邻键误触纠错：几何邻键表（纯 C++，零外部依赖）。
 //
-// 与 jiucuo 的离线评估同口径：
-//   · 邻键 = 键心归一化距离 <= 1.35 键宽/键高（含上下与斜向；librime 自带 keyboard_map
-//     只有同行左右，会漏掉 q→a 这类最常见的上下误触）
-//   · 码表评分：精确命中 → log(频次占比)；合法前缀 → PREFIX；非法 → INVALID
+// 邻键 = 键心归一化距离 <= 1.35 键宽/键高（含上下与斜向；librime 自带 keyboard_map
+// 只有同行左右，会漏掉 q→a 这类最常见的上下误触）。
+// 语言侧证据（词频/词条）不在此处：改用当前 schema 自己的 rime 词典（见
+// correction_translator 的 dict_score），五笔查五笔词典、拼音查拼音词典。
 #ifndef RIME_CORRECTION_GEOMETRY_H_
 #define RIME_CORRECTION_GEOMETRY_H_
 
 #include <array>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace rime {
@@ -39,35 +38,6 @@ class NeighborTable {
  private:
   NeighborTable();
   std::array<std::vector<int>, 26> neighbors_;
-};
-
-// 码表（码 → 最高频词条频次），用于联合解码的语言项
-class CodeTable {
- public:
-  static CodeTable& Instance();
-
-  bool loaded() const { return loaded_; }
-
-  // 载入预编译码表：JWC2 格式（见 jiucuo/scripts/export_code_table.py）
-  bool LoadFromMemory(const void* data, size_t size);
-
-  // 码串评分：精确命中 → log(占比)；合法前缀 → kPrefixScore；非法 → kInvalidScore
-  float Score(const std::string& code) const;
-
-  // 精确命中的最高频词条；无则空串
-  const std::string& TopText(const std::string& code) const;
-
-  static constexpr float kPrefixScore = -6.0f;
-  static constexpr float kInvalidScore = -30.0f;
-
- private:
-  CodeTable() = default;
-  size_t LowerBound(const std::string& code) const;
-
-  bool loaded_ = false;
-  std::vector<std::string> codes_;   // 按字典序
-  std::vector<std::string> texts_;
-  std::vector<float> logw_;
 };
 
 }  // namespace correction

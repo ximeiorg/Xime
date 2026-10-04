@@ -25,7 +25,7 @@ object CorrectionPriors {
     private const val TAG = "CorrectionPriors"
     private const val MAX_TAPS = 12
     /** 配置缺失时的兜底（xime.yaml correction.schemas 正常都有，防旧 APK/解析失败）。 */
-    private val SCHEMAS_FALLBACK = setOf("wubi86", "wubi86_pinyin")
+    private val SCHEMAS_FALLBACK = setOf("wubi86", "wubi86_pinyin", "pinyin_simp")
 
     private var appContext: Context? = null
     private val letters = ArrayDeque<Char>(MAX_TAPS)
@@ -90,9 +90,8 @@ object CorrectionPriors {
             FileLogger.e(TAG, "channel model unavailable")
             return false
         }
-        val codePath = CorrectionNative.ensureCodeTable(ctx)
-        FileLogger.i(TAG, "channel=$modelPath codes=$codePath")
-        CorrectionNative.setModelPaths(modelPath, codePath ?: "")
+        FileLogger.i(TAG, "channel=$modelPath")
+        CorrectionNative.setModelPaths(modelPath)
         CorrectionNative.setEnabled(true)
         nativeActive = true
         return true

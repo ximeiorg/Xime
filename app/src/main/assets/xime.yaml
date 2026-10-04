@@ -27,13 +27,14 @@ style:
 
 # ── 邻键误触纠错 ──
 # schemas 声明启用纠错的方案（schema_id），未声明的方案不参与纠错（按键/候选零影响）。
-# 第三方五笔方案（如 98 五笔）在 xime.custom.yaml 同路径追加即可，与内置列表取并集：
+# 语言侧证据（词频/词条）永远用方案自己的词典：五笔查五笔词典、拼音查拼音词典，
+# 不跨码制混用。第三方方案在 xime.custom.yaml 同路径追加即可，与内置列表取并集：
 #   correction:
-#     schemas: [wubi98, wubixx]
-# 注意：信道模型（几何）与码制无关，出词用方案自己的词典；但内置纠错码表为 86 版
-# 口径，非 86 码制的方案语言侧打分会有偏差（仅影响纠错候选的排序精度）。
+#     schemas: [wubi98, wanxiang]
+# 注意：仅全拼/五笔这类「按键字母 = 编码」的方案可纠错；双拼（字母经拼写运算变换）、
+# 九键（数字键）会在按键-编码对齐检查处自动跳过，不会误纠。
 correction:
-  schemas: [wubi86, wubi86_pinyin]
+  schemas: [wubi86, wubi86_pinyin, pinyin_simp]
 
 # 配色方案可配置背景类型（纯色/渐变/图片），默认均为纯色。
 # 如需渐变/图片背景，在 xime.custom.yaml 的对应主题下覆盖 keyboard_background 即可：
