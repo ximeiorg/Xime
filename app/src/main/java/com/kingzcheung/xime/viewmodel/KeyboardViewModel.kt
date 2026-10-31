@@ -601,19 +601,6 @@ class KeyboardViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /** Level 3: 在覆盖页面内回退 */
-    fun popOverlay() {
-        val current = _page.value
-        if (current is KeyboardPage.Overlay && current.backStack.isNotEmpty()) {
-            val prev = current.backStack.last()
-            _page.value = current.copy(
-                route = prev,
-                backStack = current.backStack.dropLast(1)
-            )
-            _syncViewState()
-        }
-    }
-
     /** Level 3: 关闭覆盖页面，回到背后页面 */
     fun closeOverlay() {
         val current = _page.value
