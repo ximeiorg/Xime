@@ -174,17 +174,7 @@ fun KeyboardLayout(
     val onKeyRelease = callbacks.onKeyRelease
     val onVoiceModeChange = callbacks.onVoiceModeChange
     val onCommitText = callbacks.onCommitText
-    val requestVoice: () -> Unit = {
-        // 语音转文本开关关闭时不响应任何语音入口
-        if (isSttEnabled) {
-            if (!PermissionHelper.hasRecordAudioPermission(context)) {
-                Toast.makeText(context, tr(R.string.s_xuyaomaikefengquanxiancainengs_3b6e4), Toast.LENGTH_SHORT).show()
-                PermissionHelper.requestRecordAudioPermission(context)
-            } else {
-                onVoiceModeChange?.invoke(true)
-            }
-        }
-    }
+    val requestVoice = buildVoiceRequest(context, isSttEnabled, onVoiceModeChange)
     val onGestureAction = buildUiGestureHandler(viewModel, callbacks, uiState, requestVoice, onKeyPress)
     val suppressCursorMove = LocalSuppressCursorMove.current
     var landscapeSplitKeyboardEnabled by remember {
@@ -719,7 +709,8 @@ internal fun resolveKeyboardShadowParams(): KeyboardShadowParams {
 
 /**
  * UI 手势动作统一映射（主键盘正常路径、分体路径与面板渲染共用）。
- * [requestVoice] 为 null 时不拦截 VOICE，透传 callbacks（分体路径历史行为）。
+ * [requestVoice] 传 null 时不拦截 VOICE，透传 callbacks（面板路径历史行为）；
+ * 主键盘与分体传 [buildVoiceRequest] 产物（含 STT/权限门禁）。
  */
 internal fun buildUiGestureHandler(
     viewModel: KeyboardViewModel,
@@ -744,6 +735,22 @@ internal fun buildUiGestureHandler(
         GestureAction.VOICE -> requestVoice?.invoke()
             ?: callbacks.onGestureAction?.invoke(action, value) ?: Unit
         else -> callbacks.onGestureAction?.invoke(action, value) ?: Unit
+    }
+}
+
+/** 语音入口动作（主键盘/分体共用）：STT 关闭不响应；无麦克风权限先请求，已授予则进入语音模式。 */
+internal fun buildVoiceRequest(
+    context: android.content.Context,
+    isSttEnabled: Boolean,
+    onVoiceModeChange: ((Boolean) -> Unit)?,
+): () -> Unit = {
+    if (isSttEnabled) {
+        if (!PermissionHelper.hasRecordAudioPermission(context)) {
+            Toast.makeText(context, tr(R.string.s_xuyaomaikefengquanxiancainengs_3b6e4), Toast.LENGTH_SHORT).show()
+            PermissionHelper.requestRecordAudioPermission(context)
+        } else {
+            onVoiceModeChange?.invoke(true)
+        }
     }
 }
 
@@ -2050,7 +2057,10 @@ private fun LandscapeKeyboardContent(
     val onKeyPressDown = callbacks.onKeyPressDown
     val onKeyRelease = callbacks.onKeyRelease
     val onCommitText = callbacks.onCommitText
-    val onGestureAction = buildUiGestureHandler(viewModel, callbacks, uiState, requestVoice = null, onKeyPress = onKeyPress)
+    // 分体路径与主键盘同源语音入口（空格长按/语音键）：此前 requestVoice=null 透传服务层，
+    // 而 KeyActionContext 未挂 ui，voice 动作静默失效
+    val requestVoice = buildVoiceRequest(LocalContext.current, uiState.isSttEnabled, callbacks.onVoiceModeChange)
+    val onGestureAction = buildUiGestureHandler(viewModel, callbacks, uiState, requestVoice, onKeyPress)
     val env = QwertyRowEnv(
         isAsciiMode = isAsciiMode,
         isShifted = visualIsShifted,
