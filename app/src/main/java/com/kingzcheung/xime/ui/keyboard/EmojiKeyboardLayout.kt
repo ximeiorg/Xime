@@ -145,7 +145,8 @@ fun EmojiKeyboardLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
-                .padding(start = if (isWide) 50.dp else 8.dp, end = if (isWide) 50.dp else 8.dp),
+                // 头部按钮与候选栏 logo 同位（8dp），不再随宽容器加大缩进
+                .padding(horizontal = 8.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             Row(

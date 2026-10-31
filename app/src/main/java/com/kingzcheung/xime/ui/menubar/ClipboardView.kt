@@ -132,7 +132,8 @@ fun ClipboardView(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = if (isWide) 50.dp else 8.dp, vertical = 10.dp),
+                // 返回按钮与候选栏 logo 同位（8dp），不再随宽容器加大缩进
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(

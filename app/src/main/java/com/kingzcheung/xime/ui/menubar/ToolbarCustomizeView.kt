@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -94,9 +97,8 @@ fun ToolbarCustomizeView(
     BoxWithConstraints(modifier = modifier) {
         val isWide = maxWidth >= WIDE_CONTAINER_WIDTH
 
-    val itemsPerPage = 8
-    val pages = allButtons.chunked(itemsPerPage).map { page ->
-        page + List(itemsPerPage - page.size) { null }
+    val pages = allButtons.chunked(8).map { page ->
+        page + List(8 - page.size) { null }
     }
     val pagerState = rememberPagerState(pageCount = { pages.size })
 
@@ -110,7 +112,8 @@ fun ToolbarCustomizeView(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
-                .padding(horizontal = if (isWide) 50.dp else 8.dp),
+                // 确认按钮与候选栏 logo 同位（8dp），不再随宽容器加大缩进
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -169,65 +172,55 @@ fun ToolbarCustomizeView(
                 .background(keyBgColor)
                 .padding(16.dp,10.dp)
         ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxWidth()
-            ) { page ->
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
+            if (isWide) {
+                // 宽容器（横屏全屏）：固定每行 4 项会把格子撑到超宽、圆圈随宽度等比溢出卡片，
+                // 改按可用宽度自适应列数、超出可滚动（与菜单栏横屏同款方案）
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 72.dp),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    maxItemsInEachRow = 4
                 ) {
-                    pages[page].forEach { button ->
-                        if (button != null) {
-                            val isEnabled = button.id in enabledIds
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp)
-                                        .aspectRatio(1f)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (isEnabled) accentColor.copy(0.2f)
-                                            else Color.Transparent
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (isEnabled) Color.Transparent
-                                            else keyTextColor.copy(alpha = 0.15f),
-                                            shape = CircleShape
-                                        )
-                                        .clickable { toggleButton(button) },
-
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    ToolbarButtonIcon(
-                                        item = button,
-                                        tint = if (isEnabled) accentColor else keyTextColor.copy(alpha = 0.8f),
-                                        modifier = Modifier.size(22.dp),
-                                    )
-                                }
-                                Text(
-                                    text = button.label,
-                                    fontSize = 10.sp,
-                                    color = keyTextColor.copy(alpha = 0.8f),
-                                    lineHeight = 1.sp,
-                                    maxLines = 1
+                    items(allButtons) { button ->
+                        ToolbarToggleItem(
+                            button = button,
+                            isEnabled = button.id in enabledIds,
+                            keyTextColor = keyTextColor,
+                            accentColor = accentColor,
+                            onToggle = { toggleButton(button) },
+                        )
+                    }
+                }
+            } else {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxWidth()
+                ) { page ->
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        maxItemsInEachRow = 4
+                    ) {
+                        pages[page].forEach { button ->
+                            if (button != null) {
+                                ToolbarToggleItem(
+                                    button = button,
+                                    isEnabled = button.id in enabledIds,
+                                    keyTextColor = keyTextColor,
+                                    accentColor = accentColor,
+                                    modifier = Modifier.weight(1f),
+                                    onToggle = { toggleButton(button) },
                                 )
+                            } else {
+                                Box(modifier = Modifier.weight(1f).aspectRatio(1f))
                             }
-                        } else {
-                            Box(modifier = Modifier.weight(1f).aspectRatio(1f))
                         }
                     }
                 }
             }
         }
-        if (pages.size > 1) {
+        if (!isWide && pages.size > 1) {
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -250,5 +243,53 @@ fun ToolbarCustomizeView(
 
         Spacer(modifier = Modifier.height(if (isWide) 15.dp else bottomPaddingDp.dp))
     }
+    }
+}
+
+@Composable
+private fun ToolbarToggleItem(
+    button: ToolbarButtonItem,
+    isEnabled: Boolean,
+    keyTextColor: Color,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+    onToggle: () -> Unit
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .background(
+                    if (isEnabled) accentColor.copy(0.2f)
+                    else Color.Transparent
+                )
+                .border(
+                    width = 1.dp,
+                    color = if (isEnabled) Color.Transparent
+                    else keyTextColor.copy(alpha = 0.15f),
+                    shape = CircleShape
+                )
+                .clickable { onToggle() },
+            contentAlignment = Alignment.Center
+        ) {
+            ToolbarButtonIcon(
+                item = button,
+                tint = if (isEnabled) accentColor else keyTextColor.copy(alpha = 0.8f),
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Text(
+            text = button.label,
+            fontSize = 10.sp,
+            color = keyTextColor.copy(alpha = 0.8f),
+            lineHeight = 1.sp,
+            maxLines = 1
+        )
     }
 }

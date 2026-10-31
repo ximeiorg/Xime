@@ -106,7 +106,8 @@ fun EditKeyboardLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp)
-                .padding(start = sideGap, end = sideGap),
+                // 头部按钮与候选栏 logo 同位（8dp），不再随宽容器加大缩进
+                .padding(horizontal = 8.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

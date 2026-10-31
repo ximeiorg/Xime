@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -15,6 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -76,13 +80,14 @@ fun SchemaListView(
             .background(backgroundColor),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-                .padding(horizontal = if (isWide) 50.dp else 8.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    // 返回按钮与候选栏 logo 同位（8dp），不再随宽容器加大缩进
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
             Box(
                 modifier = Modifier
                     .size(28.dp)
@@ -101,15 +106,28 @@ fun SchemaListView(
         }
 
         if (isWide) {
-            Row(
+            // 横屏：方案多时固定单行会把每格压到只剩一个字，
+            // 按可用宽度自适应列数换行、超出可滚动（与菜单栏横屏同款方案）
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 64.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 50.dp)
+                    .padding(horizontal = 8.dp)
                     .weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                contentPadding = PaddingValues(vertical = 8.dp),
             ) {
-                schemas.forEach { schema ->
+                if (schemas.isEmpty()) {
+                    item {
+                        Text(
+                            text = tr(R.string.s_meiyoukeyongdeshurufangan),
+                            color = subTextColor,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+                items(schemas) { schema ->
                     SchemaGridItem(
                         schema = schema,
                         isSelected = schema.schemaId == currentSchemaId,
@@ -117,15 +135,8 @@ fun SchemaListView(
                         textColor = textColor,
                         accentColor = accentColor,
                         onSelect = { onSelectSchema(schema.schemaId) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                         isLandscape = true
-                    )
-                }
-                if (schemas.isEmpty()) {
-                    Text(
-                        text = tr(R.string.s_meiyoukeyongdeshurufangan),
-                        color = subTextColor,
-                        fontSize = 13.sp
                     )
                 }
             }

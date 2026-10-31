@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -15,6 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -77,7 +81,8 @@ fun SchemaSwitchListView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
-                    .padding(horizontal = if (isWide) 50.dp else 8.dp),
+                    // 返回按钮与候选栏 logo 同位（8dp），不再随宽容器加大缩进
+                    .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Box(
@@ -98,29 +103,35 @@ fun SchemaSwitchListView(
             }
 
             if (isWide) {
-                Row(
+                // 横屏：开关多（如万象 20+ 项）时固定单行会把每格压到只剩一个字，
+                // 按可用宽度自适应列数换行、超出可滚动（与菜单栏横屏同款方案）
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 64.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 50.dp)
+                        .padding(horizontal = 8.dp)
                         .weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                    contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
-                    switches.forEach { sw ->
+                    if (switches.isEmpty()) {
+                        item {
+                            Text(
+                                text = tr(R.string.s_meiyoukeyongdefangankaiguan),
+                                color = subTextColor,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                    items(switches) { sw ->
                         SwitchGridItem(
                             sw = sw,
                             bgColor = itemBgColor,
                             textColor = textColor,
                             onToggle = { onToggleSwitch(sw) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             isLandscape = true
-                        )
-                    }
-                    if (switches.isEmpty()) {
-                        Text(
-                            text = tr(R.string.s_meiyoukeyongdefangankaiguan),
-                            color = subTextColor,
-                            fontSize = 13.sp
                         )
                     }
                 }
