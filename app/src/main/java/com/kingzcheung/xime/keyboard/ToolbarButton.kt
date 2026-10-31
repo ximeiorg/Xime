@@ -16,6 +16,7 @@ import androidx.compose.material.icons.twotone.LastPage
 import androidx.compose.material.icons.twotone.Paid
 import androidx.compose.material.icons.twotone.Quickreply
 import androidx.compose.material.icons.twotone.SelectAll
+import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Mic
@@ -33,6 +34,7 @@ enum class ToolbarButton(
     EMOJI("emoji", tr(R.string.s_biaoqing), Icons.TwoTone.EmojiEmotions),
     CLIPBOARD("clipboard", tr(R.string.s_jiantieban), Icons.AutoMirrored.TwoTone.Assignment),
     SCHEMA("schema", tr(R.string.s_fanganxuanze), Icons.TwoTone.KeyboardAlt),
+    SWITCHES("switches", tr(R.string.s_fangankaiguan), Icons.TwoTone.Tune),
     QUICK_PHRASE("quick_phrase", tr(R.string.s_kuaijiefasong), Icons.TwoTone.Quickreply),
     SYMBOL("symbol", tr(R.string.s_fuhao), Icons.TwoTone.Paid),
     FLOAT("float", tr(R.string.s_xuanfu), Icons.Default.PictureInPicture),

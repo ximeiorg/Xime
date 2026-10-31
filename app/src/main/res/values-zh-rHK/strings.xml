@@ -57,6 +57,7 @@
     <string name="s_biaoqing">表情</string>
     <string name="s_jiantieban">剪貼簿</string>
     <string name="s_fanganxuanze">方案選擇</string>
+    <string name="s_fangankaiguan">方案開關</string>
     <string name="s_kuaijiefasong">快捷發送</string>
     <string name="s_xuanfu">懸浮</string>
     <string name="s_quanxuan">全選</string>
@@ -290,6 +291,7 @@
     <string name="s_tupianyiqingli">圖片已清理</string>
     <string name="s_kuaijiefasongweikong">快捷發送為空</string>
     <string name="s_meiyoukeyongdeshurufangan">沒有可用的輸入方案</string>
+    <string name="s_meiyoukeyongdefangankaiguan">沒有可用的方案開關</string>
     <string name="s_xima">曦碼</string>
     <string name="s_yijiesuokaifazherukou">已解鎖開發者入口</string>
     <string name="s_guanyu">關於</string>

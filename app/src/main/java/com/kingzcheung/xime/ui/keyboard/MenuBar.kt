@@ -39,6 +39,7 @@ import androidx.compose.material.icons.twotone.Quickreply
 import androidx.compose.material.icons.twotone.Rotate90DegreesCcw
 import androidx.compose.material.icons.twotone.Settings
 import androidx.compose.material.icons.twotone.SettingsOverscan
+import androidx.compose.material.icons.twotone.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -55,7 +56,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kingzcheung.xime.viewmodel.SchemaSwitchUiState
 
 data class MenuItem(
     val icon: Painter? = null,
@@ -72,7 +72,6 @@ data class MenuBarState(
     val keyBgColor: Color = Color.White,
     val keyTextColor: Color = Color(0xFF202124),
     val isFloatingMode: Boolean = false,
-    val schemaSwitches: List<SchemaSwitchUiState> = emptyList(),
     /** 承载区受限（独立 IME 面板）时「键盘调节」「浮动键盘」不可用，入口隐藏。 */
     val canResizeKeyboard: Boolean = true,
     val canFloatKeyboard: Boolean = true,
@@ -87,10 +86,10 @@ data class MenuBarCallbacks(
     val onReloadConfig: () -> Unit,
     val onSettings: () -> Unit,
     val onSchemaList: () -> Unit,
+    val onSchemaSwitches: () -> Unit = {},
     val onToggleDarkMode: () -> Unit,
     val onFloatingModeToggle: (() -> Unit)? = null,
     val onToolbarCustomize: () -> Unit = {},
-    val onToggleSchemaSwitch: ((SchemaSwitchUiState) -> Unit)? = null,
 )
 
 @Composable
@@ -127,6 +126,7 @@ fun MenuBar(
     val deployIcon = rememberVectorPainter(Icons.TwoTone.Rotate90DegreesCcw)
     val customizeIcon = rememberVectorPainter(Icons.TwoTone.Padding)
     val schemaIcon = rememberVectorPainter(Icons.TwoTone.Keyboard)
+    val switchesIcon = rememberVectorPainter(Icons.TwoTone.Tune)
     val settingsIcon = rememberVectorPainter(Icons.TwoTone.Settings)
 
     val darkModeLabel = when (state.darkMode) {
@@ -139,21 +139,14 @@ fun MenuBar(
     val floatingLabel = if (state.isFloatingMode) tr(R.string.s_tuichuxuanfu) else tr(R.string.s_xuanfumoshi)
     val floatingAction = callbacks.onFloatingModeToggle ?: {}
 
-    // 动态方案开关：图标取第一个状态的首字；标题若有 abbrev 则用 abbrev（多个用 🔁 连接），否则用所有状态 🔁 连接
-    val switchItems = state.schemaSwitches.map { sw ->
-        val textIcon = sw.states.firstOrNull()?.firstOrNull()?.toString() ?: ""
-        val label = if (sw.abbrev.isNotEmpty()) sw.abbrev.joinToString("🔁")
-            else sw.states.joinToString("🔁")
-        MenuItem(icon = null, label = label, action = { callbacks.onToggleSchemaSwitch?.invoke(sw) }, textIcon = textIcon)
-    }
-
-    val menuItems = remember(darkModeIcon, darkModeLabel, state.isFloatingMode, state.schemaSwitches, state.canResizeKeyboard, state.canFloatKeyboard) {
+    val menuItems = remember(darkModeIcon, darkModeLabel, state.isFloatingMode, state.canResizeKeyboard, state.canFloatKeyboard) {
         listOf(
             MenuItem(clipboardIcon, tr(R.string.s_jiantieban), callbacks.onClipboard),
             MenuItem(quickSendIcon, tr(R.string.s_kuaijiefasong), callbacks.onQuickSend),
             MenuItem(schemaIcon, tr(R.string.s_shurufangan), callbacks.onSchemaList),
+            // 方案开关统一收进二级页（SchemaSwitches），一级菜单只留入口
+            MenuItem(switchesIcon, tr(R.string.s_fangankaiguan), callbacks.onSchemaSwitches),
             MenuItem(emojiIcon, tr(R.string.s_biaoqing), callbacks.onEmoji),
-        ) + switchItems + listOf(
             MenuItem(customizeIcon, tr(R.string.s_dingzhigongjulan), callbacks.onToolbarCustomize),
             // 悬浮模式下键盘内容为缩放的浮动卡片，高度不可调节，隐藏该入口；
             // 承载区受限（独立 IME 面板）时调节页的操作按钮在面板里显示不全，同样隐藏

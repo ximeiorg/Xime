@@ -77,6 +77,7 @@ import com.kingzcheung.xime.settings.SettingsPreferences
 import com.kingzcheung.xime.ui.isTablet
 import com.kingzcheung.xime.ui.menubar.ClipboardView
 import com.kingzcheung.xime.ui.menubar.SchemaListView
+import com.kingzcheung.xime.ui.menubar.SchemaSwitchListView
 import com.kingzcheung.xime.ui.menubar.ToolbarCustomizeView
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
@@ -463,6 +464,7 @@ fun KeyboardView(
                             ToolbarButton.EMOJI -> ({ viewModel.showOverlay(OverlayRoute.Emoji) })
                             ToolbarButton.CLIPBOARD -> ({ viewModel.showOverlay(OverlayRoute.Clipboard(0)) })
                             ToolbarButton.SCHEMA -> ({ viewModel.showOverlay(OverlayRoute.SchemaList, listOf(OverlayRoute.Menu)) })
+                            ToolbarButton.SWITCHES -> ({ viewModel.showOverlay(OverlayRoute.SchemaSwitches, listOf(OverlayRoute.Menu)) })
                             ToolbarButton.QUICK_PHRASE -> ({ viewModel.showOverlay(OverlayRoute.Clipboard(1)) })
                             ToolbarButton.SYMBOL -> ({ viewModel.showOverlay(OverlayRoute.Symbol) })
                             ToolbarButton.SELECT_ALL -> ({ callbacks.onToolbarEditingAction?.invoke("select_all") })
@@ -1409,7 +1411,6 @@ fun KeyboardView(
                             keyBgColor = keyBgColor,
                             keyTextColor = keyTextColor,
                             isFloatingMode = state.isFloatingMode,
-                            schemaSwitches = state.schemaSwitches,
                             canResizeKeyboard = !state.isHostConstrained,
                             canFloatKeyboard = !state.isHostConstrained,
                         ),
@@ -1422,11 +1423,20 @@ fun KeyboardView(
                             onReloadConfig = { onHapticFeedback?.invoke(); callbacks.onReloadConfig?.invoke(); viewModel.closeOverlay() },
                             onSettings = { onHapticFeedback?.invoke(); callbacks.onSettings?.invoke(); viewModel.closeOverlay() },
                             onSchemaList = { onHapticFeedback?.invoke(); viewModel.pushOverlay(OverlayRoute.SchemaList) },
+                            onSchemaSwitches = { onHapticFeedback?.invoke(); viewModel.pushOverlay(OverlayRoute.SchemaSwitches) },
                             onToggleDarkMode = { onHapticFeedback?.invoke(); callbacks.onToggleDarkMode?.invoke() },
                             onToolbarCustomize = { onHapticFeedback?.invoke(); viewModel.showOverlay(OverlayRoute.ToolbarCustomize) },
                             onFloatingModeToggle = { onHapticFeedback?.invoke(); callbacks.onFloatingModeChange?.invoke(!state.isFloatingMode); viewModel.closeOverlay() },
-                            onToggleSchemaSwitch = { sw -> onHapticFeedback?.invoke(); callbacks.onToggleSchemaSwitch?.invoke(sw); viewModel.closeOverlay() },
                         ),
+                        modifier = Modifier.fillMaxWidth().fillMaxHeight()
+                    )
+                    is OverlayRoute.SchemaSwitches -> SchemaSwitchListView(
+                        switches = state.schemaSwitches,
+                        backgroundColor = keyboardBgColor,
+                        keyTextColor = keyTextColor,
+                        keyBgColor = keyBgColor,
+                        onToggleSwitch = { sw -> onHapticFeedback?.invoke(); callbacks.onToggleSchemaSwitch?.invoke(sw) },
+                        onBack = { viewModel.popOverlay() },
                         modifier = Modifier.fillMaxWidth().fillMaxHeight()
                     )
                     is OverlayRoute.SchemaList -> SchemaListView(
