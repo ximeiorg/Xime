@@ -30,9 +30,22 @@ std::vector<std::string> GetCorrectionSchemaPatches() {
       "correction_translator|correction/enable|true",
       "correction_translator|correction/mode|append",
       "correction_translator|correction/lambda|1.0",
-      "correction_translator|correction/margin|2.0",
+      "correction_translator|correction/margin|1.0",
+      "correction_translator|correction/patch_version|2",
       "correction_translator|correction/max_candidates|3",
       "correction_translator|correction/min_code_length|2",
+      // 结构化信道核：σ 由端上自校准覆盖，这里的默认值 = TSI 实测 px 换算到
+      // 本机键尺寸（键 112x164px → σx 30.5/112、σy 33.8/164）。
+      "correction_translator|correction/sigma_x|0.272",
+      "correction_translator|correction/sigma_y|0.206",
+      // 方向先验（TSI 实测 同行 78% / 斜向 17% / 跨行 6% 的对数比）
+      "correction_translator|correction/dir_prior_h|0.0",
+      "correction_translator|correction/dir_prior_d|-1.52",
+      "correction_translator|correction/dir_prior_v|-2.56",
+      // 方向性投影门：落点至少要走到"到该邻键"方向的 1/4 才算证据
+      "correction_translator|correction/min_frac_empty|0.12",
+      "correction_translator|correction/min_frac_prefix|0.50",
+      "correction_translator|correction/min_frac_word|0.20",
   };
 }
 

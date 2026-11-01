@@ -440,7 +440,7 @@
     <string name="s_qiyongzhinengjiucuo">启用智能纠错</string>
     <string name="s_ancuoxianglinjianshi_zaihouxua_df488">按错相邻键时，在候选栏给出纠正候选（不改动原有候选，需手动选择）</string>
     <string name="s_shuoming">说明</string>
-    <string name="s_morenzhichi_wubi86_wubipinyin_048a6">• 默认支持「五笔86」「五笔拼音」「全拼」：对整条编码做邻键误触解码，任一位按偏都可能被纠正；纠正用词始终来自当前方案自己的词典。其他方案可在 rime/xime.custom.yaml 的 correction.schemas 中追加（双拼/九键不适用）。</string>
+    <string name="s_morenzhichi_wubi86_wubipinyin_048a6">• 默认支持「五笔86」「五笔拼音」「全拼」：对整条编码做邻键误触解码，任一位按偏都可能被纠正；纠正用词始终来自当前方案自己的词典。暂时不支持任何第三方方案。</string>
     <string name="s_jinggao1_cigongnengshiyanxingz_daa71">• ⚠️⚠️⚠️警告1：此功能实验性质，只对默认布局、开发者自己使用习惯做了训练，不承诺所有用户可用。</string>
     <string name="s_jinggao2_buzhichirenhezidingyi_aaabd">• ⚠️⚠️⚠️警告2：不支持任何自定义按键布局的键位纠错。</string>
     <string name="s_jiuzhenghouxuanbiaozhu_jiucuo_23e5d">• 纠正候选标注「纠错」，排在原有候选之后（不抢占正常候选），点选即上屏纠正后的词。</string>
