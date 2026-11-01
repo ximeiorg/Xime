@@ -8,6 +8,17 @@
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
+<p align="center">
+  <a href="https://gitcode.com/ximeiorg/Xime/releases"><img alt="國內下載" src="https://img.shields.io/badge/%E5%9C%8B%E5%85%A7%E4%B8%8B%E8%BC%89-GitCode%20%E9%8F%A1%E5%83%8F-FC5531?logo=git&logoColor=white"></a>
+  <a href="https://github.com/ximeiorg/Xime/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ximeiorg/Xime?label=release&color=2ea44f"></a>
+  <a href="https://github.com/ximeiorg/Xime/actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/ximeiorg/Xime/build.yml?label=build"></a>
+  <img alt="Android 9.0+" src="https://img.shields.io/badge/Android-9.0%2B%20%7C%20API%2028-3DDC84?logo=android&logoColor=white">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
+  <a href="https://rime.im/"><img alt="Rime" src="https://img.shields.io/badge/powered%20by-Rime-00A0E9"></a>
+</p>
+
+<p align="center"><b>給國內使用者</b>：GitHub 下載慢？直接到 <a href="https://gitcode.com/ximeiorg/Xime/releases"><b>GitCode 鏡像下載 APK</b></a>，程式碼與 Release 會自動同步。</p>
+
 [<img src="https://f-droid.org/badge/get-it-on.png"
     alt="Get it on F-Droid"
     height="80">](https://f-droid.org/packages/com.kingzcheung.xime)
@@ -108,7 +119,14 @@
 
 ### 國內下載
 
-由於 APK 包是透過 GitHub Actions 自動構建的，國內的倉庫沒有免費的功能使用，因此如果你覺得 GitHub Release 下載不穩定，請自行構建安裝，或者透過 [https://github.akams.cn](https://github.akams.cn) 來下載。
+GitHub Release 在國內偶爾存取不穩定，推薦使用 GitCode 鏡像倉庫：
+
+- 鏡像倉庫：[https://gitcode.com/ximeiorg/Xime](https://gitcode.com/ximeiorg/Xime)
+- 鏡像 Release：[https://gitcode.com/ximeiorg/Xime/releases](https://gitcode.com/ximeiorg/Xime/releases)
+
+鏡像的程式碼、tag 與 Release 附件（APK）都會自動同步，國內存取速度更快。
+
+如果鏡像也不可用，可以自行構建安裝，或透過 [https://github.akams.cn](https://github.akams.cn) 加速下載 GitHub Release。
 
 ### 手動構建安裝
 
@@ -131,6 +149,9 @@
 ```bash
 # 克隆專案（包含子模組）
 git clone --recursive https://github.com/ximeiorg/Xime.git
+
+# 國內網路可改用 GitCode 鏡像（子模組仍指向 GitHub，必要時自行替換 .gitmodules 中的位址）
+git clone https://gitcode.com/ximeiorg/Xime.git
 
 # 或者在已克隆的專案中初始化子模組
 git submodule update --init --recursive

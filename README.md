@@ -8,6 +8,17 @@
   <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">繁體中文</a>
 </p>
 
+<p align="center">
+  <a href="https://gitcode.com/ximeiorg/Xime/releases"><img alt="China mirror" src="https://img.shields.io/badge/China%20mirror-GitCode-FC5531?logo=git&logoColor=white"></a>
+  <a href="https://github.com/ximeiorg/Xime/releases"><img alt="Release" src="https://img.shields.io/github/v/release/ximeiorg/Xime?label=release&color=2ea44f"></a>
+  <a href="https://github.com/ximeiorg/Xime/actions/workflows/build.yml"><img alt="Build" src="https://img.shields.io/github/actions/workflow/status/ximeiorg/Xime/build.yml?label=build"></a>
+  <img alt="Android 9.0+" src="https://img.shields.io/badge/Android-9.0%2B%20%7C%20API%2028-3DDC84?logo=android&logoColor=white">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue"></a>
+  <a href="https://rime.im/"><img alt="Rime" src="https://img.shields.io/badge/powered%20by-Rime-00A0E9"></a>
+</p>
+
+<p align="center"><b>Users in China</b>: if GitHub is slow, grab the APK from the <a href="https://gitcode.com/ximeiorg/Xime/releases"><b>GitCode mirror</b></a> — code and releases are synced automatically.</p>
+
 [<img src="https://f-droid.org/badge/get-it-on.png"
     alt="Get it on F-Droid"
     height="80">](https://f-droid.org/packages/com.kingzcheung.xime)
@@ -90,6 +101,8 @@ Choose the APK matching your device architecture:
 3. Enable Xime in system input method settings
 4. Set Xime as the current input method
 
+> **China mirror**: if GitHub is slow or blocked, use the GitCode mirror — [repository](https://gitcode.com/ximeiorg/Xime) · [releases](https://gitcode.com/ximeiorg/Xime/releases). Code, tags and release assets are synced automatically.
+
 ### Plugins (Optional)
 
 Plugins are Lua-script plugins (`.xipk` format), installable and enabled from the app's Settings > Extension Store:
@@ -124,6 +137,9 @@ For detailed documentation, visit [https://ime.ximei.me](https://ime.ximei.me).
 ```bash
 # Clone with submodules
 git clone --recursive https://github.com/ximeiorg/Xime.git
+
+# China mirror (submodules still point at GitHub — rewrite .gitmodules if needed)
+git clone https://gitcode.com/ximeiorg/Xime.git
 
 # Or initialize submodules in an existing clone
 git submodule update --init --recursive
