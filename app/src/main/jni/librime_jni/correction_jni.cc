@@ -22,6 +22,9 @@
 
 namespace {
 
+// 注入补丁的版本号：参数集一变就要 +1，老机器上的 custom.yaml 会被整段重写
+const char* kPatchVersion = "2";
+
 bool ReadFile(const std::string& path, std::string* out) {
   FILE* f = fopen(path.c_str(), "rb");
   if (!f)
@@ -148,6 +151,16 @@ Java_com_kingzcheung_xime_correction_CorrectionNative_nativeSetModelPaths(
   LOGI("model paths: channel=%s codes=%s", c ? c : "(null)", t ? t : "(null)");
 }
 
+// 端上自校准的信道宽度（键宽/键高单位）；<=0 表示回退插件默认值
+JNIEXPORT void JNICALL
+Java_com_kingzcheung_xime_correction_CorrectionNative_nativeSetChannelParams(
+    JNIEnv*, jclass, jfloat sigma_x, jfloat sigma_y) {
+  correction_set_channel_params(static_cast<float>(sigma_x),
+                                static_cast<float>(sigma_y));
+  LOGI("channel params: sx=%.3f sy=%.3f", static_cast<double>(sigma_x),
+       static_cast<double>(sigma_y));
+}
+
 // ---- 2) schema 补丁注入（幂等） ----
 // 目标方案由 Kotlin 侧按配置筛选；本函数注入组件行与词典键，两者都在时跳过。
 JNIEXPORT jboolean JNICALL
@@ -176,33 +189,41 @@ Java_com_kingzcheung_xime_correction_CorrectionNative_nativeEnsureCorrectedSchem
   ReadFile(custom_path, &custom);
 
   // 目标方案由 Kotlin 侧按配置筛选（xime.yaml correction.schemas）。
-  // 幂等分两级：组件行与词典键都在才跳过（老补丁缺词典键 → 只补该键）。
-  const bool has_component =
-      schema_content.find("correction_translator") != std::string::npos ||
-      custom.find("correction_translator") != std::string::npos;
-  const bool has_dict_key = custom.find(dict_key) != std::string::npos;
-  if (has_component && has_dict_key)
-    return JNI_FALSE;  // 完整注入过
+  // 幂等以**补丁版本号**为准：参数（margin/阈值/先验）会随模型演进，老补丁里的
+  // 旧值会覆盖插件默认值（例如旧块的 cross_row_penalty:-0.7 会和新方向先验叠加），
+  // 所以版本不符就必须整段重写，不能只判"注入过没有"。
+  const std::string patch_ver_key = "\"correction/patch_version\": " + std::string(kPatchVersion);
+  const bool up_to_date = custom.find(patch_ver_key) != std::string::npos &&
+                          custom.find(dict_key) != std::string::npos;
+  if (up_to_date)
+    return JNI_FALSE;
 
-  std::vector<std::string> patch_lines;
-  if (!has_component) {
-    patch_lines = {
-        "  \"engine/translators/@before 0\": correction_translator",
-        "  \"correction/enable\": true",
-        "  \"correction/mode\": append",
-        "  \"correction/lambda\": 1.0",
-        "  \"correction/margin\": 2.0",
-        "  \"correction/min_off\": 0.3",
-        "  \"correction/cross_row_penalty\": -0.7",
-        "  \"correction/prefix_geo_gate\": true",
-        "  \"correction/max_candidates\": 3",
-        "  \"correction/min_code_length\": 2",
-    };
+  // 先摘掉所有旧的 correction 行（含组件行与词典键），再整段重写
+  std::string stripped;
+  {
+    std::istringstream in(custom);
+    std::string line;
+    while (std::getline(in, line)) {
+      if (line.find("correction/") != std::string::npos ||
+          line.find("correction_translator") != std::string::npos)
+        continue;
+      stripped += line + "\n";
+    }
   }
-  // 词典键总要确保存在（老补丁升级 / 新注入都写）
-  patch_lines.push_back("  " + dict_key);
 
-  std::string base = custom;
+  const std::vector<std::string> patch_lines = {
+      "  \"engine/translators/@before 0\": correction_translator",
+      "  \"correction/enable\": true",
+      "  \"correction/mode\": append",
+      "  \"correction/lambda\": 1.0",
+      "  \"correction/margin\": 1.0",
+      "  \"correction/max_candidates\": 3",
+      "  \"correction/min_code_length\": 2",
+      "  \"correction/patch_version\": " + std::string(kPatchVersion),
+      "  " + dict_key,
+  };
+
+  std::string base = stripped;
   while (!base.empty() && (base.back() == '\n' || base.back() == '\r' || base.back() == ' '))
     base.pop_back();
   if (base.size() >= 3 && base.substr(base.size() - 3) == "...")

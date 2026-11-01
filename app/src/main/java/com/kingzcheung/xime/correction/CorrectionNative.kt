@@ -14,6 +14,7 @@ import java.io.File
 object CorrectionNative {
     private const val TAG = "CorrectionNative"
     private const val ASSET = "corrector/channel.onnx"
+    private const val FREQ_ASSET = "corrector/wubi_freq.bin"
 
     private val loaded: Boolean by lazy {
         try {
@@ -53,10 +54,38 @@ object CorrectionNative {
         }
     }
 
-    fun setModelPaths(channelPath: String) {
+    /**
+     * 把插件自带的词频表（真实 ln 频次）解出到 filesDir。
+     * 为什么需要：真机 wubi86.dict.yaml 的 weight 列只有 {10,20}，词与词的语言分
+     * 几乎是常数（Δ ≤ 0.69 nats），而几何项是 −2~−12 nats —— 语言项压不过几何，
+     * 纠错就永远不出词。这份表是语言项唯一真实的来源。
+     */
+    fun ensureFreqTable(context: Context): String? {
+        return try {
+            val dst = File(context.filesDir, "corrector/wubi_freq.bin")
+            // 只判"存在"会把升级后的旧格式文件一直留在盘上（插件按魔数校验会加载失败），
+            // 必须比对长度：词频包格式/内容一变，长度必变。
+            // 无条件覆盖：词频包是纯数据（688KB），每次启动重写一次只有几毫秒；
+            // 而"存在就跳过"会把旧格式/旧内容一直留在盘上，插件按魔数校验直接加载失败
+            // （真机日志里就是 freq table load failed → 语言分退回常数 → 永不纠错）。
+            run {
+                dst.parentFile?.mkdirs()
+                context.assets.open(FREQ_ASSET).use { input ->
+                    dst.outputStream().use { output -> input.copyTo(output) }
+                }
+                FileLogger.i(TAG, "freq table refreshed: ${dst.length()} bytes")
+            }
+            dst.absolutePath
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "extract freq table failed: ${e.message}")
+            null
+        }
+    }
+
+    fun setModelPaths(channelPath: String, freqPath: String) {
         if (!loaded) return
         try {
-            nativeSetModelPaths(channelPath, "")
+            nativeSetModelPaths(channelPath, freqPath)
         } catch (e: Throwable) {
             Log.e(TAG, "nativeSetModelPaths failed", e)
         }
@@ -69,6 +98,19 @@ object CorrectionNative {
             nativeSetTaps(letters, offX, offY)
         } catch (e: Throwable) {
             Log.e(TAG, "nativeSetTaps failed", e)
+        }
+    }
+
+    /**
+     * 端上自校准的信道宽度（键宽/键高单位，σ）。
+     * 结构化信道核用它把"落点偏移"折算成标准噪声单位；不校准时插件用 TSI 实测默认值。
+     */
+    fun setChannelParams(sigmaX: Float, sigmaY: Float) {
+        if (!loaded) return
+        try {
+            nativeSetChannelParams(sigmaX, sigmaY)
+        } catch (e: Throwable) {
+            FileLogger.e(TAG, "setChannelParams failed: ${e.message}")
         }
     }
 
@@ -105,6 +147,7 @@ object CorrectionNative {
     private external fun nativeSetLogFile(path: String)
     private external fun nativeSetTaps(letters: ByteArray, offX: FloatArray, offY: FloatArray)
     private external fun nativeClearTaps()
+    private external fun nativeSetChannelParams(sigmaX: Float, sigmaY: Float)
     private external fun nativeSetEnabled(enabled: Boolean)
     private external fun nativeSetModelPaths(channelPath: String, codeTablePath: String)
     private external fun nativeEnsureCorrectedSchemaPatch(schema: String, userDataDir: String): Boolean

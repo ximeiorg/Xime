@@ -1,6 +1,9 @@
 #include "correction_geometry.h"
 
 #include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 
 namespace rime {
 namespace correction {
@@ -57,8 +60,100 @@ float NeighborTable::Distance(int a, int b) const {
   return std::sqrt(dx * dx + dy * dy);
 }
 
+FreqTable& FreqTable::Instance() {
+  static FreqTable table;
+  return table;
+}
+
+bool FreqTable::Load(const std::string& path) {
+  if (loaded_ || tried_)
+    return loaded_;   // 只尝试一次：失败后不再每次 Query 重试（否则日志被刷爆）
+  tried_ = true;
+  FILE* f = fopen(path.c_str(), "rb");
+  if (!f)
+    return false;
+  char magic[4] = {0};
+  uint32_t n = 0;
+  if (fread(magic, 1, 4, f) != 4 ||
+      (std::memcmp(magic, "WFQ3", 4) != 0 && std::memcmp(magic, "WFQ2", 4) != 0)) {
+    fclose(f);
+    return false;
+  }
+  uint8_t name_len = 0;
+  if (fread(&name_len, 1, 1, f) != 1) {
+    fclose(f);
+    return false;
+  }
+  const bool has_mass = std::memcmp(magic, "WFQ3", 4) == 0;
+  name_.resize(name_len);
+  if (name_len > 0 && fread(&name_[0], 1, name_len, f) != name_len) {
+    fclose(f);
+    return false;
+  }
+  if (fread(&n, 4, 1, f) != 1) {
+    fclose(f);
+    return false;
+  }
+  std::string code;
+  auto read_block = [&](std::unordered_map<std::string, float>* dst, uint32_t count) {
+    dst->reserve(static_cast<size_t>(count) * 2);
+    for (uint32_t i = 0; i < count; ++i) {
+      uint8_t len = 0;
+      if (fread(&len, 1, 1, f) != 1)
+        return false;
+      code.resize(len);
+      if (len > 0 && fread(&code[0], 1, len, f) != len)
+        return false;
+      float lf = 0.0f;
+      if (fread(&lf, 4, 1, f) != 1)
+        return false;
+      (*dst)[code] = lf;
+    }
+    return true;
+  };
+  bool ok = read_block(&freq_, n);
+  if (ok && has_mass) {
+    uint32_t nm = 0;
+    ok = fread(&nm, 4, 1, f) == 1 && read_block(&mass_, nm);
+  }
+  fclose(f);
+  loaded_ = !freq_.empty();
+  return loaded_;
+}
+
+float FreqTable::Freq(const std::string& code) const {
+  auto it = freq_.find(code);
+  return it == freq_.end() ? 0.0f : it->second;
+}
+
+float FreqTable::Mass(const std::string& code) const {
+  auto it = mass_.find(code);
+  return it == mass_.end() ? 0.0f : it->second;
+}
+
+float FreqTable::LangScore(const std::string& code) const {
+  auto it = freq_.find(code);
+  if (it != freq_.end())
+    return it->second;
+  return Mass(code);
+}
+
 bool SameRow(int a, int b) {
   return std::fabs(kKeyCenters[a].y - kKeyCenters[b].y) < 0.5f * kRowPitch;
+}
+
+KeyDelta DeltaOf(int from, int to) {
+  return KeyDelta{(kKeyCenters[to].x - kKeyCenters[from].x) / kKeyW,
+                  (kKeyCenters[to].y - kKeyCenters[from].y) / kKeyH};
+}
+
+TapDir DirOf(int pressed, int intended) {
+  const KeyDelta d = DeltaOf(pressed, intended);
+  if (std::fabs(d.dy) * kKeyH < 0.5f * kRowPitch)
+    return TapDir::kHoriz;
+  if (std::fabs(d.dx) < 0.35f)
+    return TapDir::kVert;
+  return TapDir::kDiag;
 }
 
 }  // namespace correction

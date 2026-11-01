@@ -5,6 +5,7 @@
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
         <option name="testRunner" value="CHOOSE_PER_TEST" />
+        <option name="distributionType" value="LOCAL" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="modules">
           <set>
@@ -13,7 +14,7 @@
             <option value="$PROJECT_DIR$/plugin-core" />
           </set>
         </option>
-        <option name="resolveExternalAnnotations" value="true" />
+        <option name="myGradleHome" value="$USER_HOME$/gradle-9.8.2" />
       </GradleProjectSettings>
     </option>
   </component>

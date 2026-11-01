@@ -54,6 +54,9 @@ object CorrectionPriors {
     private const val MIN_N_PER_KEY = 30      // 单键样本不足 → 回退全局中位数
     private const val MIN_N_GLOBAL = 300      // 全局也不足 → 不校准（冷启动直通）
     private const val OFF_GATE = 0.55f        // 越界疑似误触，不进窗口（中位数本身也稳健，双保险）
+    private const val MIN_N_SCALE = 400       // 估信道宽度（σ）所需的最小击键数
+    private const val SCALE_MIN = 0.15f       // σ 合理区间（键宽/键高单位）；越界视为不可信
+    private const val SCALE_MAX = 0.40f
     private const val PERSIST_MIN_MS = 60_000L
 
     private var appContext: Context? = null
@@ -73,6 +76,9 @@ object CorrectionPriors {
     private val actY = FloatArray(26) { Float.NaN }
     private var globalX = Float.NaN
     private var globalY = Float.NaN
+    /** 端上自校准的信道宽度（MAD 稳健估计）；NaN = 未校准，插件用 TSI 实测默认值。 */
+    private var scaleX = Float.NaN
+    private var scaleY = Float.NaN
     private var stateActive = false
 
     /** native 侧是否曾被成功启用。关闭态下所有 JNI 调用必须短路：
@@ -136,10 +142,15 @@ object CorrectionPriors {
         loadState()
         // 语言分与出词均来自各方案自己的 rime 词典（wubi86 词典已补 weight 列），
         // 无独立码表资产。
-        FileLogger.i(TAG, "channel=$modelPath")
-        CorrectionNative.setModelPaths(modelPath)
+        val freqPath = CorrectionNative.ensureFreqTable(ctx)
+        if (freqPath == null) {
+            FileLogger.e(TAG, "freq table unavailable -> language score would be flat")
+        }
+        FileLogger.i(TAG, "channel=$modelPath freq=$freqPath")
+        CorrectionNative.setModelPaths(modelPath, freqPath ?: "")
         CorrectionNative.setEnabled(true)
         nativeActive = true
+        pushChannelParams()
         return true
     }
 
@@ -170,6 +181,16 @@ object CorrectionPriors {
                 if (actX[i].isNaN() && !gx.isNaN()) {
                     actX[i] = gx
                     actY[i] = gy
+                }
+            }
+            (obj["sigma"] as? JsonArray)?.let { a ->
+                if (a.size >= 2) {
+                    val sx = a[0].jsonPrimitive.floatOrNull ?: Float.NaN
+                    val sy = a[1].jsonPrimitive.floatOrNull ?: Float.NaN
+                    if (sx.isFinite() && sy.isFinite()) {
+                        scaleX = sx
+                        scaleY = sy
+                    }
                 }
             }
             stateActive = n > 0 || !gx.isNaN()
@@ -214,6 +235,8 @@ object CorrectionPriors {
             }
         }
         stateActive = changed > 0 || !globalX.isNaN()
+        estimateScale()
+        pushChannelParams()
         appContext?.let { persist(it) }
     }
 
@@ -244,10 +267,57 @@ object CorrectionPriors {
                     })
                 }
                 put("keys", keys)
+                if (scaleX.isFinite() && scaleY.isFinite()) {
+                    put("sigma", buildJsonArray {
+                        add(JsonPrimitive(round2(scaleX)))
+                        add(JsonPrimitive(round2(scaleY)))
+                    })
+                }
             }.toString())
         } catch (e: Throwable) {
             FileLogger.i(TAG, "persist offset state failed: ${e.message}")
         }
+    }
+
+    /**
+     * 用 MAD（中位数绝对偏差）稳健估计落点散布 —— 即结构化信道核的 σ。
+     * 为什么用 MAD 而不是标准差：滑窗里约 6% 是真实误触（大偏移），标准差会被拉高，
+     * 而信道核要的是"用户按对时手指抖多大"。MAD 对这类离群点不敏感（崩溃点 50%）。
+     */
+    private fun estimateScale() {
+        if (ringTotal < MIN_N_SCALE) return
+        val allX = FloatArray(ringTotal)
+        val allY = FloatArray(ringTotal)
+        var kx = 0
+        for (i in 0..25) {
+            val rx = ringX[i]
+            val ry = ringY[i]
+            for (j in 0 until rx.size) {
+                if (kx >= allX.size) break
+                allX[kx] = rx.elementAt(j)
+                allY[kx] = ry.elementAt(j)
+                kx++
+            }
+        }
+        if (kx < MIN_N_SCALE) return
+        val sx = robustScale(allX.copyOf(kx))
+        val sy = robustScale(allY.copyOf(kx))
+        scaleX = if (sx in SCALE_MIN..SCALE_MAX) sx else Float.NaN
+        scaleY = if (sy in SCALE_MIN..SCALE_MAX) sy else Float.NaN
+        FileLogger.i(TAG, "channel scale: sx=$scaleX sy=$scaleY (n=$kx)")
+    }
+
+    private fun robustScale(values: FloatArray): Float {
+        if (values.size < MIN_N_SCALE) return Float.NaN
+        val med = medianOf(values.copyOf())
+        for (i in values.indices) values[i] = abs(values[i] - med)
+        return 1.4826f * medianOf(values)
+    }
+
+    private fun pushChannelParams() {
+        if (!nativeActive) return
+        if (scaleX.isNaN() || scaleY.isNaN()) return
+        CorrectionNative.setChannelParams(scaleX, scaleY)
     }
 
     /** 全部键滑窗样本合并后的中位数 (x, y)；样本不足返回 NaN。 */
@@ -358,27 +428,26 @@ object CorrectionPriors {
             return
         }
         val n = code.length
-        val arr = letters.toCharArray()
-        val off = arr.size - n
-        for (i in 0 until n) {
-            if (arr[off + i] != code[i]) {
-                CorrectionNative.clearTaps()
-                lastPush = tr(R.string.s_anjianxulieyubianmabuyizhi_vs_30afd, String(arr), code)
-                FileLogger.d(TAG, lastPush!!)
-                return
-            }
+        // 只保留与当前编码等长的尾部：缓冲区必须随组合编码收敛，否则上屏/反查留下的
+        // 陈旧按键会一直堆在前面，之后每次 sync 都"尾部对不上"，纠错在整段输入里哑火
+        // （真机日志里一次错位后 taps-unaligned 成片出现，就是这个原因）。
+        while (letters.size > n) {
+            letters.removeFirst(); offX.removeFirst(); offY.removeFirst()
         }
+        val arr = letters.toCharArray()
+        val oxa = offX.toFloatArray()
+        val oya = offY.toFloatArray()
         val l = ByteArray(n)
         val ox = FloatArray(n)
         val oy = FloatArray(n)
-        val oxa = offX.toFloatArray()
-        val oya = offY.toFloatArray()
         val sb = StringBuilder()
         for (i in 0 until n) {
             l[i] = code[i].code.toByte()
-            ox[i] = oxa[off + i]
-            oy[i] = oya[off + i]
-            sb.append(String.format("%.2f/%.2f ", ox[i], oy[i]))
+            // 字母对不上 = 这个落点不属于当前编码的这一位，按"无几何证据"送（NaN）
+            val aligned = i < arr.size && arr[i] == code[i]
+            ox[i] = if (aligned) oxa[i] else Float.NaN
+            oy[i] = if (aligned) oya[i] else Float.NaN
+            sb.append(if (aligned) String.format("%.2f/%.2f ", ox[i], oy[i]) else "? ")
         }
         CorrectionNative.setTaps(l, ox, oy)
         lastPush = tr(R.string.s_yituisong_code_off, code, sb)
