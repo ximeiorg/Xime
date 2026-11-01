@@ -1,0 +1,78 @@
+name: Sync Release to GitCode
+
+# 手动把 GitHub Release 镜像到 GitCode（镜像仓库的代码与 tag 由 GitCode 侧自动同步，
+# 这里只补 release 页面与附件）。日常发布由 release.yml 自动触发，本流程用于补传历史版本。
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要同步的 tag，多个用逗号分隔；留空 = GitHub 最新正式版'
+        required: false
+        default: ''
+      exclude:
+        description: '排除的文件名正则，多个用逗号分隔（例如 ^xipm-）'
+        required: false
+        default: ''
+      include_prerelease:
+        description: '包含预发布版本（nightly 等）'
+        type: boolean
+        default: false
+      dry_run:
+        description: '仅预览同步计划，不写入 GitCode'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sync script
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      - name: Sync releases
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAGS: ${{ inputs.tag }}
+          EXCLUDE: ${{ inputs.exclude }}
+          INCLUDE_PRE: ${{ inputs.include_prerelease }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -u
+
+          if [ -z "${GITCODE_TOKEN:-}" ] && [ "$DRY_RUN" != "true" ]; then
+            echo "::error::缺少 GITCODE_TOKEN，请在 Settings → Secrets 中配置"
+            exit 1
+          fi
+
+          common=()
+          if [ "$INCLUDE_PRE" = "true" ]; then common+=(--include-prerelease); fi
+          if [ "$DRY_RUN" = "true" ]; then common+=(--dry-run); fi
+          if [ -n "${EXCLUDE:-}" ]; then
+            IFS=',' read -ra items <<< "$EXCLUDE"
+            for item in "${items[@]}"; do
+              item="$(echo "$item" | xargs)"
+              [ -n "$item" ] && common+=(--exclude "$item")
+            done
+          fi
+
+          status=0
+          if [ -z "${TAGS// /}" ]; then
+            python3 scripts/sync-release-to-gitcode.py "${common[@]}" || status=1
+          else
+            IFS=',' read -ra items <<< "$TAGS"
+            for item in "${items[@]}"; do
+              tag="$(echo "$item" | xargs)"
+              [ -z "$tag" ] && continue
+              python3 scripts/sync-release-to-gitcode.py --tag "$tag" "${common[@]}" || status=1
+            done
+          fi
+          exit $status

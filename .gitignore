@@ -62,3 +62,8 @@ app/src/main/jni/ncnn
 app/src/main/jni/third_party/
 /.zcode
 /.workbuddy
+
+# Release 同步脚本的本地凭据与缓存
+.env.local
+__pycache__/
+*.pyc

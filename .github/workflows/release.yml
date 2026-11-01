@@ -243,3 +243,37 @@ jobs:
           files: xipm-dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 把完整 Release（正文 + 全部附件）镜像到 GitCode。
+  # 放在 publish-xipm 之后，确保 xipm 二进制也在同步范围内。
+  sync-gitcode:
+    runs-on: ubuntu-latest
+    needs: [build, publish-xipm]
+    if: >-
+      always() && !cancelled() &&
+      needs.build.result == 'success'
+
+    steps:
+      - name: Checkout sync script
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      - name: Check GitCode token
+        id: token
+        run: |
+          if [ -z "${{ secrets.GITCODE_TOKEN }}" ]; then
+            echo "::warning::未配置 GITCODE_TOKEN，跳过 GitCode 镜像同步"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sync release to GitCode
+        if: steps.token.outputs.enabled == 'true'
+        env:
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 scripts/sync-release-to-gitcode.py --tag "${GITHUB_REF#refs/tags/}"
