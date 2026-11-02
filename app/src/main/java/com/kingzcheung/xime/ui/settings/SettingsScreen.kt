@@ -47,6 +47,7 @@ fun SettingsScreen(
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
                 onNavigateToSmartPrediction = { navController.navigate(SettingsRoutes.SmartPrediction) },
                 onNavigateToCorrection = { navController.navigate(SettingsRoutes.Correction) },
+                onNavigateToFuzzyPinyin = { navController.navigate(SettingsRoutes.FuzzyPinyin) },
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
                 onNavigateToClipboard = { navController.navigate(SettingsRoutes.Clipboard) },
@@ -191,6 +192,11 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.Correction) {
             CorrectionSettingsContent(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(SettingsRoutes.FuzzyPinyin) {
+            FuzzyPinyinSettingsContent(
                 onBack = { navController.popBackStack() }
             )
         }

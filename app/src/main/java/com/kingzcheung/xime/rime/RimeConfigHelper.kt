@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import com.kingzcheung.xime.settings.PersonalDictManager
 import com.kingzcheung.xime.settings.SchemaConfigHelper
+import com.kingzcheung.xime.settings.FuzzyPinyinManager
 import com.kingzcheung.xime.settings.MarketVersionStore
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.scheme.SchemeFiles
@@ -56,6 +57,8 @@ object RimeConfigHelper {
         // 状态对齐（迁移一次 + 过滤失效项），再把启用列表镜像进 default.yaml。
         SchemeStore.ensure(context)
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
+        // 模糊拼音是用户级状态：每次重建 rime 目录后按 prefs 重放补丁。
+        FuzzyPinyinManager.reconcile(context)
         // 为所有启用方案打个人词库补丁
         PersonalDictManager.ensureSchemaPacks(context)
         // 不再在初始化阶段删 build：build 是否重建统一由 ensureDeployment()
@@ -220,6 +223,7 @@ object RimeConfigHelper {
         // 同步初始化路径同样先对齐状态，再镜像 schema_list
         SchemeStore.ensure(context)
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
+        FuzzyPinyinManager.reconcile(context)
         runBlocking { PersonalDictManager.ensureSchemaPacks(context) }
         // build 是否重建统一由 ensureDeployment() 决定（缺失/半成品时强制 fullCheck）
 

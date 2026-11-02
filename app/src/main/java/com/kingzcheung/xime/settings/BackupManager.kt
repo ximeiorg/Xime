@@ -208,6 +208,8 @@ object BackupManager {
             SchemeStore.invalidate()
             SchemeStore.ensure(context)
             SchemaManager.applyEnabledSchemasToDefaultYaml(context)
+            // 备份可能带回旧方案的模糊拼音块；按恢复后的 prefs 重新对账。
+            FuzzyPinyinManager.reconcile(context)
         } catch (e: Exception) {
             Log.e(TAG, "Restore: 重新镜像 schema_list 失败", e)
         }
