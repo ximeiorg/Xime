@@ -1398,6 +1398,23 @@ public:
         return value == True;
     }
 
+    // 读取 user.yaml 布尔值：-1 键不存在，0 false，1 true。
+    // 用于区分「用户显式关闭」与「从未设置」——后者应保留方案 switches.reset 默认值。
+    int getUserConfigBoolState(const char *key)
+    {
+        if (!rime || !initialized_)
+            return -1;
+        RimeConfig config;
+        if (!rime->user_config_open("user", &config))
+            return -1;
+        Bool value = False;
+        Bool found = rime->config_get_bool(&config, key, &value);
+        rime->config_close(&config);
+        if (found != True)
+            return -1;
+        return value == True ? 1 : 0;
+    }
+
     // 写 user.yaml 用户状态字符串（user_config 组件 auto_save=true）
     bool setUserConfigString(const char *key, const char *value)
     {
@@ -2472,6 +2489,21 @@ extern "C"
         bool value = Rime::Instance().getUserConfigBool(key_ptr);
         env->ReleaseStringUTFChars(key, key_ptr);
         return value ? JNI_TRUE : JNI_FALSE;
+    }
+
+    // 读取 user.yaml 布尔值三态：-1 不存在，0 false，1 true
+    JNIEXPORT jint JNICALL
+    Java_com_kingzcheung_xime_rime_RimeEngine_nativeGetUserConfigBoolOrNull(
+        JNIEnv *env,
+        jobject thiz,
+        jstring key)
+    {
+        const char *key_ptr = env->GetStringUTFChars(key, nullptr);
+        if (!key_ptr)
+            return -1;
+        int value = Rime::Instance().getUserConfigBoolState(key_ptr);
+        env->ReleaseStringUTFChars(key, key_ptr);
+        return value;
     }
 
     // 写 user.yaml 用户状态字符串

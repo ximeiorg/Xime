@@ -23,6 +23,10 @@ import java.io.IOException
 object RimeConfigHelper {
     private const val TAG = "RimeConfigHelper"
     private const val ASSETS_RIME_DIR = "rime"
+    /** 内置 OpenCC 简繁转换数据：随内置方案集放在 assets/rime/opencc。 */
+    private const val ASSETS_OPENCC_DIR = "rime/opencc"
+    /** librime 查找 OpenCC 配置的目录名（相对 rime 数据目录）。 */
+    private const val RIME_OPENCC_DIR = "opencc"
     /** app 固定的 default.custom.yaml 模板（assets 根，与 xime.yaml 并列，不随 submodule 分发）。 */
     private const val ASSETS_DEFAULT_CUSTOM = "default.custom.yaml"
 
@@ -95,6 +99,8 @@ object RimeConfigHelper {
             if (restored > 0) {
                 FileLogger.w(TAG, "Restored $restored builtin file(s), forcing full check")
             }
+            // 简繁转换数据不是编译输入，但会话重建后才懒加载：缺了要补（不强制重编）
+            ensureOpenccAssets(context, SchemeFiles.rimeDir(context))
 
             val engine = RimeEngine.getInstance()
             if (!RimeEngine.isInitialized()) {
@@ -309,6 +315,8 @@ object RimeConfigHelper {
      * 不能覆盖；没有内容（全新安装、被清空、安装失败回退）才铺。
      */
     private fun copyAssetsToRimeDir(context: Context, targetDir: File): Boolean {
+        // 简繁转换数据与方案集无关，每次初始化都补齐（旧版本升级/方案包替换后可能缺失）
+        ensureOpenccAssets(context, targetDir)
         if (SchemeFiles.installedSchemaIds(targetDir).isNotEmpty()) {
             // 已有方案集：只补用户模板与存量迁移，不碰方案文件
             seedAndMigrateDefaultCustom(context, targetDir)
@@ -328,6 +336,43 @@ object RimeConfigHelper {
         seedAndMigrateDefaultCustom(context, targetDir)
         FileLogger.i(TAG, "Seeded builtin schemas (rime was empty)")
         return true
+    }
+
+    /**
+     * 补齐内置 OpenCC 简繁转换数据（`assets/rime/opencc/` 下的 `.json` 与 `.ocd2`）。
+     *
+     * librime 的 simplifier 按 `<user_data_dir>/opencc/<config>` 查找转换配置，
+     * 缺目录时「简入繁出」不生效（日志：`opencc config not found: s2hk.json`）。
+     * 只补缺失文件，不覆盖用户自有数据（用户或方案包可能自带更新的 opencc 词典）；
+     * 返回本次补齐的文件数。
+     */
+    internal fun ensureOpenccAssets(context: Context, rimeDir: File): Int {
+        val names = try {
+            context.assets.list(ASSETS_OPENCC_DIR)
+        } catch (e: IOException) {
+            FileLogger.e(TAG, "Failed to list opencc assets", e)
+            null
+        } ?: return 0
+
+        val targetDir = File(rimeDir, RIME_OPENCC_DIR)
+        var copied = 0
+        for (name in names) {
+            // LICENSE 等随包说明不落到 rime 数据目录
+            if (!name.endsWith(".json") && !name.endsWith(".ocd2")) continue
+            val target = File(targetDir, name)
+            if (target.isFile && target.length() > 0L) continue
+            try {
+                target.parentFile?.mkdirs()
+                context.assets.open("$ASSETS_OPENCC_DIR/$name").use { input ->
+                    FileOutputStream(target).use { output -> input.copyTo(output) }
+                }
+                copied++
+            } catch (e: IOException) {
+                FileLogger.e(TAG, "Failed to copy opencc asset: $name", e)
+            }
+        }
+        if (copied > 0) FileLogger.i(TAG, "Restored $copied builtin opencc file(s)")
+        return copied
     }
 
     /**
