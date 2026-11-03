@@ -50,6 +50,9 @@ interface ActionExecutor {
      * @param key 功能键字符串，如 "enter"、"space"、"delete"、"clear_all"
      */
     fun dispatchKey(key: String)
+
+    /** 轮换切换到下一个已启用输入方案（菜单栏方案列表顺序，末尾回到首个）。 */
+    fun cycleSchema()
 }
 
 /**
@@ -113,6 +116,9 @@ enum class GestureAction(val value: String) {
 
     /** 切换中/英文输入模式。UI 分发层优先处理。 */
     TOGGLE_ASCII("toggle_ascii"),
+
+    /** 轮换切换到下一个已启用输入方案（与菜单栏方案列表顺序一致，末尾回到首个）。 */
+    CYCLE_SCHEMA("cycle_schema"),
 
     /** 删除/退格。UI 分发层优先处理。 */
     DELETE("delete"),
