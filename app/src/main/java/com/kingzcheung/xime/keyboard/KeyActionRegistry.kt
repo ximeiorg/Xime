@@ -129,6 +129,9 @@ object KeyActionRegistry {
         register("toggle_ascii", ActionDomain.CROSS, GestureAction.TOGGLE_ASCII) { c, _ ->
             c.service.dispatchKey("ime_switch")
         }
+        register("cycle_schema", ActionDomain.SERVICE, GestureAction.CYCLE_SCHEMA) { c, _ ->
+            c.service.cycleSchema()
+        }
         register("delete", ActionDomain.CROSS, GestureAction.DELETE) { c, _ -> c.service.dispatchKey("delete") }
 
         register("enter", ActionDomain.SERVICE, GestureAction.ENTER) { c, _ -> c.service.dispatchKey("enter") }

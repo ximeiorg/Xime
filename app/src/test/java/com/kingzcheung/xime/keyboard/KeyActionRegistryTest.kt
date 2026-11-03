@@ -30,7 +30,15 @@ class KeyActionRegistryTest {
         assertEquals(ActionDomain.UI, KeyActionRegistry.fromId("switch_route")!!.domain)
         assertEquals(ActionDomain.CROSS, KeyActionRegistry.fromId("delete")!!.domain)
         assertEquals(ActionDomain.CROSS, KeyActionRegistry.fromId("toggle_ascii")!!.domain)
+        assertEquals(ActionDomain.SERVICE, KeyActionRegistry.fromId("cycle_schema")!!.domain)
         assertEquals(ActionDomain.SERVICE, KeyActionRegistry.fromId("repeat_space")!!.domain)
+    }
+
+    @Test
+    fun `cycle_schema 交给服务层轮换方案`() {
+        val executor = RecordingExecutor()
+        KeyActionRegistry.execute(GestureAction.CYCLE_SCHEMA, KeyActionContext(executor), "")
+        assertEquals(1, executor.schemaCycles)
     }
 
     @Test
@@ -81,6 +89,7 @@ class KeyActionRegistryTest {
         val commands = mutableListOf<String>()
         val dispatched = mutableListOf<String>()
         val cursorMoves = mutableListOf<Int>()
+        var schemaCycles = 0
 
         override fun commitText(text: String) = Unit
         override fun performEditorMenuAction(actionId: Int) = Unit
@@ -94,6 +103,9 @@ class KeyActionRegistryTest {
         override fun repeatLastInput() = Unit
         override fun dispatchKey(key: String) {
             dispatched.add(key)
+        }
+        override fun cycleSchema() {
+            schemaCycles++
         }
     }
 }

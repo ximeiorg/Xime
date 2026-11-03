@@ -439,6 +439,7 @@ color_schemes:
 #             select_all, copy, cut, paste, line_start, line_end, undo, none, repeat,
 #             功能键：delete, enter, newline（固定换行，无视编辑器回车动作）, space, repeat_space（value 为次数，默认 5），
 #                     clear_all, undo_clear, toggle_ascii, toggle_symbols, toggle_shift,
+#                     cycle_schema（轮换到下一个已启用输入方案，顺序同菜单栏方案列表，末尾回到首个）,
 #                     voice（进入语音输入）, switch_route（value: emoji|symbol|clipboard）
 #     command 可用命令（会走键盘按键路由，与"点击对应按键"等价）：
 #       clear_composition - 清空当前输入编码和候选词
