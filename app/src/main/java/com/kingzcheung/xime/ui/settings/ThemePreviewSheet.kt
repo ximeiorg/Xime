@@ -201,7 +201,6 @@ private fun ThemeKeyboardPreview(
     modifier: Modifier = Modifier,
 ) {
     val bgColor = if (isDark) theme.keyboardBgDark else theme.keyboardBgLight
-    val accent = if (isDark) theme.accentDark else theme.accentLight
     val specialKeyColor = if (isDark) theme.specialKeyDark else theme.specialKeyLight
     val textColor = if (isDark) theme.keyTextColorDark else theme.keyTextColorLight
 
@@ -214,6 +213,7 @@ private fun ThemeKeyboardPreview(
         else longToColor(kbColors.candidateTextColor)
     val selectedTextColor = KeyboardThemes.getCandidateSelectedTextColorOverride(theme.id, isDark)
         ?: if (isDark) theme.candidateSelectedTextColorDark else theme.candidateSelectedTextColorLight
+    val selectedBgColor = KeyboardThemes.getCandidateSelectedBgColor(theme.id, isDark)
     // 与实机键盘同一条取色逻辑（亮度自适应），保证预览所见即所得
     val specialTextColor = KeyboardThemes.getSpecialKeyTextColorForBackground(
         specialKeyColor, textColor
@@ -236,7 +236,7 @@ private fun ThemeKeyboardPreview(
                     .fillMaxSize()
                     .padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
             ) {
-                CandidateBarPreview(accent, candidateTextColor, selectedTextColor, candidateTextSize)
+                CandidateBarPreview(candidateTextColor, selectedTextColor, selectedBgColor, candidateTextSize)
 
                 Column(modifier = Modifier
                     .fillMaxWidth()
@@ -338,9 +338,9 @@ private fun ThemeKeyboardPreview(
 
 @Composable
 private fun CandidateBarPreview(
-    accent: Color,
     textColor: Color,
     selectedTextColor: Color,
+    selectedBgColor: Color,
     textSize: Int,
 ) {
     Column(
@@ -357,18 +357,18 @@ private fun CandidateBarPreview(
             PreviewCandidate(
                 text = tr(R.string.s_xima),
                 isSelected = true,
-                accent = accent,
                 textColor = textColor,
                 selectedTextColor = selectedTextColor,
+                selectedBgColor = selectedBgColor,
                 textSize = textSize
             )
             Spacer(modifier = Modifier.width(4.dp))
             PreviewCandidate(
                 text = tr(R.string.s_shurufa),
                 isSelected = false,
-                accent = accent,
                 textColor = textColor,
                 selectedTextColor = selectedTextColor,
+                selectedBgColor = selectedBgColor,
                 textSize = textSize
             )
         }
@@ -379,15 +379,15 @@ private fun CandidateBarPreview(
 private fun PreviewCandidate(
     text: String,
     isSelected: Boolean,
-    accent: Color,
     textColor: Color,
     selectedTextColor: Color,
+    selectedBgColor: Color,
     textSize: Int,
 ) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(5.dp))
-            .background(if (isSelected) accent.copy(alpha = 0.2f) else Color.Transparent)
+            .background(if (isSelected) selectedBgColor else Color.Transparent)
             .padding(horizontal = 6.dp, vertical = 4.dp),
     ) {
         Text(

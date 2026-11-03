@@ -468,6 +468,11 @@ data class ColorSchemeEntry(
     val candidateSelectedTextColor: Long? = null,
     @SerialName("candidate_selected_text_color_dark")
     val candidateSelectedTextColorDark: Long? = null,
+    /** 候选选中背景色；null 表示未配置，按主色 20% 透明派生。 */
+    @SerialName("candidate_selected_bg_color")
+    val candidateSelectedBgColor: Long? = null,
+    @SerialName("candidate_selected_bg_color_dark")
+    val candidateSelectedBgColorDark: Long? = null,
     @SerialName("keyboard_background")
     val keyboardBackground: BackgroundConfig? = null,
     @SerialName("key_background")
@@ -2262,6 +2267,8 @@ object KeysConfigHelper {
                 candidateTextColorDark = customEntry.candidateTextColorDark ?: base.candidateTextColorDark,
                 candidateSelectedTextColor = customEntry.candidateSelectedTextColor ?: base.candidateSelectedTextColor,
                 candidateSelectedTextColorDark = customEntry.candidateSelectedTextColorDark ?: base.candidateSelectedTextColorDark,
+                candidateSelectedBgColor = customEntry.candidateSelectedBgColor ?: base.candidateSelectedBgColor,
+                candidateSelectedBgColorDark = customEntry.candidateSelectedBgColorDark ?: base.candidateSelectedBgColorDark,
                 keyboardBackground = customEntry.keyboardBackground ?: base.keyboardBackground,
                 keyBackground = customEntry.keyBackground ?: base.keyBackground,
                 candidateBarBackground = customEntry.candidateBarBackground ?: base.candidateBarBackground,
