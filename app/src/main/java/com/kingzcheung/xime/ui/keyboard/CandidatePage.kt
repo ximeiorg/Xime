@@ -130,6 +130,8 @@ data class CandidatePageState(
     val railSelectedPinyinIndex: Int = -1,
     /** 拼音选中胶囊强调色（对齐九键 CandidateItem）；Unspecified 时用 textColor 兜底 */
     val railAccentColor: Color = Color.Unspecified,
+    /** 拼音选中胶囊背景色；Unspecified 时按 [railAccentColor] 20% 透明派生 */
+    val railSelectedBgColor: Color = Color.Unspecified,
     /** 右栏等分压缩（悬浮模式页高有限）：true 时 4 键均分列高（同横屏），
      *  false 保持竖屏固定 46dp 方块——固定尺寸在悬浮矮卡片下放不下会整体溢出，
      *  最底部的回车键被卡片圆角裁掉一半 */
@@ -322,6 +324,7 @@ fun CandidatePage(
                                 modifier = Modifier.weight(1f),
                                 isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
                                 accentColor = state.railAccentColor,
+                                selectedBgColor = state.railSelectedBgColor,
                                 isPinyin = isPinyinRail
                             )
                         }
@@ -343,6 +346,7 @@ fun CandidatePage(
                                     modifier = Modifier.height(itemHeightDp),
                                     isSelected = isPinyinRail && index == state.railSelectedPinyinIndex,
                                     accentColor = state.railAccentColor,
+                                    selectedBgColor = state.railSelectedBgColor,
                                     isPinyin = isPinyinRail
                                 )
                             }
@@ -785,11 +789,13 @@ private fun CandidateRailSymbolKey(
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
     accentColor: Color = Color.Unspecified,
+    selectedBgColor: Color = Color.Unspecified,
     isPinyin: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pillColor = if (accentColor == Color.Unspecified) textColor else accentColor
+    val pillBg = if (selectedBgColor == Color.Unspecified) pillColor.copy(alpha = 0.2f) else selectedBgColor
 
     Box(
         modifier = modifier
@@ -808,7 +814,7 @@ private fun CandidateRailSymbolKey(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(5.dp))
-                    .background(pillColor.copy(alpha = 0.2f))
+                    .background(pillBg)
                     .padding(horizontal = 3.dp, vertical = 1.dp)
             ) {
                 Text(

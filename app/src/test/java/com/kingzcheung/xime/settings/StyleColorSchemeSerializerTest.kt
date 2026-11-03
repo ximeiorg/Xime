@@ -125,6 +125,42 @@ class StyleColorSchemeSerializerTest {
     }
 
     @Test
+    fun `color_schemes 的 candidate_selected_bg_color 可以解析`() {
+        val config = yaml.decodeFromString(
+            XimeConfig.serializer(),
+            "color_schemes:\n" +
+                "  ocean_blue:\n" +
+                "    name: \"海洋蔚蓝\"\n" +
+                "    primary_color: 0x1A73E8\n" +
+                "    candidate_selected_bg_color: 0x331A73E8\n" +
+                "    candidate_selected_bg_color_dark: 0x55FFFFFF\n"
+        )
+        val entry = config.colorSchemes?.get("ocean_blue")
+        assertNotNull(entry)
+        assertEquals(0x331A73E8L, entry?.candidateSelectedBgColor)
+        assertEquals(0x55FFFFFFL, entry?.candidateSelectedBgColorDark)
+    }
+
+    @Test
+    fun `mergeColorSchemes 保留未覆盖的候选选中背景色`() {
+        val default = mapOf(
+            "ocean_blue" to ColorSchemeEntry(
+                name = "海洋蔚蓝",
+                candidateSelectedBgColor = 0x331A73E8,
+                candidateSelectedBgColorDark = 0x55FFFFFF,
+            )
+        )
+        val custom = mapOf(
+            "ocean_blue" to ColorSchemeEntry(name = "海洋蔚蓝（改）")
+        )
+        val merged = KeysConfigHelper.mergeColorSchemesForTest(default, custom)
+        val entry = merged?.get("ocean_blue")
+        assertNotNull(entry)
+        assertEquals(0x331A73E8L, entry?.candidateSelectedBgColor)
+        assertEquals(0x55FFFFFFL, entry?.candidateSelectedBgColorDark)
+    }
+
+    @Test
     fun `mergeColorSchemes 显式纯黑主色不被当作未配置`() {
         val default = mapOf("mono" to ColorSchemeEntry(name = "墨黑", primaryColor = 0xE65100))
         val custom = mapOf("mono" to ColorSchemeEntry(primaryColor = 0x000000))

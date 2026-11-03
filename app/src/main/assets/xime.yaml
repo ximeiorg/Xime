@@ -89,6 +89,9 @@ fuzzy_pinyin:
 #   candidate_selected_text_color / _dark      - 候选选中文字色（亮/暗），未设置时亮色回退
 #                                                 primary_color 原色、暗色回退 primary 提亮 45%
 #                                                 （灰色系 primary 提亮后仍偏暗时建议单独配置）
+#   candidate_selected_bg_color / _dark        - 候选选中背景色（亮/暗），未设置时按
+#                                                 primary_color 20% 透明派生；支持
+#                                                 0xAARRGGBB（如 0x33FF0000）自定义透明度
 #
 # ── 暗色配色约束（新增皮肤时请遵守，详见 docs/theme-dark-colors.md）──
 # 1. 暗色功能键不再默认取 primary_color：主色的 OKLCH 彩度普遍在 0.16~0.21，

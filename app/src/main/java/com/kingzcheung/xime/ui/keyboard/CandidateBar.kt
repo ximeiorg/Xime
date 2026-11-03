@@ -98,6 +98,8 @@ data class CandidateBarVisuals(
     val dividerColor: Color,
     val accentColor: Color = Color(0xFF1A73E8),
     val selectedTextColor: Color = Color(0xFF1A73E8),
+    /** 选中候选的背景色；Unspecified 时按强调色 20% 透明派生。 */
+    val selectedBackgroundColor: Color = Color.Unspecified,
     val isDarkTheme: Boolean = false,
     /** 按键底色：深色下圆形图标按钮与按键同材质（半透明白叠在键盘背景上）。 */
     val keyBgColor: Color = Color.Unspecified,
@@ -480,6 +482,7 @@ fun CandidateBar(
                             textColor = visuals.textColor,
                             accentColor = visuals.accentColor,
                             dividerColor = visuals.dividerColor,
+                            selectedBackgroundColor = visuals.selectedBackgroundColor,
                             fontSize = candidateTextSize.sp,
                             fontFamily = candidateFontFamily,
                         )
@@ -502,6 +505,7 @@ fun CandidateBar(
                             isSelected = index == 0,
                             accentColor = visuals.accentColor,
                             selectedTextColor = visuals.selectedTextColor,
+                            selectedBackgroundColor = visuals.selectedBackgroundColor,
                             fontSize = candidateTextSize.sp,
                             candidateFontFamily = candidateFontFamily,
                             commentFontFamily = commentFontFamily
@@ -536,6 +540,7 @@ fun CandidateBar(
                         isSelected = assocState?.highlightIndex == index,
                         accentColor = visuals.accentColor,
                         selectedTextColor = visuals.selectedTextColor,
+                        selectedBackgroundColor = visuals.selectedBackgroundColor,
                         fontSize = candidateTextSize.sp,
                         candidateFontFamily = candidateFontFamily,
                         commentFontFamily = commentFontFamily
@@ -721,15 +726,21 @@ fun ClipboardImageCandidateItem(
     accentColor: Color,
     dividerColor: Color = Color.Unspecified,
     isSelected: Boolean = false,
+    selectedBackgroundColor: Color = Color.Unspecified,
     fontSize: androidx.compose.ui.unit.TextUnit = 16.sp,
     fontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.Default,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val selectedBg = if (selectedBackgroundColor == Color.Unspecified) {
+        accentColor.copy(alpha = 0.2f)
+    } else {
+        selectedBackgroundColor
+    }
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (isSelected) accentColor.copy(alpha = 0.2f) else containerColor
+                if (isSelected) selectedBg else containerColor
             )
             .tolerantClick(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 5.dp, vertical = 4.dp),
@@ -789,6 +800,7 @@ fun CandidateItem(
     isSelected: Boolean = false,
     accentColor: Color = Color(0xFF1A73E8),
     selectedTextColor: Color = Color(0xFF1A73E8),
+    selectedBackgroundColor: Color = Color.Unspecified,
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 19.sp,
     candidateFontFamily: androidx.compose.ui.text.font.FontFamily = androidx.compose.ui.text.font.FontFamily.Default,
@@ -799,8 +811,15 @@ fun CandidateItem(
         modifier = modifier
             .clip(RoundedCornerShape(5.dp))
             .background(
-                if (isSelected) accentColor.copy(alpha = 0.2f)
-                else Color.Transparent
+                if (isSelected) {
+                    if (selectedBackgroundColor == Color.Unspecified) {
+                        accentColor.copy(alpha = 0.2f)
+                    } else {
+                        selectedBackgroundColor
+                    }
+                } else {
+                    Color.Transparent
+                }
             )
             // 候选栏在 LazyRow 内且外层还有滚动手势：用 tolerantClick 容忍轻点的小位移，
             // 避免 ROM 手势判定吃掉点击（部分平板/高采样率屏幕会表现为“点候选没反应”）

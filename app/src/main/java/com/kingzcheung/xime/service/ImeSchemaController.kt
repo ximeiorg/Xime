@@ -274,11 +274,10 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 Toast.makeText(service, tr(R.string.s_fanganweibushu_qingzaifangangu_63cf5), Toast.LENGTH_SHORT).show()
                 return
             }
-            val asciiDefault = SchemaManager.isAsciiDefaultSchema(service, schemaId)
             val ascii = service.asciiModeController.applySchemaDefault(schemaId)
-            // 普通中文方案保持原有「非 ascii 时用中文标点」；english 方案的候选模式
-            // 仍属于英文方案（ascii_mode=false 只是切到候选），不能把 ascii_punct 改成中文。
-            if (!ascii && !asciiDefault) {
+            // 标点默认值也由方案声明：ascii_punct reset:1 时不覆盖；
+            // 未声明或 reset:0 的普通中文方案保持原有「非 ascii 时用中文标点」。
+            if (!ascii && SchemaManager.schemaSwitchReset(service, schemaId, "ascii_punct") != 1) {
                 service.rimeEngine.setOption("ascii_punct", false)
             }
             service.uiState.value = service.uiState.value.copy(isAsciiMode = ascii)

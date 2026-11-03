@@ -88,6 +88,9 @@ data class KeyboardColorScheme(
     // 候选选中文字颜色（未配置时回退到主题强调色）
     val candidateSelectedTextColorLight: Color = Color(0xFF8F73E2),
     val candidateSelectedTextColorDark: Color = Color(0xFFD0BCFF),
+    // 候选选中背景色（Unspecified = 未配置，按强调色 20% 透明派生）
+    val candidateSelectedBgColorLight: Color = Color.Unspecified,
+    val candidateSelectedBgColorDark: Color = Color.Unspecified,
     // 分隔线颜色
     val dividerColorLight: Color = Color(0xFFDADCE0),
     val dividerColorDark: Color = Color(0xFF3C4043),
@@ -230,6 +233,10 @@ object KeyboardThemes {
             candidateTextColorDark = candColorDark,
             candidateSelectedTextColorLight = candSelectedLight,
             candidateSelectedTextColorDark = candSelectedDark,
+            candidateSelectedBgColorLight = entry.candidateSelectedBgColor?.let { longToColor(it) }
+                ?: Color.Unspecified,
+            candidateSelectedBgColorDark = entry.candidateSelectedBgColorDark?.let { longToColor(it) }
+                ?: Color.Unspecified,
             keyboardBackground = entry.keyboardBackground,
             keyBackground = entry.keyBackground,
             candidateBarBackground = entry.candidateBarBackground,
@@ -430,6 +437,10 @@ object KeyboardThemes {
                 ?: cfgColor,
             candidateSelectedTextColorDark = entry.candidateSelectedTextColorDark?.let { longToColor(it) }
                 ?: lightened,
+            candidateSelectedBgColorLight = entry.candidateSelectedBgColor?.let { longToColor(it) }
+                ?: scheme.candidateSelectedBgColorLight,
+            candidateSelectedBgColorDark = entry.candidateSelectedBgColorDark?.let { longToColor(it) }
+                ?: scheme.candidateSelectedBgColorDark,
             keyboardBackground = entry.keyboardBackground ?: scheme.keyboardBackground,
             keyBackground = entry.keyBackground ?: scheme.keyBackground,
             candidateBarBackground = entry.candidateBarBackground ?: scheme.candidateBarBackground,
@@ -516,6 +527,17 @@ object KeyboardThemes {
     fun getCandidateSelectedTextColor(themeId: String, isDark: Boolean): Color {
         val theme = getThemeById(themeId)
         return if (isDark) theme.candidateSelectedTextColorDark else theme.candidateSelectedTextColorLight
+    }
+
+    /**
+     * 候选选中背景色：显式配置时原样使用（支持带透明度），
+     * 未配置时按强调色 20% 透明派生，保持既有观感。
+     */
+    fun getCandidateSelectedBgColor(themeId: String, isDark: Boolean): Color {
+        val theme = getThemeById(themeId)
+        val configured = if (isDark) theme.candidateSelectedBgColorDark else theme.candidateSelectedBgColorLight
+        if (configured != Color.Unspecified) return configured
+        return getAccentColor(themeId, isDark).copy(alpha = 0.2f)
     }
 
     fun getDividerColor(themeId: String, isDark: Boolean): Color {

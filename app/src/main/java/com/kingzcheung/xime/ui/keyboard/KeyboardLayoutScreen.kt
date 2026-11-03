@@ -71,6 +71,8 @@ fun KeyboardLayoutScreen(
     val kbShadow = KeysConfigHelper.getKeyboardShadow()
     val kbKey = KeysConfigHelper.getKeyboardKeyConfig()
     val accentColor = KeyboardThemes.getAccentColor(uiState.themeId, uiState.isDarkTheme)
+    val candidateSelectedBgColor =
+        KeyboardThemes.getCandidateSelectedBgColor(uiState.themeId, uiState.isDarkTheme)
 
     // 代码布局（九键 / 笔画 / 手写）的键面圆角与阴影圆角同样走「yaml 按键盘覆盖 → 设备档」，
     // 与 26 键 / 面板共用同一条解析：平板统一 14dp（此前这三处漏了设备档，仍是全局 8dp/硬编码 6dp）。
@@ -285,6 +287,7 @@ fun KeyboardLayoutScreen(
                         specialKeyBackgroundColor = specialKeyBgColor,
                         bubbleBackgroundColor = themeSpecialKeyColor,
                         accentColor = accentColor,
+                        selectedCandidateBgColor = candidateSelectedBgColor,
                         keyboardBackgroundColor = keyboardBgColor,
                         shadowEnabled = kbShadow.enabled,
                         shadowElevation = kbShadow.elevation.dp,

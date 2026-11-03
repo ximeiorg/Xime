@@ -106,6 +106,8 @@ fun T9KeyboardLayout(
     specialKeyBackgroundColor: Color,
     bubbleBackgroundColor: Color = keyBackgroundColor,
     accentColor: Color = Color(0xFF1A73E8),
+    /** 左栏选中拼音胶囊背景色；Unspecified 时按 accentColor 20% 透明派生。 */
+    selectedCandidateBgColor: Color = Color.Unspecified,
     keyboardBackgroundColor: Color = Color.Transparent,
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
@@ -157,6 +159,7 @@ fun T9KeyboardLayout(
         specialKeyBackgroundColor = specialKeyBackgroundColor,
         bubbleBackgroundColor = bubbleBackgroundColor,
         accentColor = accentColor,
+        selectedCandidateBgColor = selectedCandidateBgColor,
         shadowEnabled = shadowEnabled,
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
@@ -212,6 +215,7 @@ private fun T9KeyboardSwipeOverlay(
     specialKeyBackgroundColor: Color,
     bubbleBackgroundColor: Color = keyBackgroundColor,
     accentColor: Color,
+    selectedCandidateBgColor: Color = Color.Unspecified,
     shadowEnabled: Boolean,
     shadowElevation: Dp,
     shadowShapeRadius: Dp,
@@ -302,6 +306,7 @@ private fun T9KeyboardSwipeOverlay(
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBackgroundColor,
                         accentColor = accentColor,
+                        selectedCandidateBgColor = selectedCandidateBgColor,
                         shadowEnabled = shadowEnabled,
                         shadowElevation = shadowElevation,
                         shadowShapeRadius = shadowShapeRadius,
@@ -336,6 +341,7 @@ private fun T9KeyboardSwipeOverlay(
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBackgroundColor,
                         accentColor = accentColor,
+                        selectedCandidateBgColor = selectedCandidateBgColor,
                         shadowEnabled = shadowEnabled,
                         shadowElevation = shadowElevation,
                         shadowShapeRadius = shadowShapeRadius,
@@ -366,6 +372,7 @@ private fun T9KeyboardContent(
     keyTextColor: Color,
     specialKeyBackgroundColor: Color,
     accentColor: Color,
+    selectedCandidateBgColor: Color = Color.Unspecified,
     shadowEnabled: Boolean,
     shadowElevation: Dp,
     shadowShapeRadius: Dp,
@@ -504,6 +511,7 @@ private fun T9KeyboardContent(
                     textColor = keyTextColor,
                     backgroundColor = keyBackgroundColor,
                     accentColor = accentColor,
+                    selectedBackgroundColor = selectedCandidateBgColor,
                     fontSize = candidateFontSize,
                     isSelected = isSelected,
                     modifier = rowModifier
@@ -519,6 +527,7 @@ private fun T9KeyboardContent(
                     textColor = keyTextColor,
                     backgroundColor = keyBackgroundColor,
                     accentColor = accentColor,
+                    selectedBackgroundColor = selectedCandidateBgColor,
                     fontSize = candidateFontSize,
                     isSelected = false,
                     modifier = rowModifier
@@ -962,6 +971,7 @@ private fun CandidateItem(
     textColor: Color,
     backgroundColor: Color = Color.Transparent,
     accentColor: Color = Color(0xFF1A73E8),
+    selectedBackgroundColor: Color = Color.Unspecified,
     modifier: Modifier = Modifier,
     fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
     isSelected: Boolean = false,
@@ -984,10 +994,15 @@ private fun CandidateItem(
         contentAlignment = Alignment.Center
     ) {
         if (isSelected) {
+            val selectedBg = if (selectedBackgroundColor == Color.Unspecified) {
+                accentColor.copy(alpha = 0.2f)
+            } else {
+                selectedBackgroundColor
+            }
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(5.dp))
-                    .background(accentColor.copy(alpha = 0.2f))
+                    .background(selectedBg)
                     .padding(horizontal = 3.dp, vertical = 1.dp)
             ) {
                 Text(

@@ -4,6 +4,7 @@ import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -80,6 +81,7 @@ class SchemaAsciiDefaultTest {
         assertFalse(SchemaManager.isAsciiDefaultSchema(context, "wubi86"))
         assertFalse(SchemaManager.isAsciiDefaultSchema(context, "pinyin_simp"))
         assertFalse(SchemaManager.isAsciiDefaultSchema(context, "missing"))
+        assertNull(SchemaManager.schemaSwitchReset(context, "pinyin_simp", "ascii_punct"))
     }
 
     @Test
@@ -97,6 +99,9 @@ class SchemaAsciiDefaultTest {
         val spacing = switches.firstOrNull { it.name == "english_spacing" }
         assertNotNull("english_spacing switch must be visible in 方案开关", spacing)
         assertEquals(1, spacing!!.reset)
+        val asciiPunct = switches.firstOrNull { it.name == "ascii_punct" }
+        assertNotNull(asciiPunct)
+        assertEquals(1, asciiPunct!!.reset)
         assertTrue(
             "english_spacing.lua must be referenced by the schema",
             schemaFile.readText().contains("lua_filter@*english_spacing"),

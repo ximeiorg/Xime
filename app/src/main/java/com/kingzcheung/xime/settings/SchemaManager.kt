@@ -620,10 +620,20 @@ object SchemaManager {
      * 纯英文方案靠这个标记在切换方案/新输入会话时保持英文；
      * 普通中文方案的 `ascii_mode` 没有 reset 或为 0，不受影响。
      */
-    fun isAsciiDefaultSchema(context: Context, schemaId: String): Boolean {
-        if (schemaId.isEmpty()) return false
+    fun isAsciiDefaultSchema(context: Context, schemaId: String): Boolean =
+        schemaSwitchReset(context, schemaId, "ascii_mode") == 1
+
+    /**
+     * 读取方案某个 boolean switch 声明的 `reset`（未声明返回 null）。
+     *
+     * 让「进入方案用什么默认状态」由方案 yaml 决定，而不是在 Android 层按方案名硬编码：
+     * `ascii_mode reset: 1` = 默认英文，`ascii_punct reset: 1` = 保留方案自己的标点默认值。
+     */
+    fun schemaSwitchReset(context: Context, schemaId: String, switchName: String): Int? {
+        if (schemaId.isEmpty()) return null
         return getSchemaSwitches(context, schemaId)
-            .any { it.name == "ascii_mode" && it.reset == 1 }
+            .firstOrNull { it.name == switchName }
+            ?.reset
     }
 
     /** 纯解析：从 .schema.yaml 读取 switches。 */

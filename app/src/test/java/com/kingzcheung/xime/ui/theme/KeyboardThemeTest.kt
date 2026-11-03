@@ -32,6 +32,15 @@ class KeyboardThemeTest {
     }
 
     @Test
+    fun `候选选中背景未配置时按强调色20%派生`() {
+        val accent = KeyboardThemes.getAccentColor("lavender_purple", false)
+        assertEquals(
+            accent.copy(alpha = 0.2f),
+            KeyboardThemes.getCandidateSelectedBgColor("lavender_purple", false)
+        )
+    }
+
+    @Test
     fun `陶土橙背景走暗色分支`() {
         // 落日橙光深色功能键 0xD97757，亮度低于阈值应配柔白文字
         assertEquals(
