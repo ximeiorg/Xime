@@ -125,7 +125,8 @@ fun PluginsSettingsContent(
     onNavigateToPluginMarketDetail: (String) -> Unit = {},
     onNavigateToSpeechToText: () -> Unit = {},
     onNavigateToClipboardSync: () -> Unit = {},
-    onNavigateToBackup: () -> Unit = {}
+    onNavigateToBackup: () -> Unit = {},
+    onNavigateToMarket: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val viewModel: PluginsSettingsViewModel = viewModel()
@@ -188,6 +189,18 @@ fun PluginsSettingsContent(
                             offset = DpOffset(0.dp, 4.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(tr(R.string.s_chajianshichang)) },
+                                onClick = {
+                                    showMenu = false
+                                    onNavigateToMarket()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.TwoTone.Storefront, null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp))
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text(tr(R.string.s_congwenjiananzhuangchajian)) },
                                 onClick = {

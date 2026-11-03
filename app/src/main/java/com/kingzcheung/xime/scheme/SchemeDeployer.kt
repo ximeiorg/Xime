@@ -3,6 +3,7 @@ package com.kingzcheung.xime.scheme
 import android.content.Context
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.rime.RimeEngine
+import com.kingzcheung.xime.settings.FuzzyPinyinManager
 import com.kingzcheung.xime.settings.PersonalDictManager
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.util.FileLogger
@@ -39,6 +40,8 @@ internal object SchemeDeployer {
         seedDefaultCustom(context, rimeDir)
         // 启用列表是状态，schema_list 是派生物：每次部署前重新镜像。
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
+        // 模糊拼音是用户级状态，部署前物化成各方案 custom.yaml 的托管块。
+        FuzzyPinyinManager.reconcile(context)
         runBlocking { PersonalDictManager.ensureSchemaPacks(context) }
 
         ensureEngine(context)

@@ -795,6 +795,11 @@
     <string name="s_geshurufangan_gewenjian">%1$s 个输入方案 · %2$s 个文件</string>
     <string name="s_xiezai_2">卸载 (%1$s)</string>
     <string name="s_fanganshichang">方案市场</string>
+    <string name="s_moxingshichang">模型市场</string>
+    <string name="s_qushangdiangengduomoxing">从扩展商店下载智能联想 / 纠错模型</string>
+    <string name="s_chajianshichang">插件市场</string>
+    <string name="s_bujushichang">布局市场</string>
+    <string name="s_qushangdiangengduobuju">从扩展商店下载更多键盘布局</string>
     <string name="s_zanweiqiyongrenhefangan">暂未启用任何方案</string>
     <string name="s_tianjiashurufanganhou_xuyaodia_7ee14">添加输入方案后，需要点击一次「部署方案」进行部署</string>
     <string name="s_meiyouqitakeyongfangan">没有其他可用方案</string>
@@ -836,7 +841,7 @@
     <string name="s_zhinenglianxiang">智能联想</string>
     <string name="s_jiyu_ai_moxingdezhinenglianxia_5cce9">基于 AI 模型的智能联想词预测</string>
     <string name="s_zhinengjiucuo_shiyanxing">智能纠错（实验性）</string>
-    <string name="s_ancuoxianglinjianshigeichujiuz_834ec">按错相邻键时给出纠正候选</string>
+    <string name="s_ancuoxianglinjianshigeichujiuz_834ec">邻键误触时由模型打分纠错</string>
     <string name="s_zaixian_asr_fuwu_xuanzhuangyuy_74a1a">在线 ASR 服务（需安装语音识别插件）</string>
     <string name="s_shujuyutongbu">数据与同步</string>
     <string name="s_tupianjilu_tijixianzhi_zhanyon_fa4c6">图片记录、体积限制、占用清理与剪贴板同步</string>
@@ -1037,4 +1042,45 @@
     <string name="s_wenjianming_shibie_shibai">「%1$s」没能识别出目标词库，请重命名为 &lt;词典名&gt;.txt</string>
     <string name="s_yongmougefangan_daguozi">用某个方案打过字之后，引擎会自动生成对应的 .userdb</string>
     <string name="s_zidingyibeijing">自定义背景</string>
+
+    <!-- 模糊拼音 -->
+    <string name="s_mohupinyin">模糊拼音</string>
+    <string name="s_mohupinyin_jianjie">仅对全拼方案生效：zh/z、n/l、an/ang 等模糊匹配</string>
+    <string name="s_fuzzy_shengmu">声母</string>
+    <string name="s_fuzzy_yunmu">韵母</string>
+    <string name="s_fuzzy_teshu">特殊音节</string>
+    <string name="s_fuzzy_scope_hint">仅对全拼方案生效；双拼、九键、五笔不会被修改。修改后自动应用，可能需要几秒钟。</string>
+    <string name="s_fuzzy_declare_hint">只处理 fuzzy_pinyin.schemas 声明的方案；第三方全拼方案可在 rime/xime.custom.yaml 同路径追加。</string>
+    <string name="s_fuzzy_applying">正在应用…</string>
+    <string name="s_fuzzy_apply">应用</string>
+    <string name="s_fuzzy_pending_apply">有修改未应用，点右上角「应用」后生效。</string>
+    <string name="s_fuzzy_applied_to">已应用到：%1$s</string>
+    <string name="s_fuzzy_none">当前没有可应用的全拼方案</string>
+    <string name="s_fuzzy_transitive_hint">多个开关叠加时可能产生传递匹配；例如同时开启「uan = uang」和「huang = wang」时，wan 也会匹配 huang。</string>
+    <string name="s_fuzzy_apply_failed">应用失败，请稍后重试</string>
+    <string name="s_fuzzy_shiyongfangan">适用方案</string>
+    <string name="s_fuzzy_user_patch_conflict">以下方案已有自定义拼写规则，未自动应用：%1$s</string>
+    <string name="s_fuzzy_rule_z_zh">z = zh</string>
+    <string name="s_fuzzy_rule_c_ch">c = ch</string>
+    <string name="s_fuzzy_rule_s_sh">s = sh</string>
+    <string name="s_fuzzy_rule_g_k">g = k</string>
+    <string name="s_fuzzy_rule_h_f">h = f</string>
+    <string name="s_fuzzy_rule_n_l">n = l</string>
+    <string name="s_fuzzy_rule_r_l">r = l</string>
+    <string name="s_fuzzy_rule_an_ang">an = ang</string>
+    <string name="s_fuzzy_rule_en_eng">en = eng</string>
+    <string name="s_fuzzy_rule_in_ing">in = ing</string>
+    <string name="s_fuzzy_rule_an_ai">an = ai</string>
+    <string name="s_fuzzy_rule_eng_ong">eng = ong</string>
+    <string name="s_fuzzy_rule_ian_iang">ian = iang</string>
+    <string name="s_fuzzy_rule_on_ong">on = ong</string>
+    <string name="s_fuzzy_rule_uan_uang">uan = uang</string>
+    <string name="s_fuzzy_rule_un_ong">un = ong</string>
+    <string name="s_fuzzy_rule_un_iong">un = iong</string>
+    <string name="s_fuzzy_rule_hui_fei">hui = fei</string>
+    <string name="s_fuzzy_rule_huang_wang">huang = wang</string>
+    <string name="s_fuzzy_conflict_n_l_r_l">n = l 与 r = l 同时开启时，n/l/r 会互通。</string>
+    <string name="s_fuzzy_conflict_en_eng_ong">en = eng 与 eng = ong 同时开启时，en/eng/ong 会互通。</string>
+    <string name="s_fuzzy_conflict_un_on_ong">un = ong 与 on = ong 同时开启时，un/on/ong 会互通。</string>
+    <string name="s_fuzzy_conflict_uan_huang">uan = uang 与 huang = wang 同时开启时，wan/wang/huang 会互通。</string>
 </resources>

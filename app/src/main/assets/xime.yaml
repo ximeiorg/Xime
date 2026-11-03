@@ -45,6 +45,17 @@ style:
 correction:
   schemas: [wubi86, wubi86_pinyin, pinyin_simp]
 
+# ── 模糊拼音 ──
+# 模糊规则（zh/z、n/l、an/ang…）是拼音字母层面的 speller/algebra fuzz，只对「全拼」
+# 方案成立。Rime 方案没有类型字段，按 id/名称/代数结构猜测会把双拼、形码误判成
+# 拼音并污染编码，所以这里只认显式声明：schemas 列出按全拼处理的 schema_id。
+# 第三方全拼方案在 xime.custom.yaml 同路径追加即可，与内置列表取并集：
+#   fuzzy_pinyin:
+#     schemas: [wanxiang]
+# 未声明的方案不会被写入任何模糊拼音补丁；双拼、九键、五笔不要声明。
+fuzzy_pinyin:
+  schemas: [pinyin_simp, rime_ice, rime_frost]
+
 # 配色方案可配置背景类型（纯色/渐变/图片），默认均为纯色。
 # 如需渐变/图片背景，在 xime.custom.yaml 的对应主题下覆盖 keyboard_background 即可：
 #

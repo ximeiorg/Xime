@@ -1020,30 +1020,44 @@ object KeysConfigHelper {
     // 天然失效；外部改动 custom 文件经 mtime 感知穿透；解析失败不缓存下次重试。
     private var _loadedCustomStamp: Pair<Long, Long>? = null
 
-    // 纠错绑定列表及其缓存戳（correction.schemas，独立于全量解析——该查询在按键
-    // 热路径调用，只解析顶层一个列表，开销远小于 loadXimeConfig 全量解析）。
-    private var _correctionSchemas: Set<String> = emptySet()
-    private var _correctionSchemasStamp: Pair<Long, Long>? = null
+    // 顶层 <section>.schemas 绑定及缓存戳（correction / fuzzy_pinyin，独立于全量解析——
+    // 这些查询在按键热路径与设置页调用，只解析顶层一个列表，开销远小于 loadXimeConfig）。
+    private val _topLevelSchemas = mutableMapOf<String, Pair<Pair<Long, Long>, Set<String>>>()
 
     /**
      * 启用邻键误触纠错的方案 id 集合（xime.yaml 顶层 correction.schemas，
      * xime.custom.yaml 同路径追加，与内置取并集）。解析失败/未配置时为空集。
      */
-    fun correctionSchemas(context: Context): Set<String> {
+    fun correctionSchemas(context: Context): Set<String> =
+        topLevelSchemas(context, "correction")
+
+    /**
+     * 模糊拼音作用的方案 id 集合（xime.yaml 顶层 fuzzy_pinyin.schemas）。
+     *
+     * 模糊规则是拼音字母层面的 fuzz，只对「全拼」有意义；而 Rime 方案没有类型字段，
+     * 按名称/结构猜测会把双拼、形码误判成拼音并污染编码，因此只认显式声明。
+     * 第三方全拼方案在 xime.custom.yaml 同路径追加即可。
+     */
+    fun fuzzyPinyinSchemas(context: Context): Set<String> =
+        topLevelSchemas(context, "fuzzy_pinyin")
+
+    private fun topLevelSchemas(context: Context, section: String): Set<String> {
         val customFile = File(context.filesDir, "rime/$XIME_CUSTOM_CONFIG_FILE")
         val stamp = if (customFile.exists()) {
             customFile.lastModified() to customFile.length()
         } else {
             0L to 0L
         }
-        if (_correctionSchemasStamp == stamp) return _correctionSchemas
-        _correctionSchemasStamp = stamp
+        _topLevelSchemas[section]?.let { (cachedStamp, cached) ->
+            if (cachedStamp == stamp) return cached
+        }
         val builtIn = readAssetText(context, XIME_CONFIG_FILE)
-            ?.let { parseTopLevelSchemasYamlText(it, "correction") } ?: emptySet()
+            ?.let { parseTopLevelSchemasYamlText(it, section) } ?: emptySet()
         val custom = readCustomText(context)
-            ?.let { parseTopLevelSchemasYamlText(it, "correction") } ?: emptySet()
-        _correctionSchemas = builtIn + custom
-        return _correctionSchemas
+            ?.let { parseTopLevelSchemasYamlText(it, section) } ?: emptySet()
+        val merged = builtIn + custom
+        _topLevelSchemas[section] = stamp to merged
+        return merged
     }
 
     /** 从 YAML 文本提取顶层 `<section>.schemas` 列表（如 correction.schemas）。 */

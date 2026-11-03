@@ -27,6 +27,9 @@ object SettingsPreferences {
     /** 纠错模型影子模式（只记录"会怎么改"，不改行为，默认关闭）。 */
 
     private const val KEY_CORRECTOR_ENABLED = "corrector_enabled"
+
+    /** 模糊拼音选中的规则 id 集合；空集合 = 关闭。 */
+    private const val KEY_FUZZY_PINYIN_RULES = "fuzzy_pinyin_rules"
     
     private const val KEY_SOUND_ENABLED = "sound_enabled"
     private const val KEY_SOUND_VOLUME = "sound_volume"
@@ -294,6 +297,18 @@ object SettingsPreferences {
 
     fun setCorrectorEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_CORRECTOR_ENABLED, enabled).apply()
+    }
+
+    /** 模糊拼音规则 id 集合（空集合 = 关闭）。 */
+    fun getFuzzyPinyinRules(context: Context): Set<String> =
+        getPrefs(context).getStringSet(KEY_FUZZY_PINYIN_RULES, emptySet())
+            ?.toSet()
+            .orEmpty()
+
+    fun setFuzzyPinyinRules(context: Context, rules: Set<String>) {
+        getPrefs(context).edit()
+            .putStringSet(KEY_FUZZY_PINYIN_RULES, rules.toSet())
+            .apply()
     }
 
     fun isSetupCompleted(context: Context): Boolean {
