@@ -1465,6 +1465,10 @@ fun KeyboardView(
                             callbacks.onClipboardSelect?.invoke(text)
                             viewModel.closeOverlay()
                         },
+                        onQuickSendSelect = { text ->
+                            callbacks.onQuickSendSelect?.invoke(text)
+                            viewModel.closeOverlay()
+                        },
                         onSelectImage = { item ->
                             callbacks.onClipboardImageSelect?.invoke(item)
                             viewModel.closeOverlay()
