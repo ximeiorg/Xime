@@ -110,6 +110,26 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
     }
 
     /**
+     * 切换方案后立即套用该方案的 ascii 默认值。
+     *
+     * 新会话由 [applyStartDecision] 处理；但用户在当前会话里从中文方案切到 english
+     * 时也必须立刻进入英文键盘，不能等下一次 onStartInput。
+     */
+    internal fun applySchemaDefault(schemaId: String): Boolean {
+        if (!RimeEngine.isInitialized()) return service.uiState.value.isAsciiMode
+        val target = schemaId.isNotEmpty() &&
+            SchemaManager.isAsciiDefaultSchema(service, schemaId)
+        if (service.rimeEngine.isAsciiMode() != target) {
+            service.rimeEngine.setOption("ascii_mode", target)
+            FileLogger.i(
+                XimeInputMethodService.TAG,
+                "applySchemaDefault: schema=$schemaId, ascii ${!target} -> $target"
+            )
+        }
+        return target
+    }
+
+    /**
      * 新输入会话的 ascii 决策：默认中文（英文态不跨收起存活）；
      * 密码类输入框临时强制英文；方案声明默认英文时保持英文（不持久化）。
      * 设置引擎选项并返回目标模式，供调用方同步 uiState 与键盘布局。

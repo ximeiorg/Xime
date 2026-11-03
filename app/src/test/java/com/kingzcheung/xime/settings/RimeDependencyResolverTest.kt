@@ -104,6 +104,43 @@ class RimeDependencyResolverTest {
     }
 
     @Test
+    fun `scan strips inline comments from dependency values`() {
+        val schema = """
+            schema:
+              schema_id: wubi86_trad
+              dependencies:
+                - pinyin_simp  # 反查使用的拼音词库
+            translator:
+              dictionary: wubi86  # 主词典
+            reverse_lookup:
+              dictionary: pinyin_simp  # 反查使用的拼音词库
+            punctuator:
+              import_preset: default  # 共享预设
+        """.trimIndent()
+        val refs = RimeDependencyResolver.scanSchemaRefs(schema, null)
+        assertEquals(setOf("wubi86"), refs.mainDicts)
+        assertEquals(setOf("pinyin_simp"), refs.reverseDicts)
+        assertEquals(setOf("default"), refs.presets)
+        assertEquals(setOf("pinyin_simp"), refs.schemaDeps)
+    }
+
+    @Test
+    fun `scan strips inline comments from dictionary lists and essay flag`() {
+        val dict = """
+            ---
+            name: "cangjie5"
+            use_preset_vocabulary: true  # 使用预设词库
+            import_tables:
+              - cangjie5.base  # 基础词库
+              - cangjie5.stem  # 词干
+            ...
+        """.trimIndent()
+        val refs = RimeDependencyResolver.scanSchemaRefs("", dict)
+        assertEquals(setOf("cangjie5.base", "cangjie5.stem"), refs.mainDicts)
+        assertTrue(refs.needsEssay)
+    }
+
+    @Test
     fun `expectedFiles maps names to filenames`() {
         val refs = SchemaRefs(
             mainDicts = setOf("cangjie5", "cangjie5.base"),

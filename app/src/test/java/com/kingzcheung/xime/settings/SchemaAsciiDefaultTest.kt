@@ -90,6 +90,20 @@ class SchemaAsciiDefaultTest {
         assertEquals(1, asciiMode!!.reset)
     }
 
+    @Test
+    fun `English 方案暴露自动空格开关并引用 lua filter`() {
+        val schemaFile = repoFile("rime/english.schema.yaml")
+        val switches = SchemaManager.parseSchemaSwitches(schemaFile)
+        val spacing = switches.firstOrNull { it.name == "english_spacing" }
+        assertNotNull("english_spacing switch must be visible in 方案开关", spacing)
+        assertEquals(1, spacing!!.reset)
+        assertTrue(
+            "english_spacing.lua must be referenced by the schema",
+            schemaFile.readText().contains("lua_filter@*english_spacing"),
+        )
+        assertTrue(repoFile("rime/lua/english_spacing.lua").isFile)
+    }
+
     /** 词库头部 name 必须与文件名/方案 dictionary 一致，否则部署会去找
      *  `wanxiang_english.dict.yaml` 而编译失败。 */
     @Test

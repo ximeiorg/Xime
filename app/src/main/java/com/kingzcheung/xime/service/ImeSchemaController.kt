@@ -79,6 +79,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 if (savedSchema in availableSchemas) {
                     applyPageSizeSetting(savedSchema)
                     service.rimeEngine.switchSchema(savedSchema)
+                    // 部署会重建会话；当前若是 english 方案，保持其 ascii 默认值。
+                    service.asciiModeController.applySchemaDefault(savedSchema)
                 } else {
                     FileLogger.w(
                         XimeInputMethodService.TAG,
@@ -272,15 +274,20 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                 Toast.makeText(service, tr(R.string.s_fanganweibushu_qingzaifangangu_63cf5), Toast.LENGTH_SHORT).show()
                 return
             }
-            if (!service.rimeEngine.isAsciiMode()) {
+            val asciiDefault = SchemaManager.isAsciiDefaultSchema(service, schemaId)
+            val ascii = service.asciiModeController.applySchemaDefault(schemaId)
+            // 普通中文方案保持原有「非 ascii 时用中文标点」；english 方案的候选模式
+            // 仍属于英文方案（ascii_mode=false 只是切到候选），不能把 ascii_punct 改成中文。
+            if (!ascii && !asciiDefault) {
                 service.rimeEngine.setOption("ascii_punct", false)
             }
+            service.uiState.value = service.uiState.value.copy(isAsciiMode = ascii)
             service.sessionController.updateSchemaName()
             service.updateUI()
             // 确保键盘布局与方案匹配（如 T9 九键不应被 switchMain 重置为全键盘）
             service.keyboardViewModel.dispatch(
                 com.kingzcheung.xime.ui.keyboard.KeyboardDispatchAction.AsciiModeChanged(
-                    service.rimeEngine.isAsciiMode(), schemaId
+                    ascii, schemaId
                 )
             )
             Toast.makeText(service, tr(R.string.s_yiqiehuanshurufangan), Toast.LENGTH_SHORT).show()

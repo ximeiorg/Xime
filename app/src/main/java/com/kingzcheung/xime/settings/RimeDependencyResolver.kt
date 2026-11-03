@@ -56,7 +56,7 @@ object RimeDependencyResolver {
                 val indent = raw.takeWhile { it == ' ' }.length
 
                 if (line.startsWith("- ")) {
-                    listTarget?.add(line.removePrefix("- ").trim().removeSurrounding("\""))
+                    listTarget?.add(scalarValue(line.removePrefix("- ")))
                     continue
                 }
                 listTarget = null
@@ -64,24 +64,28 @@ object RimeDependencyResolver {
 
                 when {
                     line.startsWith("dictionary:") -> {
-                        val v = line.substringAfter(":").trim().removeSurrounding("\"")
+                        val v = scalarValue(line.substringAfter(":"))
                         if (v.isNotEmpty()) {
                             (if (top == "reverse_lookup") reverseDicts else mainDicts).add(v)
                         }
                     }
                     line.startsWith("import_preset:") -> {
-                        val v = line.substringAfter(":").trim().removeSurrounding("\"")
+                        val v = scalarValue(line.substringAfter(":"))
                         if (v.isNotEmpty()) presets.add(v)
                     }
                     line.startsWith("dependencies:") && top == "schema" -> listTarget = schemaDeps
                     line.startsWith("import_tables:") -> listTarget = mainDicts
                     line.startsWith("use_preset_vocabulary:") ->
-                        if (line.substringAfter(":").trim().startsWith("true")) needsEssay = true
+                        if (scalarValue(line.substringAfter(":")).startsWith("true")) needsEssay = true
                 }
             }
         }
         return SchemaRefs(mainDicts, reverseDicts, presets, needsEssay, schemaDeps)
     }
+
+    /** 去掉 YAML 行内注释与包裹引号；方案里出现 `dictionary: pinyin_simp  # 注释` 很常见。 */
+    private fun scalarValue(raw: String): String =
+        raw.substringBefore('#').trim().removeSurrounding("\"")
 
     /** 把 [SchemaRefs] 推成期望存在的文件名集合。纯函数。 */
     fun expectedFiles(refs: SchemaRefs): Set<String> {
