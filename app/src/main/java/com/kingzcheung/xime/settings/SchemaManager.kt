@@ -63,6 +63,8 @@ data class SchemaSwitch(
     val options: List<String> = emptyList(),
     val states: List<String> = emptyList(),
     val abbrev: List<String> = emptyList(),
+    /** 方案声明的默认值（`reset`），未声明为 null。 */
+    val reset: Int? = null,
 )
 
 @Serializable
@@ -612,6 +614,18 @@ object SchemaManager {
         return parseSchemaSwitches(file)
     }
 
+    /**
+     * 方案是否声明默认英文（`switches` 中 `ascii_mode` 的 `reset: 1`）。
+     *
+     * 纯英文方案靠这个标记在切换方案/新输入会话时保持英文；
+     * 普通中文方案的 `ascii_mode` 没有 reset 或为 0，不受影响。
+     */
+    fun isAsciiDefaultSchema(context: Context, schemaId: String): Boolean {
+        if (schemaId.isEmpty()) return false
+        return getSchemaSwitches(context, schemaId)
+            .any { it.name == "ascii_mode" && it.reset == 1 }
+    }
+
     /** 纯解析：从 .schema.yaml 读取 switches。 */
     internal fun parseSchemaSwitches(file: File): List<SchemaSwitch> {
         return try {
@@ -637,9 +651,14 @@ object SchemaManager {
             ?.items?.mapNotNull { (it as? YamlScalar)?.content }
             .orEmpty()
         val abbrev = parseAbbrev(entry["abbrev"])
+        val reset = (entry["reset"] as? YamlScalar)?.content?.toIntOrNull()
         return when {
-            name.isNotBlank() -> SchemaSwitch(name = name, options = emptyList(), states = states, abbrev = abbrev)
-            options.isNotEmpty() -> SchemaSwitch(name = "", options = options, states = states, abbrev = abbrev)
+            name.isNotBlank() -> SchemaSwitch(
+                name = name, options = emptyList(), states = states, abbrev = abbrev, reset = reset
+            )
+            options.isNotEmpty() -> SchemaSwitch(
+                name = "", options = options, states = states, abbrev = abbrev, reset = reset
+            )
             else -> null
         }
     }
@@ -674,7 +693,7 @@ object SchemaManager {
     }
 
     /** 内置方案（保持默认启用顺序）。 */
-    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin")
+    internal val BUILTIN_SCHEMAS = listOf("wubi86", "wubi86_pinyin", "pinyin_simp", "t9_pinyin", "english")
 
     /**
      * 启用方案列表（真相在 prefs，由 [com.kingzcheung.xime.scheme.SchemeStore] 维护）。

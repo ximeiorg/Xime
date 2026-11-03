@@ -219,6 +219,28 @@ class SchemaYamlParserTest {
     }
 
     @Test
+    fun `getSchemaSwitches parses reset`() {
+        val f = writeSchema("""
+            schema:
+              schema_id: english
+              name: English
+            switches:
+              - name: ascii_mode
+                reset: 1
+                states: [ 中文, 英文 ]
+              - name: full_shape
+                reset: 0
+                states: [ 半角, 全角 ]
+              - name: no_reset
+                states: [ A, B ]
+        """.trimIndent())
+        val switches = SchemaManager.parseSchemaSwitches(f)
+        assertEquals(1, switches[0].reset)
+        assertEquals(0, switches[1].reset)
+        assertNull(switches[2].reset)
+    }
+
+    @Test
     fun `getSchemaSwitches ignores switches without states`() {
         val f = writeSchema("""
             schema:
