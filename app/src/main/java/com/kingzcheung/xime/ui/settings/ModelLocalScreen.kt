@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.twotone.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -63,6 +64,7 @@ import com.kingzcheung.xime.viewmodel.ModelManagementViewModel
 @Composable
 fun ModelLocalContent(
     onBack: () -> Unit,
+    onNavigateToMarket: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val viewModel: ModelManagementViewModel = viewModel()
@@ -125,6 +127,21 @@ fun ModelLocalContent(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                SettingsItem(
+                    icon = Icons.TwoTone.Storefront,
+                    title = tr(R.string.s_moxingshichang),
+                    subtitle = tr(R.string.s_qushangdiangengduomoxing),
+                    onClick = onNavigateToMarket,
+                    showArrow = true,
+                )
+            }
             if (localModels.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {

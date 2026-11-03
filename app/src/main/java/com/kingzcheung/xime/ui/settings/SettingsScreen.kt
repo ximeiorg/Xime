@@ -99,6 +99,7 @@ fun SettingsScreen(
         composable(SettingsRoutes.ModelLocal) {
             ModelLocalContent(
                 onBack = { navController.popBackStack() },
+                onNavigateToMarket = { navController.navigate(SettingsRoutes.MarketModel) },
             )
         }
         composable(
@@ -158,7 +159,8 @@ fun SettingsScreen(
                 },
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToClipboardSync = { navController.navigate(SettingsRoutes.ClipboardSync) },
-                onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) }
+                onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) },
+                onNavigateToMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
             )
         }
         composable(
@@ -178,7 +180,8 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.LayoutDisplay) {
             LayoutDisplaySettingsContent(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToMarket = { navController.navigate(SettingsRoutes.MarketLayouts) },
             )
         }
         composable(SettingsRoutes.SmartPrediction) {
@@ -316,6 +319,26 @@ fun SettingsScreen(
                 onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
                 onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
                 initialTab = 2,
+            )
+        }
+        composable(SettingsRoutes.MarketLayouts) {
+            MarketHubContent(
+                onBack = { navController.popBackStack() },
+                onNavigateToDetail = { schemeId ->
+                    navController.navigate("schema_market_detail/$schemeId")
+                },
+                onNavigateToModelDetail = { modelId ->
+                    navController.navigate("model_market_detail/$modelId")
+                },
+                onNavigateToPluginDetail = { pluginId ->
+                    navController.navigate("plugin_market_detail/$pluginId")
+                },
+                onNavigateToLayoutDetail = { layoutId ->
+                    navController.navigate("layout_market_detail/$layoutId")
+                },
+                onNavigateToLocal = { navController.navigate(SettingsRoutes.SchemaLocal) },
+                onNavigateToModelLocal = { navController.navigate(SettingsRoutes.ModelLocal) },
+                initialTab = 3,
             )
         }
         composable(SettingsRoutes.LogViewer) {

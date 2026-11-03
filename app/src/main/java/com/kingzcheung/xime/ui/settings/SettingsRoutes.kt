@@ -6,6 +6,7 @@ object SettingsRoutes {
     const val Market = "market"
     const val MarketModel = "market_model"
     const val MarketPlugins = "market_plugins"
+    const val MarketLayouts = "market_layouts"
     const val SchemaLocal = "schema_local"
     const val ModelLocal = "model_local"
     const val SchemaMarketDetail = "schema_market_detail/{schemeId}"

@@ -32,134 +32,133 @@ class FuzzyPinyinManagerTest {
     """
 
     @Test
-    fun `full pinyin schema is supported`() {
-        val dir = tempRimeDir()
-        try {
-            writeSchema(dir, "pinyin_simp", pinyinSchema)
-            assertEquals(
-                FuzzyPinyinManager.SchemaStatus.SUPPORTED,
-                FuzzyPinyinManager.inspectSchema(dir, "pinyin_simp"),
-            )
-        } finally {
-            dir.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun `t9 double pinyin wubi and no algebra are skipped`() {
-        val dir = tempRimeDir()
-        try {
-            writeSchema(
-                dir, "t9_pinyin",
-                """
-                schema:
-                  name: 拼音九键
-                speller:
-                  algebra:
-                    - derive/[abc]/2/
-                """,
-            )
-            writeSchema(
-                dir, "double_pinyin_flypy",
-                """
-                schema:
-                  name: 小鹤双拼
-                speller:
-                  algebra:
-                    - xform/iu$/$1Q/
-                """,
-            )
-            writeSchema(
-                dir, "wubi86",
-                """
-                schema:
-                  name: 五笔86
-                speller:
-                  algebra:
-                    - derive/^a/b/
-                """,
-            )
-            writeSchema(
-                dir, "pinyin_no_algebra",
-                """
-                schema:
-                  name: 拼音无代数
-                speller:
-                  alphabet: abcdefghijklmnopqrstuvwxyz
-                """,
-            )
-            assertEquals(FuzzyPinyinManager.SchemaStatus.T9, FuzzyPinyinManager.inspectSchema(dir, "t9_pinyin"))
-            assertEquals(
-                FuzzyPinyinManager.SchemaStatus.DOUBLE_PINYIN,
-                FuzzyPinyinManager.inspectSchema(dir, "double_pinyin_flypy"),
-            )
-            assertEquals(FuzzyPinyinManager.SchemaStatus.SHAPE, FuzzyPinyinManager.inspectSchema(dir, "wubi86"))
-            assertEquals(
-                FuzzyPinyinManager.SchemaStatus.NO_ALGEBRA,
-                FuzzyPinyinManager.inspectSchema(dir, "pinyin_no_algebra"),
-            )
-            assertEquals(
-                FuzzyPinyinManager.SchemaStatus.NO_SCHEMA,
-                FuzzyPinyinManager.inspectSchema(dir, "missing"),
-            )
-        } finally {
-            dir.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun `unknown schema with algebra is not treated as pinyin`() {
-        val dir = tempRimeDir()
-        try {
-            writeSchema(
-                dir, "custom_shape",
-                """
-                schema:
-                  name: 自定义形码
-                speller:
-                  algebra:
-                    - derive/^a/b/
-                """,
-            )
-            assertEquals(
-                FuzzyPinyinManager.SchemaStatus.NOT_PINYIN,
-                FuzzyPinyinManager.inspectSchema(dir, "custom_shape"),
-            )
-        } finally {
-            dir.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun `reconcile writes only enabled supported schemas and removes on clear`() {
+    fun `reconcile writes only enabled and declared schemas`() {
         val dir = tempRimeDir()
         try {
             writeSchema(dir, "pinyin_simp", pinyinSchema)
             writeSchema(
-                dir, "wubi86",
+                dir, "other_pinyin",
                 """
                 schema:
-                  name: 五笔86
+                  name: 第三方拼音
                 speller:
                   algebra:
-                    - derive/^a/b/
+                    - derive/^([jqxy])u/$1v/
                 """,
             )
 
             val first = FuzzyPinyinManager.reconcile(
                 rimeDir = dir,
-                enabledSchemas = setOf("pinyin_simp", "wubi86"),
+                enabledSchemas = setOf("pinyin_simp", "other_pinyin"),
+                declaredSchemas = setOf("pinyin_simp"),
                 selectedRules = setOf("z_zh"),
             )
-            assertTrue(first.changedSchemas.contains("pinyin_simp"))
-            assertFalse(first.changedSchemas.contains("wubi86"))
-            assertTrue(File(dir, "pinyin_simp.custom.yaml").isFile)
-            assertFalse(File(dir, "wubi86.custom.yaml").exists())
             assertEquals(listOf("pinyin_simp"), first.appliedSchemas)
+            assertTrue(File(dir, "pinyin_simp.custom.yaml").isFile)
+            assertFalse(File(dir, "other_pinyin.custom.yaml").exists())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `undeclared schema is untouched even if it looks like full pinyin`() {
+        val dir = tempRimeDir()
+        try {
+            writeSchema(dir, "pinyin_simp", pinyinSchema)
+            // 名字、字母表、代数都像全拼，但没在 fuzzy_pinyin.schemas 声明：按约定不猜。
+            writeSchema(
+                dir, "third_party_quanpin",
+                """
+                schema:
+                  name: 某全拼
+                speller:
+                  alphabet: zyxwvutsrqponmlkjihgfedcba
+                  algebra:
+                    - abbrev/^([a-z]).+$/$1/
+                    - derive/^([nl])ue$/$1ve/
+                """,
+            )
+
+            val result = FuzzyPinyinManager.reconcile(
+                rimeDir = dir,
+                enabledSchemas = setOf("third_party_quanpin"),
+                declaredSchemas = setOf("pinyin_simp"),
+                selectedRules = setOf("z_zh"),
+            )
+            assertTrue(result.appliedSchemas.isEmpty())
+            assertTrue(result.changedSchemas.isEmpty())
+            assertFalse(File(dir, "third_party_quanpin.custom.yaml").exists())
+            assertFalse(File(dir, "pinyin_simp.custom.yaml").exists())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `declared schema is applied regardless of its name`() {
+        val dir = tempRimeDir()
+        try {
+            // 显式声明是权威来源：第三方/自定义命名的全拼方案不必符合任何命名约定。
+            writeSchema(
+                dir, "my_scheme",
+                """
+                schema:
+                  name: 自用拼音
+                speller:
+                  algebra:
+                    - derive/^([jqxy])u/$1v/
+                """,
+            )
+            val result = FuzzyPinyinManager.reconcile(
+                rimeDir = dir,
+                enabledSchemas = setOf("my_scheme"),
+                declaredSchemas = setOf("my_scheme"),
+                selectedRules = setOf("z_zh"),
+            )
+            assertEquals(listOf("my_scheme"), result.appliedSchemas)
+            assertTrue(File(dir, "my_scheme.custom.yaml").readText().contains(FuzzyPinyinPatch.BEGIN))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `reconcile leaves disabled declared schemas untouched`() {
+        val dir = tempRimeDir()
+        try {
+            writeSchema(dir, "pinyin_simp", pinyinSchema)
+            val result = FuzzyPinyinManager.reconcile(
+                rimeDir = dir,
+                enabledSchemas = emptySet(),
+                declaredSchemas = setOf("pinyin_simp"),
+                selectedRules = setOf("z_zh"),
+            )
+            assertFalse(File(dir, "pinyin_simp.custom.yaml").exists())
+            assertTrue(result.changedSchemas.isEmpty())
+            assertTrue(result.appliedSchemas.isEmpty())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `clearing rules removes the managed block`() {
+        val dir = tempRimeDir()
+        try {
+            writeSchema(dir, "pinyin_simp", pinyinSchema)
+            FuzzyPinyinManager.reconcile(
+                rimeDir = dir,
+                enabledSchemas = setOf("pinyin_simp"),
+                declaredSchemas = setOf("pinyin_simp"),
+                selectedRules = setOf("z_zh"),
+            )
+            assertTrue(File(dir, "pinyin_simp.custom.yaml").isFile)
 
             val cleared = FuzzyPinyinManager.reconcile(
                 rimeDir = dir,
-                enabledSchemas = setOf("pinyin_simp", "wubi86"),
+                enabledSchemas = setOf("pinyin_simp"),
+                declaredSchemas = setOf("pinyin_simp"),
                 selectedRules = emptySet(),
             )
             assertTrue(cleared.changedSchemas.contains("pinyin_simp"))
@@ -170,18 +169,54 @@ class FuzzyPinyinManagerTest {
     }
 
     @Test
-    fun `reconcile leaves disabled schemas untouched`() {
+    fun `reconcile drops the block when a schema is undeclared later`() {
         val dir = tempRimeDir()
         try {
             writeSchema(dir, "pinyin_simp", pinyinSchema)
-            val result = FuzzyPinyinManager.reconcile(
+            FuzzyPinyinManager.reconcile(
                 rimeDir = dir,
-                enabledSchemas = emptySet(),
+                enabledSchemas = setOf("pinyin_simp"),
+                declaredSchemas = setOf("pinyin_simp"),
                 selectedRules = setOf("z_zh"),
             )
+            assertTrue(File(dir, "pinyin_simp.custom.yaml").isFile)
+
+            // 用户把方案从 fuzzy_pinyin.schemas 删掉：下次对账要摘掉旧块。
+            val result = FuzzyPinyinManager.reconcile(
+                rimeDir = dir,
+                enabledSchemas = setOf("pinyin_simp"),
+                declaredSchemas = emptySet(),
+                selectedRules = setOf("z_zh"),
+            )
+            assertTrue(result.changedSchemas.contains("pinyin_simp"))
             assertFalse(File(dir, "pinyin_simp.custom.yaml").exists())
-            assertTrue(result.changedSchemas.isEmpty())
-            assertTrue(result.appliedSchemas.isEmpty())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `orphan custom file with managed block is cleaned`() {
+        val dir = tempRimeDir()
+        try {
+            writeSchema(dir, "pinyin_simp", pinyinSchema)
+            val orphan = File(dir, "removed_schema.custom.yaml")
+            orphan.writeText(
+                "patch:\n" +
+                    "${FuzzyPinyinPatch.BEGIN}\n" +
+                    "  \"speller/algebra/+\":\n" +
+                    "    - \"fuzz/^n(.+)$/l$1/\"\n" +
+                    "${FuzzyPinyinPatch.END}\n",
+            )
+
+            val result = FuzzyPinyinManager.reconcile(
+                rimeDir = dir,
+                enabledSchemas = setOf("pinyin_simp"),
+                declaredSchemas = setOf("pinyin_simp"),
+                selectedRules = setOf("z_zh"),
+            )
+            assertTrue(result.changedSchemas.contains("removed_schema"))
+            assertFalse(orphan.exists())
         } finally {
             dir.deleteRecursively()
         }

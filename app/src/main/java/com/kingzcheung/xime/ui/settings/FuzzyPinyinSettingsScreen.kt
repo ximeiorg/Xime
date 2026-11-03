@@ -24,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,31 +44,32 @@ import com.kingzcheung.xime.settings.FuzzyPinyinGroup
 import com.kingzcheung.xime.settings.FuzzyPinyinManager
 import com.kingzcheung.xime.settings.FuzzyPinyinRule
 import com.kingzcheung.xime.settings.FuzzyPinyinRules
-import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * 模糊拼音设置页。
  *
- * 开关只写 prefs（用户级状态）；500ms 防抖后对账各方案 custom.yaml 并部署。
- * 模糊音最终编译进 prism，所以修改后必须走一次部署才生效。
+ * 开关只是草稿：点右上角「应用」才落 prefs，并对账各方案 custom.yaml、部署使其生效；
+ * 不点「应用」直接退出等于放弃本次修改。模糊音最终编译进 prism，所以必须走一次部署。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf(FuzzyPinyinManager.getSelectedRules(context)) }
     var supported by remember { mutableStateOf<List<FuzzyPinyinManager.SchemaSupport>>(emptyList()) }
-    var initialized by remember { mutableStateOf(false) }
-    var edited by remember { mutableStateOf(false) }
+    var saved by remember { mutableStateOf(selected) }
+    var dirty by remember { mutableStateOf(false) }
     var applying by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
-        // 进页先对账一次：覆盖上次退出时防抖部署未完成、备份恢复带回旧块等情况。
+    // 统一应用：落 prefs → 对账（写 custom.yaml 托管块）→ 需要时部署 → 刷新适用方案。
+    suspend fun applyRules() {
         applying = true
+        FuzzyPinyinManager.setSelectedRules(context, selected)
         val (result, deployOk) = withContext(Dispatchers.IO) {
             val reconciled = FuzzyPinyinManager.reconcile(context)
             val ok = if (reconciled.changedSchemas.isNotEmpty()) {
@@ -80,28 +83,16 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
             FuzzyPinyinManager.applicableSchemas(context)
         }
         applying = false
+        saved = selected
+        dirty = false
         status = buildStatus(result, deployOk, supported)
-        initialized = true
     }
 
-    LaunchedEffect(selected, initialized) {
-        if (!initialized || !edited) return@LaunchedEffect
-        delay(500)
-        applying = true
-        val (result, deployOk) = withContext(Dispatchers.IO) {
-            val reconciled = FuzzyPinyinManager.reconcile(context)
-            val ok = if (reconciled.changedSchemas.isNotEmpty()) {
-                SchemeDeployer.deploy(context).ok
-            } else {
-                true
-            }
-            reconciled to ok
-        }
+    LaunchedEffect(Unit) {
+        // 只读加载适用方案；不自动对账/部署——未点「应用」的草稿不落地。
         supported = withContext(Dispatchers.IO) {
             FuzzyPinyinManager.applicableSchemas(context)
         }
-        applying = false
-        status = buildStatus(result, deployOk, supported)
     }
 
     Scaffold(
@@ -116,6 +107,14 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = tr(R.string.s_fanhui),
                             )
+                        }
+                    },
+                    actions = {
+                        TextButton(
+                            onClick = { scope.launch { applyRules() } },
+                            enabled = dirty && !applying,
+                        ) {
+                            Text(tr(R.string.s_fuzzy_apply))
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -139,8 +138,11 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
         ) {
             item {
                 Text(
-                    text = if (applying) tr(R.string.s_fuzzy_applying) else status
-                        ?: tr(R.string.s_fuzzy_scope_hint),
+                    text = when {
+                        applying -> tr(R.string.s_fuzzy_applying)
+                        dirty -> tr(R.string.s_fuzzy_pending_apply)
+                        else -> status ?: tr(R.string.s_fuzzy_scope_hint)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -157,10 +159,9 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
                                 enabled = !applying,
                                 onCheckedChange = { checked ->
                                     val next = if (checked) selected + rule.id else selected - rule.id
-                                    edited = true
+                                    dirty = next != saved
+                                    // 只改草稿；prefs 在点「应用」时才写，未应用退出即放弃。
                                     selected = next
-                                    // 立即落 prefs：即使用户马上退出，下次启动仍能重放。
-                                    SettingsPreferences.setFuzzyPinyinRules(context, next)
                                 },
                             )
                             if (index != rules.lastIndex) {
@@ -195,6 +196,11 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
                         )
                         Text(
                             text = tr(R.string.s_fuzzy_scope_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = tr(R.string.s_fuzzy_declare_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

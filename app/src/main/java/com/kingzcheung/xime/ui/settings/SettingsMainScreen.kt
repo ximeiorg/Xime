@@ -277,6 +277,19 @@ fun SettingsMainContent(
                         onClick = onNavigateToDictionary,
                         showArrow = true
                     )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    // 模糊拼音改的是全拼方案的拼写规则（写 custom.yaml、需部署），归方案类
+                    SettingsItem(
+                        icon = Icons.TwoTone.Translate,
+                        title = tr(R.string.s_mohupinyin),
+                        subtitle = tr(R.string.s_mohupinyin_jianjie),
+                        onClick = onNavigateToFuzzyPinyin,
+                        showArrow = true
+                    )
                 })
             }
 
@@ -301,18 +314,6 @@ fun SettingsMainContent(
                         title = tr(R.string.s_chajianguanli),
                         subtitle = tr(R.string.s_guanliyianzhuangdechajian),
                         onClick = onNavigateToPlugins,
-                        showArrow = true
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 56.dp),
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsItem(
-                        icon = Icons.TwoTone.Straighten,
-                        title = tr(R.string.s_moxingguanli),
-                        subtitle = tr(R.string.s_guanlibendixiazaidezhinengmoxing),
-                        onClick = onNavigateToModelLocal,
                         showArrow = true
                     )
                 })
@@ -344,11 +345,12 @@ fun SettingsMainContent(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
+                    // 模型文件管理跟随使用它的智能能力（联想 / 纠错）放在一处
                     SettingsItem(
-                        icon = Icons.TwoTone.Translate,
-                        title = tr(R.string.s_mohupinyin),
-                        subtitle = tr(R.string.s_mohupinyin_jianjie),
-                        onClick = onNavigateToFuzzyPinyin,
+                        icon = Icons.TwoTone.Straighten,
+                        title = tr(R.string.s_moxingguanli),
+                        subtitle = tr(R.string.s_guanlibendixiazaidezhinengmoxing),
+                        onClick = onNavigateToModelLocal,
                         showArrow = true
                     )
                     HorizontalDivider(
