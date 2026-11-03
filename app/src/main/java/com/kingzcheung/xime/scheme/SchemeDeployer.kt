@@ -38,6 +38,8 @@ internal object SchemeDeployer {
         rimeDir.mkdirs()
 
         seedDefaultCustom(context, rimeDir)
+        // 老内置安装升级：补新增的 english 方案文件；第三方方案集跳过。
+        RimeConfigHelper.ensureBuiltinSchemaFiles(context, rimeDir)
         // 启用列表是状态，schema_list 是派生物：每次部署前重新镜像。
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
         // 模糊拼音是用户级状态，部署前物化成各方案 custom.yaml 的托管块。

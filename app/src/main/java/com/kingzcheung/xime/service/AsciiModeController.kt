@@ -6,6 +6,7 @@ import com.kingzcheung.xime.i18n.tr
 
 import android.view.inputmethod.EditorInfo
 import com.kingzcheung.xime.rime.RimeEngine
+import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -100,32 +101,64 @@ internal class AsciiModeController(private val service: XimeInputMethodService) 
     }
 
     /**
-     * 新输入会话的 ascii 决策：默认中文（英文态不跨收起存活）；
-     * 密码类输入框临时强制英文（不持久化）。
-     * 设置引擎选项并返回目标模式，供调用方同步 uiState 与键盘布局。
+     * 当前方案是否声明默认英文（`ascii_mode reset: 1`，如内置纯英文方案）。
+     * 这类方案在会话开始/结束时都必须保持英文，不能套用「默认中文」策略。
      */
-    internal fun applyStartDecision(attribute: EditorInfo?): Boolean {
+    private fun schemaDefaultsToAscii(): Boolean {
+        val schemaId = service.rimeEngine.getCurrentSchema()
+        return schemaId.isNotEmpty() && SchemaManager.isAsciiDefaultSchema(service, schemaId)
+    }
+
+    /**
+     * 切换方案后立即套用该方案的 ascii 默认值。
+     *
+     * 新会话由 [applyStartDecision] 处理；但用户在当前会话里从中文方案切到 english
+     * 时也必须立刻进入英文键盘，不能等下一次 onStartInput。
+     */
+    internal fun applySchemaDefault(schemaId: String): Boolean {
         if (!RimeEngine.isInitialized()) return service.uiState.value.isAsciiMode
-        val target = EditorInfoClassifier.isPasswordEditor(attribute)
+        val target = schemaId.isNotEmpty() &&
+            SchemaManager.isAsciiDefaultSchema(service, schemaId)
         if (service.rimeEngine.isAsciiMode() != target) {
             service.rimeEngine.setOption("ascii_mode", target)
             FileLogger.i(
                 XimeInputMethodService.TAG,
-                "applyStartDecision: ascii ${!target} -> $target (password=$target)"
+                "applySchemaDefault: schema=$schemaId, ascii ${!target} -> $target"
             )
         }
         return target
     }
 
     /**
-     * 会话结束归位：引擎 ascii 回落到默认中文。
+     * 新输入会话的 ascii 决策：默认中文（英文态不跨收起存活）；
+     * 密码类输入框临时强制英文；方案声明默认英文时保持英文（不持久化）。
+     * 设置引擎选项并返回目标模式，供调用方同步 uiState 与键盘布局。
+     */
+    internal fun applyStartDecision(attribute: EditorInfo?): Boolean {
+        if (!RimeEngine.isInitialized()) return service.uiState.value.isAsciiMode
+        val password = EditorInfoClassifier.isPasswordEditor(attribute)
+        val schemaAscii = schemaDefaultsToAscii()
+        val target = password || schemaAscii
+        if (service.rimeEngine.isAsciiMode() != target) {
+            service.rimeEngine.setOption("ascii_mode", target)
+            FileLogger.i(
+                XimeInputMethodService.TAG,
+                "applyStartDecision: ascii ${!target} -> $target (password=$password, schemaAscii=$schemaAscii)"
+            )
+        }
+        return target
+    }
+
+    /**
+     * 会话结束归位：引擎 ascii 回落到方案默认值（普通方案为中文，纯英文方案为英文）。
      * 面板同步/密码框/用户显式切换产生的英文态均为会话级，不跨会话残留。
      */
     internal fun restoreDefaultChoice() {
         if (!RimeEngine.isInitialized()) return
-        if (service.rimeEngine.isAsciiMode()) {
-            service.rimeEngine.setOption("ascii_mode", false)
-            FileLogger.i(XimeInputMethodService.TAG, "restoreDefaultChoice: ascii true -> false")
+        val target = schemaDefaultsToAscii()
+        if (service.rimeEngine.isAsciiMode() != target) {
+            service.rimeEngine.setOption("ascii_mode", target)
+            FileLogger.i(XimeInputMethodService.TAG, "restoreDefaultChoice: ascii ${!target} -> $target")
         }
     }
 }
