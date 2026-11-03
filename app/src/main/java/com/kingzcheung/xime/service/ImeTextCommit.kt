@@ -137,6 +137,24 @@ internal class ImeTextCommit(private val service: XimeInputMethodService) {
     }
 
     /**
+     * 快捷发送条目点选：只上屏，不写回系统剪贴板。
+     *
+     * 快捷发送是长期复用的短语，不属于剪贴板历史；写回系统剪贴板会被剪贴板监听
+     * 采集为一条新历史，并重新出现在候选栏。
+     */
+    internal fun selectQuickSendItem(text: String) {
+        if (service.candidateState.value.isComposing) {
+            service.keyRouter.postRimeJob {
+                service.rimeEngine.clearComposition()
+                withContext(Dispatchers.Main) {
+                    service.updateUI()
+                }
+            }
+        }
+        service.commitPastedText(text)
+    }
+
+    /**
      * 剪贴板**图片**条目点选。
      *
      * 两条路径（与 Emoji 图片发送一致，复用 [commitImage] 的 MIME 探测）：

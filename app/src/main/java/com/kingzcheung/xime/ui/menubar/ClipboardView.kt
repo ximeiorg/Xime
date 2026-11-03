@@ -83,6 +83,8 @@ fun ClipboardView(
     viewModel: KeyboardViewModel,
     onSelectItem: (String) -> Unit,
     onSplitWords: (String, Long) -> Unit,
+    /** 快捷发送条目点选：只上屏，不写回系统剪贴板；未提供时回退到 [onSelectItem]。 */
+    onQuickSendSelect: ((String) -> Unit)? = null,
     onBack: (() -> Unit)? = null,
     onClipboardTabChange: ((Int) -> Unit)? = null,
     bottomPaddingDp: Int = 0,
@@ -333,7 +335,7 @@ fun ClipboardView(
                     subTextColor = subTextColor,
                     accentColor = accentColor,
                     viewModel = viewModel,
-                    onSelect = onSelectItem,
+                    onSelect = onQuickSendSelect ?: onSelectItem,
                     onQuickSendAddClick = onQuickSendAddClick,
                     onQuickSendEditItem = onQuickSendEditItem,
                     onDragSendStarted = onDragSendStarted,

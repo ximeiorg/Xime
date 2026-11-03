@@ -26,6 +26,8 @@ data class KeyboardCallbacks(
     val onToggleDarkMode: (() -> Unit)? = null,
     val onClipboard: (() -> Unit)? = null,
     val onClipboardSelect: ((String) -> Unit)? = null,
+    /** 快捷发送条目点选（只上屏，不写回系统剪贴板）。 */
+    val onQuickSendSelect: ((String) -> Unit)? = null,
     /**
      * 剪贴板**图片**条目点选：服务层先尝试 `commitContent` 直插宿主，
      * 宿主不支持图片 MIME 时降级为写入系统剪贴板并提示用户长按输入框粘贴。
