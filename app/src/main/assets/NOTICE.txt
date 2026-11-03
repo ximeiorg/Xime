@@ -19,3 +19,14 @@ Source: https://github.com/rime/librime
 License: BSD 3-Clause License
 
 Used as the core input method engine.
+
+================================================================================
+OpenCC
+================================================================================
+
+Source: https://github.com/BYVoid/OpenCC
+License: Apache License 2.0
+
+Runtime data under assets/opencc/ (conversion configs and compiled dictionaries)
+is used by librime's simplifier for simplified-to-traditional conversion
+(e.g. the built-in "简入繁出" schema).

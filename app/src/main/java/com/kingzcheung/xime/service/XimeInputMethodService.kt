@@ -2192,6 +2192,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         keyRouter.handleKeyPress(key, false)
     }
 
+    override fun cycleSchema() {
+        schemaController.cycleSchema()
+    }
+
     // ── 原有方法 ──
 
     

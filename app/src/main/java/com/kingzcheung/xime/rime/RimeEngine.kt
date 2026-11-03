@@ -715,6 +715,21 @@ class RimeEngine {
         return nativeGetUserConfigBool(key)
     }
 
+    /**
+     * 读取 user.yaml 布尔值；键不存在返回 null。
+     *
+     * 必须与「显式保存的 false」区分：未设置时应保留方案自身的 `switches.reset`
+     * 默认值（如「简入繁出」的繁体默认开），不能一概覆盖成 false。
+     */
+    fun getUserConfigBoolOrNull(key: String): Boolean? {
+        if (!isInitialized) return null
+        return when (nativeGetUserConfigBoolOrNull(key)) {
+            1 -> true
+            0 -> false
+            else -> null
+        }
+    }
+
     /** 写 user.yaml 用户状态字符串（auto_save，自动落盘）。 */
     fun setUserConfigString(key: String, value: String) {
         if (!isInitialized) return
@@ -860,6 +875,7 @@ class RimeEngine {
     private external fun nativeGetSchemaString(schemaId: String, key: String): String?
     private external fun nativeGetUserConfigString(key: String): String?
     private external fun nativeGetUserConfigBool(key: String): Boolean
+    private external fun nativeGetUserConfigBoolOrNull(key: String): Int
     private external fun nativeSetUserConfigString(key: String, value: String): Boolean
     private external fun nativeSetUserConfigBool(key: String, value: Boolean): Boolean
     private external fun nativeIsModuleRegistered(moduleName: String): Boolean

@@ -459,7 +459,11 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         for (def in defs) {
             if (def.name.isNotEmpty()) {
                 if (def.name == "ascii_mode") continue
-                service.rimeEngine.setOption(def.name, service.rimeEngine.getUserConfigBool("var/option/${def.name}"))
+                // 用户显式切换过才覆盖；从未设置时保留方案 switches.reset 的默认值
+                // （否则会把「简入繁出」默认的 zh_trad=true 覆盖成 false）
+                service.rimeEngine.getUserConfigBoolOrNull("var/option/${def.name}")?.let { persisted ->
+                    service.rimeEngine.setOption(def.name, persisted)
+                }
             } else if (def.options.isNotEmpty()) {
                 val activeIndex = def.options.indexOfFirst { service.rimeEngine.getUserConfigBool("var/option/$it") }
                 if (activeIndex >= 0) {
