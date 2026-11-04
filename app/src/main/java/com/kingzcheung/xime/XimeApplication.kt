@@ -158,7 +158,9 @@ class XimeApplication : Application(), ImageLoaderFactory {
     }
     
     private fun preInitializeRimeEngine() {
-        if (RimeEngine.isInitialized()) {
+        // :inference / :asr 也会走 Application.onCreate；子进程若也开引擎，会抢不到 userdb 的 LOCK
+        // 并触发 RepairDB，把主进程正在写的 log 归档进 lost/，学习数据整段丢失
+        if (getProcessName() != packageName || RimeEngine.isInitialized()) {
             return
         }
         
