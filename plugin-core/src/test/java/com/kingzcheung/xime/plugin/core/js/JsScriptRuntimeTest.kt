@@ -27,7 +27,7 @@ class JsScriptRuntimeTest {
         // 清理可能残留的错误日志（测试用独立 pluginId）
         listOf(
             "js-isolation-a", "js-isolation-b",
-            "js-timeout", "js-error", "js-missing-entry", "js-host-api"
+            "js-timeout", "js-timeout-nopoison", "js-error", "js-missing-entry", "js-host-api"
         ).forEach { PluginErrorLog.clearErrors(it) }
     }
 
@@ -143,11 +143,37 @@ class JsScriptRuntimeTest {
         val elapsed = System.currentTimeMillis() - start
         assertNull("死循环应超时返回 null", result)
         assertTrue("超时应在限时附近返回，实际 ${elapsed}ms", elapsed >= 800 && elapsed < 15_000)
+        // 超时日志要能看出是哪一次调用卡住（扩展点名进 message）
+        val recorded = PluginErrorLog.getErrors("js-timeout").last()
+        assertEquals(ErrorCategory.TIMEOUT_POISONED, recorded.category)
+        assertTrue("超时日志应带调用名，实际：${recorded.message}", recorded.message.contains("spin"))
 
         // 中毒后：后续调用立即失败
         val second = runtime.call("spin")
         assertNull("中毒后调用应立即返回 null", second)
         runtime.close()
+    }
+
+    @Test
+    fun `timeout without poison only aborts current call`() {
+        val pluginId = "js-timeout-nopoison"
+        val dir = File("build/js-timeout-nopoison"); dir.mkdirs()
+        File(dir, "main.js").writeText(
+            "globalThis.plugin = { spin: function() { while (true) {} }, ping: function() { return 'pong'; } }"
+        )
+        val runtime = JsScriptRuntime(pluginId, dir, "main.js", MemoryConfigStore(), callTimeoutMs = 1_000)
+        try {
+            assertTrue(runtime.load())
+            assertNull(runtime.call("spin", timeoutMs = 500, poisonOnTimeout = false))
+            // 不中毒：后续调用照常执行（引擎中断已复位）
+            assertEquals("pong", runtime.call("ping"))
+            val recorded = PluginErrorLog.getErrors(pluginId).last()
+            assertEquals(ErrorCategory.TIMEOUT, recorded.category)
+            assertTrue("超时日志应带调用名，实际：${recorded.message}", recorded.message.contains("spin"))
+        } finally {
+            PluginErrorLog.clearErrors(pluginId)
+            runtime.close()
+        }
     }
 
     @Test

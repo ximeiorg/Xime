@@ -25,12 +25,27 @@ import java.io.File
  *   适配器解析为 [BackupDownload]；宿主恢复后经 [releaseBackup] 释放（删缓存文件）
  * - backup.list() → {id,name,createdAt,size} 数组
  * - backup.remove(id) / backup.test()
+ *
+ * **超时**：备份动作本质是长耗时网络 IO（整包上传/下载可能几十 MB），统一用
+ * [BACKUP_CALL_TIMEOUT_MS] 而不是通用 180s，且超时只中止本次调用（`poisonOnTimeout = false`），
+ * 不停用插件——慢网络不该被当成"死循环"。
  */
 class JsBackupPluginAdapter(
     runtime: JsScriptRuntime,
     pluginContext: PluginContext,
-    private val blobStore: BlobStore? = null
+    private val blobStore: BlobStore? = null,
+    /** 便于单测注入更短超时；线上固定 [BACKUP_CALL_TIMEOUT_MS]。 */
+    private val callTimeoutMs: Long = BACKUP_CALL_TIMEOUT_MS,
 ) : JsPluginAdapter(runtime, pluginContext), BackupPlugin {
+
+    /** 备份扩展点统一入口：长耗时、超时只中止本次调用（不中毒）。 */
+    private fun callBackup(path: String, vararg args: Any?): Any? =
+        runtime.callAsync(
+            path, *args,
+            timeoutMs = callTimeoutMs,
+            poisonOnTimeout = false,
+            reportTimeoutOnAbort = true,
+        )
 
     override suspend fun pushBackup(name: String, archive: File): BackupResult =
         withContext(Dispatchers.IO) {
@@ -39,7 +54,7 @@ class JsBackupPluginAdapter(
             // 所有权仍属调用方（BackupManager）：release 只注销句柄，不删文件
             val blobId = store.register(pluginContext.pluginInfo.id, archive, owned = false)
             try {
-                val result = runtime.callAsync(
+                val result = callBackup(
                     JsPluginContract.PATH_BACKUP_PUSH,
                     mapOf("name" to name, "size" to archive.length(), "archiveId" to blobId)
                 )
@@ -54,7 +69,7 @@ class JsBackupPluginAdapter(
 
     override suspend fun pullBackup(id: String): BackupDownload? = withContext(Dispatchers.IO) {
         try {
-            val result = runtime.callAsync(JsPluginContract.PATH_BACKUP_PULL, id)
+            val result = callBackup(JsPluginContract.PATH_BACKUP_PULL, id)
             val blobId = (JsScriptRuntime.jsToKotlin(result) as? String)?.takeIf { it.isNotEmpty() }
                 ?: return@withContext null
             val store = blobStore ?: return@withContext null
@@ -73,7 +88,7 @@ class JsBackupPluginAdapter(
 
     override suspend fun listBackups(): List<RemoteBackupEntry>? = withContext(Dispatchers.IO) {
         try {
-            val result = runtime.callAsync(JsPluginContract.PATH_BACKUP_LIST)
+            val result = callBackup(JsPluginContract.PATH_BACKUP_LIST)
             val items = JsScriptRuntime.jsToKotlin(result) as? List<*> ?: return@withContext null
             items.mapNotNull { item ->
                 val map = JsScriptRuntime.jsToKotlin(item) as? Map<*, *> ?: return@mapNotNull null
@@ -93,7 +108,7 @@ class JsBackupPluginAdapter(
 
     override suspend fun deleteBackup(id: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            (JsScriptRuntime.jsToKotlin(runtime.callAsync(JsPluginContract.PATH_BACKUP_REMOVE, id)) as? Boolean) ?: false
+            (JsScriptRuntime.jsToKotlin(callBackup(JsPluginContract.PATH_BACKUP_REMOVE, id)) as? Boolean) ?: false
         } catch (e: Exception) {
             Log.e("JsBackup", "deleteBackup failed", e)
             false
@@ -102,7 +117,7 @@ class JsBackupPluginAdapter(
 
     override suspend fun testConnection(): String? = withContext(Dispatchers.IO) {
         try {
-            val result = runtime.callAsync(JsPluginContract.PATH_BACKUP_TEST)
+            val result = callBackup(JsPluginContract.PATH_BACKUP_TEST)
             val v = JsScriptRuntime.jsToKotlin(result)
             when (v) {
                 null -> null
@@ -141,6 +156,15 @@ class JsBackupPluginAdapter(
     }
 
     companion object {
+        /**
+         * 备份扩展点调用上限（5 分钟）。
+         *
+         * 整包上传/下载是"真实耗时可到几十秒到几分钟"的网络操作，而不是脚本计算：
+         * 通用 180s 在看门狗眼里和"死循环"无法区分（issue #1244）。这里放宽到 5 分钟兜底，
+         * 真正的卡顿仍由 HTTP 层超时与用户取消兜住。
+         */
+        internal const val BACKUP_CALL_TIMEOUT_MS = 5 * 60_000L
+
         /**
          * 远端时间戳归一化：契约是**毫秒**，但插件可能返回**秒**。
          *

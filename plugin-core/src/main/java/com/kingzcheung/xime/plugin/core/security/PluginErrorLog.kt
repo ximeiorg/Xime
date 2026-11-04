@@ -157,6 +157,7 @@ object PluginErrorLog {
             ErrorCategory.NETWORK_DENIED -> "插件尝试访问未授权的服务器，已被阻止"
             ErrorCategory.HTTP_ERROR -> "插件网络请求失败（${error.operation}）"
             ErrorCategory.TIMEOUT_POISONED -> "插件执行超时，已停止运行"
+            ErrorCategory.TIMEOUT -> "插件执行超时，本次操作已中止"
             ErrorCategory.STREAM_ERROR -> "插件网络连接中断"
             ErrorCategory.OTHER -> "插件运行出现问题（${error.operation}）"
         }
@@ -173,6 +174,8 @@ object PluginErrorLog {
                 "请检查网络连接或服务器状态后重试。"
             ErrorCategory.TIMEOUT_POISONED ->
                 "请重新加载插件；若反复出现请更新插件或联系作者（疑似死循环）。"
+            ErrorCategory.TIMEOUT ->
+                "请重试；若反复出现，请检查网络连接或更新插件。"
             ErrorCategory.STREAM_ERROR ->
                 "网络恢复后请重试；若频繁中断请联系插件作者。"
             ErrorCategory.OTHER ->
