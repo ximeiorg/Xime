@@ -1112,6 +1112,7 @@ internal fun categoryLabel(category: ErrorCategory): String = when (category) {
     ErrorCategory.NETWORK_DENIED -> tr(R.string.s_fangwenbeijujue)
     ErrorCategory.HTTP_ERROR -> tr(R.string.s_wangluoshibai)
     ErrorCategory.TIMEOUT_POISONED -> tr(R.string.s_yitingyong)
+    ErrorCategory.TIMEOUT -> tr(R.string.s_chaoshi)
     ErrorCategory.STREAM_ERROR -> tr(R.string.s_lianjiezhongduan)
     ErrorCategory.OTHER -> tr(R.string.s_qita)
 }

@@ -16,6 +16,8 @@ import com.kingzcheung.xime.plugin.core.js.sdk.JsHostApiImpl
 import com.kingzcheung.xime.plugin.core.js.sdk.JsPluginContract
 import com.kingzcheung.xime.plugin.core.js.ws.WsHostApi
 import com.kingzcheung.xime.plugin.core.js.ws.WsHostListener
+import com.kingzcheung.xime.plugin.core.security.ErrorCategory
+import com.kingzcheung.xime.plugin.core.security.PluginErrorLog
 import com.dokar.quickjs.binding.ObjectBindingScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,9 +34,11 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
@@ -65,6 +69,11 @@ import java.util.zip.GZIPOutputStream
  * - 业务调用（load/call/onLoad/onUnload）硬超时 [CALL_TIMEOUT_MS]：引擎级
  *   `evaluationTimeoutMillis` 兜底死循环，超时后调用线程中断引擎、插件标记中毒
  *   （后续任何 JS 一律拒绝，直到宿主重载插件）。
+ * - 超时只从任务**真正开始执行**时起算：排队等前一个调用不算超时；排队超过时限则放弃
+ *   本次调用，且不中断正在执行的调用、不中毒（那不是插件代码的问题）。
+ * - 以网络传输为主的长耗时扩展点（如 `backup.push`）可通过 [call]/[callAsync] 传更大的
+ *   `timeoutMs`，并用 `poisonOnTimeout = false` 只中止本次调用（记录一次 TIMEOUT 错误，
+ *   插件继续可用）。
  * - 回调槽（SSE/WS 事件）与事件通道：短超时兜底恶意死循环回调，**不中毒**。
  * - transformCandidates：hotPath 15ms 硬超时，超时报错回退原始候选（由调用方熔断）。
  */
@@ -231,6 +240,9 @@ class JsScriptRuntime(
      */
     @Volatile
     private var pendingBinaryArgs: List<ByteArray> = emptyList()
+
+    /** 当前在途的宿主网络桥调用数：超时日志据此判断"卡在 JS 还是卡在网上"。 */
+    private val activeHttpCalls = AtomicInteger(0)
 
     @Volatile
     private var loaded = false
@@ -595,7 +607,7 @@ class JsScriptRuntime(
             })();
         """.trimIndent()
         try {
-            runGuarded(10_000, poisonOnTimeout = false) {
+            runGuarded("沙箱引导", 10_000, poisonOnTimeout = false) {
                 runBlocking { engine.evaluate<Any?>(code, filename = "_bootstrap.js") }
             }
         } catch (e: Exception) {
@@ -817,7 +829,7 @@ class JsScriptRuntime(
             val timeoutMillis = (args.getOrNull(4) as? Number)?.toInt()?.takeIf { it > 0 }
             val api = httpHostApi
             val response = api?.let {
-                withContext(Dispatchers.IO) { it.request(method, url, headers, body, timeoutMillis) }
+                withHttpCall { withContext(Dispatchers.IO) { it.request(method, url, headers, body, timeoutMillis) } }
             }
             respond(api, response)
         }
@@ -831,7 +843,7 @@ class JsScriptRuntime(
             val timeoutMillis = (args.getOrNull(4) as? Number)?.toInt()?.takeIf { it > 0 }
             val api = httpHostApi
             val response = api?.let {
-                withContext(Dispatchers.IO) { it.upload(method, url, headers, blobId, timeoutMillis) }
+                withHttpCall { withContext(Dispatchers.IO) { it.upload(method, url, headers, blobId, timeoutMillis) } }
             }
             respond(api, response)
         }
@@ -844,7 +856,7 @@ class JsScriptRuntime(
             val timeoutMillis = (args.getOrNull(3) as? Number)?.toInt()?.takeIf { it > 0 }
             val api = httpHostApi
             val response = api?.let {
-                withContext(Dispatchers.IO) { it.download(method, url, headers, timeoutMillis) }
+                withHttpCall { withContext(Dispatchers.IO) { it.download(method, url, headers, timeoutMillis) } }
             }
             respond(api, response)
         }
@@ -887,6 +899,16 @@ class JsScriptRuntime(
             override fun onData(text: String) = dispatchCallback(CB_ON_SSE_DATA, listOf(sid, text))
             override fun onDone(fullText: String) = dispatchCallback(CB_ON_SSE_DONE, listOf(sid, fullText))
             override fun onError(message: String) = dispatchCallback(CB_ON_SSE_ERROR, listOf(sid, message))
+        }
+    }
+
+    /** 宿主网络桥调用计数：超时日志里带上它，能区分"卡在 JS"和"卡在网上"。 */
+    private suspend fun <T> withHttpCall(block: suspend () -> T): T {
+        activeHttpCalls.incrementAndGet()
+        try {
+            return block()
+        } finally {
+            activeHttpCalls.decrementAndGet()
         }
     }
 
@@ -1002,23 +1024,32 @@ class JsScriptRuntime(
     /**
      * 在引擎串行调度器上执行 JS 代码并限时。
      *
+     * 超时只从任务**开始执行**时起算：排队等前一个调用不算超时，超过时限只放弃本次调用
+     * （不中断正在执行的调用、不中毒）。真正执行超时后按 [poisonOnTimeout] 决定是停用插件
+     * 还是只中止本次调用。
+     *
+     * @param label 扩展点名（写进超时日志，便于定位是哪一次调用卡住）
      * @param binaries 本次表达式引用的字节载荷（`__ximeHost.bin(i)`），执行前置入、
      *   执行后清空；默认空表示表达式内无二进制参数。
      * @return [GuardResult.Ok]（正常返回，value 可为 null）或 [GuardResult.TimedOut]（超时/中断）
      */
     private fun <T> runGuarded(
+        label: String,
         timeoutMs: Long,
         poisonOnTimeout: Boolean,
         binaries: List<ByteArray> = emptyList(),
+        reportTimeoutOnAbort: Boolean = false,
         block: () -> T,
     ): GuardResult<T> {
         if (poisoned || closed) return GuardResult.TimedOut
+        val started = CountDownLatch(1)
         val future = try {
             executor.submit(Callable {
                 // 二次判定：任务真正开始执行时运行时可能已关闭。[close] 的屏障只保证
                 // "已开始的调用"先于引擎关闭结束，不保证"提交"与"关闭"之间没有窗口。
                 if (closed) throw RuntimeClosedSignal()
                 pendingBinaryArgs = binaries
+                started.countDown()
                 try {
                     block()
                 } finally {
@@ -1029,11 +1060,19 @@ class JsScriptRuntime(
             // 执行器已随关闭销毁：这不是脚本错误，按"无结果"处理。
             return GuardResult.TimedOut
         }
+        // 排队阶段：运行时单线程串行执行，前一个调用（如整包上传）没结束时本次任务还没开始。
+        // 这里放弃即可——绝不能中断正在执行的 evaluate（那会打断别人的上传，还会被误判成
+        // 插件死循环；真机记录过"长备份 + 设置页读 schema"被毒停）。
+        if (!started.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+            future.cancel(false)
+            Log.w(TAG, "[$pluginId] $label 排队 ${timeoutMs}ms 仍未开始执行（运行时忙），本次调用放弃")
+            return GuardResult.TimedOut
+        }
         return try {
             GuardResult.Ok(future.get(timeoutMs, TimeUnit.MILLISECONDS))
         } catch (e: TimeoutException) {
             future.cancel(true)
-            interruptAndPoison(poisonOnTimeout)
+            interruptAndHandleTimeout(poisonOnTimeout, reportTimeoutOnAbort, timeoutDescription(label, timeoutMs))
             GuardResult.TimedOut
         } catch (e: Exception) {
             future.cancel(true)
@@ -1042,9 +1081,16 @@ class JsScriptRuntime(
             if (closed || isClosedLike(e)) return GuardResult.TimedOut
             // QuickJsInterruptedException 或中断引发的 CancellationException 视为超时
             if (isInterruptLike(e))
-                interruptAndPoison(poisonOnTimeout)
+                interruptAndHandleTimeout(poisonOnTimeout, reportTimeoutOnAbort, "$label 执行被中断")
             throw e
         }
+    }
+
+    /** 超时描述：带扩展点名与在途网络请求数，便于区分"卡在 JS"还是"卡在网上"。 */
+    private fun timeoutDescription(label: String, timeoutMs: Long): String {
+        val limit = if (timeoutMs >= 1000) "${timeoutMs / 1000}s" else "${timeoutMs}ms"
+        val http = activeHttpCalls.get()
+        return "$label 超过 $limit 未返回" + if (http > 0) "（当时有 $http 个网络请求在途）" else ""
     }
 
     /** 是否为"运行时已关闭"引发的失败（关闭信号 / 执行器拒绝 / 引擎已关闭）。 */
@@ -1072,24 +1118,51 @@ class JsScriptRuntime(
         return false
     }
 
-    private fun interruptAndPoison(doPoison: Boolean) {
+    private fun interruptAndHandleTimeout(
+        poisonOnTimeout: Boolean,
+        reportTimeoutOnAbort: Boolean,
+        detail: String,
+    ) {
         try {
             engine.interruptEvaluation()
         } catch (_: Exception) {
         }
-        if (doPoison) poison()
+        when {
+            poisonOnTimeout -> poison(detail)
+            reportTimeoutOnAbort -> recordTimeout(detail)
+            else -> Log.w(TAG, "[$pluginId] $detail，本次调用已中止")
+        }
     }
 
-    private fun poison() {
+    private fun poison(detail: String) {
         if (poisoned) return
         poisoned = true
-        com.kingzcheung.xime.plugin.core.security.PluginErrorLog.logError(
+        Log.e(TAG, "[$pluginId] $detail，插件已标记中毒；JS 线程栈=${jsThreadStack()}")
+        PluginErrorLog.logError(
             pluginId = pluginId,
             operation = "插件执行超时",
-            message = "插件执行超时（疑似死循环），已停止执行该插件，请重载或卸载",
-            category = com.kingzcheung.xime.plugin.core.security.ErrorCategory.TIMEOUT_POISONED
+            message = "$detail（疑似死循环），已停止执行该插件，请重载或卸载",
+            category = ErrorCategory.TIMEOUT_POISONED
         )
-        api.logError("插件执行超时（疑似死循环），已停止执行该插件，请重载或卸载")
+    }
+
+    /** IO 型长调用超时：只中止本次调用，插件继续可用（不停用，避免把慢网络当成死循环）。 */
+    private fun recordTimeout(detail: String) {
+        Log.w(TAG, "[$pluginId] $detail，本次调用已中止（不中毒）")
+        PluginErrorLog.logError(
+            pluginId = pluginId,
+            operation = "插件执行超时",
+            message = "$detail，本次操作已中止；插件仍可继续使用",
+            category = ErrorCategory.TIMEOUT
+        )
+    }
+
+    /** JS 执行线程的栈（仅用于超时诊断日志；取不到时返回 n/a）。 */
+    private fun jsThreadStack(): String {
+        val target = JS_THREAD_PREFIX + pluginId
+        val trace = Thread.getAllStackTraces().entries
+            .firstOrNull { it.key.name == target }?.value ?: return "n/a"
+        return trace.take(6).joinToString(" <- ") { it.toString() }
     }
 
     /**
@@ -1130,7 +1203,7 @@ class JsScriptRuntime(
     fun hasMethod(path: String): Boolean {
         if (!loaded || closed) return false
         return try {
-            val result = runGuarded(callTimeoutMs, poisonOnTimeout = false) {
+            val result = runGuarded("hasMethod $path", callTimeoutMs, poisonOnTimeout = false) {
                 runBlocking { engine.evaluate<Any?>(functionGuardExpr(path), filename = entryScript) }
             }
             when (result) {
@@ -1156,7 +1229,7 @@ class JsScriptRuntime(
         val (argsJs, binaries) = argsExpr(args)
         val expr = slotExpr(method, argsJs)
         try {
-            runGuarded(callbackTimeoutMs, poisonOnTimeout = false, binaries = binaries) {
+            runGuarded(method, callbackTimeoutMs, poisonOnTimeout = false, binaries = binaries) {
                 runBlocking { engine.evaluate<Any?>(expr, filename = entryScript) }
             }
         } catch (e: Exception) {
@@ -1194,7 +1267,7 @@ class JsScriptRuntime(
         val slotPath = JsPluginContract.PATH_EVENTS_PREFIX + JsPluginContract.eventSlotName(event.type)
         val expr = callExpr(slotPath, payloadJs)
         try {
-            runGuarded(callbackTimeoutMs, poisonOnTimeout = false, binaries = binaries) {
+            runGuarded(slotPath, callbackTimeoutMs, poisonOnTimeout = false, binaries = binaries) {
                 runBlocking { engine.evaluate<Any?>(expr, filename = entryScript) }
             }
         } catch (e: Exception) {
@@ -1223,7 +1296,7 @@ class JsScriptRuntime(
             "globalThis.plugin.transform && typeof globalThis.plugin.transform.candidates === 'function') ? " +
             "JSON.parse(JSON.stringify(globalThis.plugin.transform.candidates($reqJs))) : null"
         return try {
-            val result = runGuarded(TRANSFORM_TIMEOUT_MS, poisonOnTimeout = false, binaries = binaries) {
+            val result = runGuarded("transform.candidates", TRANSFORM_TIMEOUT_MS, poisonOnTimeout = false, binaries = binaries) {
                 runBlocking { engine.evaluate<Any?>(expr, filename = entryScript) }
             }
             val value = when (result) {
@@ -1274,7 +1347,7 @@ class JsScriptRuntime(
     fun load(): Boolean {
         if (loaded) return true
         return try {
-            val ok = runGuarded(callTimeoutMs, poisonOnTimeout = true) {
+            val ok = runGuarded("脚本加载", callTimeoutMs, poisonOnTimeout = true) {
                 runBlocking {
                     if (loaded) return@runBlocking true
                     val entryFile = File(pluginDir, entryScript)
@@ -1327,7 +1400,7 @@ class JsScriptRuntime(
     private fun invokeLifecycle(name: String) {
         if (!loaded || poisoned || closed) return
         try {
-            runGuarded(callTimeoutMs, poisonOnTimeout = true) {
+            runGuarded(name, callTimeoutMs, poisonOnTimeout = true) {
                 runBlocking {
                     engine.evaluate<Any?>(
                         asyncStashExpr(slotExpr(name, "")),
@@ -1346,14 +1419,24 @@ class JsScriptRuntime(
      * 调用插件导出对象上的方法。
      * @param name 方法名（如 getCategories / getEmojis / getPanelState / pushBackup）
      * @param args 参数（null/Boolean/Int/Long/Double/String/Map/List/ByteArray/Uint8Array）
+     * @param timeoutMs 本次调用超时（默认 [callTimeoutMs]；长耗时网络类调用可放宽）
+     * @param poisonOnTimeout 超时是否停用插件；网络/IO 型长调用传 false 只中止本次调用
+     * @param reportTimeoutOnAbort 不中毒的超时是否写一条 TIMEOUT 错误记录（备份等显式操作传 true，
+     *   按键热路径/callback 保持静默，避免刷屏）
      * @return JS 返回值（已转纯 Kotlin 结构）；方法不存在 / 报错 / 超时返回 null
      */
-    fun call(name: String, vararg args: Any?): Any? {
+    fun call(
+        name: String,
+        vararg args: Any?,
+        timeoutMs: Long = callTimeoutMs,
+        poisonOnTimeout: Boolean = true,
+        reportTimeoutOnAbort: Boolean = false,
+    ): Any? {
         if (!loaded || closed) return null
         return try {
             val (argsJs, binaries) = argsExpr(args.toList())
             val expr = callExpr(name, argsJs)
-            val result = runGuarded(callTimeoutMs, poisonOnTimeout = true, binaries = binaries) {
+            val result = runGuarded(name, timeoutMs, poisonOnTimeout, binaries = binaries, reportTimeoutOnAbort = reportTimeoutOnAbort) {
                 runBlocking { engine.evaluate<Any?>(expr, filename = entryScript) }
             }
             when (result) {
@@ -1377,14 +1460,24 @@ class JsScriptRuntime(
      *
      * @param name 方法名（如 panel.state / panel.onAction 的路径）
      * @param args 参数（null/Boolean/Int/Long/Double/String/Map/List/ByteArray/Uint8Array）
+     * @param timeoutMs 本次调用超时（默认 [callTimeoutMs]；长耗时网络类调用可放宽）
+     * @param poisonOnTimeout 超时是否停用插件；网络/IO 型长调用传 false 只中止本次调用
+     * @param reportTimeoutOnAbort 不中毒的超时是否写一条 TIMEOUT 错误记录
+     *   （备份等显式操作传 true，按键热路径/callback 保持静默，避免刷屏）
      * @return 返回值（已转纯 Kotlin 结构）；方法不存在 / rejected / 报错 / 超时返回 null
      */
-    fun callAsync(name: String, vararg args: Any?): Any? {
+    fun callAsync(
+        name: String,
+        vararg args: Any?,
+        timeoutMs: Long = callTimeoutMs,
+        poisonOnTimeout: Boolean = true,
+        reportTimeoutOnAbort: Boolean = false,
+    ): Any? {
         if (!loaded || closed) return null
         return try {
             val (argsJs, binaries) = argsExpr(args.toList())
             val invoke = callExpr(name, argsJs)
-            val result = runGuarded(callTimeoutMs, poisonOnTimeout = true, binaries = binaries) {
+            val result = runGuarded(name, timeoutMs, poisonOnTimeout, binaries = binaries, reportTimeoutOnAbort = reportTimeoutOnAbort) {
                 runBlocking {
                     engine.evaluate<Any?>(asyncStashExpr(invoke), filename = entryScript)
                     engine.evaluate<Any?>(asyncReadExpr(), filename = entryScript)
