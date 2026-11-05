@@ -732,6 +732,7 @@
     <string name="s_fangwenbeijujue">訪問被拒絕</string>
     <string name="s_wangluoshibai">網絡失敗</string>
     <string name="s_yitingyong">已停用</string>
+    <string name="s_chaoshi">逾時</string>
     <string name="s_lianjiezhongduan">連接中斷</string>
     <string name="s_you_tiaocuowujilu">有 %1$s 條錯誤記錄</string>
     <string name="s_cuowujilu_tiao">錯誤記錄（%1$s 條）：</string>

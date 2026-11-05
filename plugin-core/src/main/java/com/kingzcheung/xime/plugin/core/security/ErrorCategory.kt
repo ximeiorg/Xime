@@ -20,6 +20,9 @@ enum class ErrorCategory {
     /** 插件执行超时（疑似死循环），已被停止执行（中毒）。 */
     TIMEOUT_POISONED,
 
+    /** 插件执行超时，已中止本次调用但**未**停用插件（常见于慢网络下的长传输）。 */
+    TIMEOUT,
+
     /** 长连接会话中断（SSE/WS 流错误）。 */
     STREAM_ERROR,
 
