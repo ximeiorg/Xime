@@ -164,7 +164,12 @@ class JsScriptRuntimeTest {
         val runtime = JsScriptRuntime(pluginId, dir, "main.js", MemoryConfigStore(), callTimeoutMs = 1_000)
         try {
             assertTrue(runtime.load())
-            assertNull(runtime.call("spin", timeoutMs = 500, poisonOnTimeout = false))
+            assertNull(
+                runtime.call(
+                    "spin", timeoutMs = 500,
+                    poisonOnTimeout = false, reportTimeoutOnAbort = true,
+                )
+            )
             // 不中毒：后续调用照常执行（引擎中断已复位）
             assertEquals("pong", runtime.call("ping"))
             val recorded = PluginErrorLog.getErrors(pluginId).last()
