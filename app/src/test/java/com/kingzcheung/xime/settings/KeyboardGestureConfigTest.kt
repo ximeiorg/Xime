@@ -28,6 +28,24 @@ class KeyboardGestureConfigTest {
         assertEquals("!", kc.swipeUp!!.value)
         assertEquals(GestureAction.COMMIT, kc.swipeLeft!!.action)
         assertEquals("?", kc.swipeLeft!!.value)
+        // 简写不是显式 action，字母区仍需保持按键路由
+        assertFalse(kc.swipeUp!!.explicitAction)
+        assertFalse(kc.swipeLeft!!.explicitAction)
+    }
+
+    @Test
+    fun `显式 action 与槽位默认动作可区分`() {
+        val kc = parse("""
+            a:
+              swipe_up: { action: commit, value: "~" }
+              swipe_down: { value: "~" }
+              tap: "a"
+        """.trimIndent())["a"]!!
+        assertTrue(kc.swipeUp!!.explicitAction)
+        assertEquals(GestureAction.COMMIT, kc.swipeUp!!.action)
+        assertFalse(kc.swipeDown!!.explicitAction)
+        assertEquals(GestureAction.COMMIT, kc.swipeDown!!.action)
+        assertFalse(kc.tap!!.explicitAction)
     }
 
     @Test

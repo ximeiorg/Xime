@@ -35,18 +35,50 @@ class KeyboardGestureActionDispatchTest {
     }
 
     @Test
-    fun `send_rime 与 commit 动作走 onKeyPress 以保留组合语义与 shift 大写`() {
+    fun `send_rime 与槽位默认 commit 走 onKeyPress 以保留组合语义与 shift 大写`() {
         val r = Recorder()
         dispatchKeyActionOrPress(
             KeyAction(action = GestureAction.SEND_RIME, value = "q"), "Q",
             r.onKeyPress, r.onCommitText, r.onGestureAction,
         )
+        // 槽位默认 commit：字符串简写/只写 value，未显式写 action
         dispatchKeyActionOrPress(
             KeyAction(action = GestureAction.COMMIT, value = "q"), "Q",
             r.onKeyPress, r.onCommitText, r.onGestureAction,
         )
         assertEquals(listOf("Q", "Q"), r.pressed)
+        assertEquals(emptyList<String>(), r.committed)
         assertEquals(emptyList<Pair<GestureAction, String>>(), r.gestures)
+    }
+
+    @Test
+    fun `显式 action commit 直接上屏且不经过 onKeyPress`() {
+        val r = Recorder()
+        dispatchKeyActionOrPress(
+            KeyAction(action = GestureAction.COMMIT, value = "!", explicitAction = true), "1",
+            r.onKeyPress, r.onCommitText, r.onGestureAction,
+        )
+        assertEquals(listOf("!"), r.committed)
+        assertEquals(emptyList<String>(), r.pressed)
+        assertEquals(emptyList<Pair<GestureAction, String>>(), r.gestures)
+    }
+
+    @Test
+    fun `显式 commit 无 value 时回退 label 再回退按键默认值`() {
+        val withLabel = Recorder()
+        dispatchKeyActionOrPress(
+            KeyAction(action = GestureAction.COMMIT, label = "，", explicitAction = true), "q",
+            withLabel.onKeyPress, withLabel.onCommitText, withLabel.onGestureAction,
+        )
+        assertEquals(listOf("，"), withLabel.committed)
+
+        val empty = Recorder()
+        dispatchKeyActionOrPress(
+            KeyAction(action = GestureAction.COMMIT, explicitAction = true), "Q",
+            empty.onKeyPress, empty.onCommitText, empty.onGestureAction,
+        )
+        assertEquals(listOf("Q"), empty.committed)
+        assertEquals(emptyList<String>(), empty.pressed)
     }
 
     @Test
@@ -173,16 +205,28 @@ class KeyboardGestureActionDispatchTest {
     }
 
     @Test
-    fun `上滑提交值取调用方传入的 commitValue 且走 onKeyPress 而非直接上屏`() {
+    fun `上滑槽位默认 commit 取 commitValue 且走 onKeyPress 而非直接上屏`() {
         val r = Recorder()
         val handler = swipeUpHandlerFor(
             KeyAction(action = GestureAction.COMMIT, value = "~"), "~",
             r.onKeyPress, r.onCommitText, r.onGestureAction,
         )
         handler!!.invoke("～")
-        // 字母上滑必须经 onKeyPress（保留输入法组合/候选语义），不能直连 onCommitText
+        // 槽位默认（未显式写 action）的字母上滑必须经 onKeyPress，保留输入法组合/候选语义
         assertEquals(listOf("~"), r.pressed)
         assertEquals(emptyList<String>(), r.committed)
+    }
+
+    @Test
+    fun `上滑显式 action commit 直接上屏`() {
+        val r = Recorder()
+        val handler = swipeUpHandlerFor(
+            KeyAction(action = GestureAction.COMMIT, value = "~", explicitAction = true), "~",
+            r.onKeyPress, r.onCommitText, r.onGestureAction,
+        )
+        handler!!.invoke("～")
+        assertEquals(listOf("~"), r.committed)
+        assertEquals(emptyList<String>(), r.pressed)
     }
 
     // ── 长按气泡选中的动作 ──

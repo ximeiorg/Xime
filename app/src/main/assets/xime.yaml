@@ -429,15 +429,15 @@ color_schemes:
 #
 # 每个手势的值格式：
 #   - 字符串 "a" → 按槽位默认动作（tap 为 send_rime：走按键路由进 rime，与手敲
-#     该键一致；swipe/长按为 commit：输出 value 直接上屏），显示也是它。
-#     本文件已显式写出 action: commit 的是真·直接上屏的手势：长按气泡候选、
-#     九键/笔画键上滑输数字；全键盘字母区的上滑保持简写——槽位默认 commit，
-#     但执行时沿用按键路由（与手敲该键一致，非绕过引擎直出）
+#     该键一致；swipe/长按为 commit），显示也是它。
+#     注意区分两种 commit：显式写 action: commit 的手势一律直接上屏（不经过引擎）；
+#     字符串简写 / 只写 value 的「槽位默认 commit」在 26 键字母区的 tap/上滑仍走按键
+#     路由（与手敲该键一致，保留组合态/候选/全半角/简繁语义）
 #   - { label, action, value }
 #     （对象形式省略 action 时取槽位默认）
 #     label:  按键上显示的文字
 #     action: send_rime（走按键路由进 rime 组合，tap 的默认，与手敲该键同一路由）,
-#             commit（输出 value 直接上屏，swipe/长按的默认）,
+#             commit（输出 value 直接上屏；显式写出时字母区 tap/上滑也不经过引擎）,
 #             command（内置命令，value 为命令名）,
 #             select_all, copy, cut, paste, line_start, line_end, undo, none, repeat,
 #             功能键：delete, enter, newline（固定换行，无视编辑器回车动作）, space, repeat_space（value 为次数，默认 5），
