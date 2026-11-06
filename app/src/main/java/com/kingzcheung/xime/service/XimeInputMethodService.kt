@@ -735,8 +735,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 必须在任何异步操作之前同步加载键盘按键配置，
         // 否则 KeyboardLayout 组合时 swipeUp/swipeDown 配置可能尚未就绪，
         // 导致按键上的符号不显示、上滑/下滑手势不触发。
+        val configStartAt = android.os.SystemClock.elapsedRealtime()
         runBlocking(Dispatchers.IO) {
             KeysConfigHelper.loadConfig(this@XimeInputMethodService)
+        }
+        // 冷启动性能基线：超过 100ms 说明配置解析/资产读取又想主线程要时间了
+        val configCost = android.os.SystemClock.elapsedRealtime() - configStartAt
+        if (configCost > 100L) {
+            FileLogger.w(TAG, "initRimeEngine: keys config load blocked main thread ${configCost}ms")
         }
 
         // 引擎异步就绪前先以持久化方案填充 UI 状态：键盘首帧事件链（InputSessionStarted/
