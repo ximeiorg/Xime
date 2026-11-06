@@ -429,15 +429,15 @@ color_schemes:
 #
 # 每个手势的值格式：
 #   - 字符串 "a" → 按槽位默认动作（tap 为 send_rime：走按键路由进 rime，与手敲
-#     该键一致；swipe/长按为 commit：输出 value 直接上屏），显示也是它。
-#     本文件已显式写出 action: commit 的是真·直接上屏的手势：长按气泡候选、
-#     九键/笔画键上滑输数字；全键盘字母区的上滑保持简写——槽位默认 commit，
-#     但执行时沿用按键路由（与手敲该键一致，非绕过引擎直出）
+#     该键一致；swipe/长按为 commit），显示也是它。
+#     注意区分两种 commit：显式写 action: commit 的手势一律直接上屏（不经过引擎）；
+#     字符串简写 / 只写 value 的「槽位默认 commit」在 26 键字母区的 tap/上滑仍走按键
+#     路由（与手敲该键一致，保留组合态/候选/全半角/简繁语义）
 #   - { label, action, value }
 #     （对象形式省略 action 时取槽位默认）
 #     label:  按键上显示的文字
 #     action: send_rime（走按键路由进 rime 组合，tap 的默认，与手敲该键同一路由）,
-#             commit（输出 value 直接上屏，swipe/长按的默认）,
+#             commit（输出 value 直接上屏；显式写出时字母区 tap/上滑也不经过引擎）,
 #             command（内置命令，value 为命令名）,
 #             select_all, copy, cut, paste, line_start, line_end, undo, none, repeat,
 #             功能键：delete, enter, newline（固定换行，无视编辑器回车动作）, space, repeat_space（value 为次数，默认 5），
@@ -1041,8 +1041,9 @@ keyboard:
       enter: { tap: { action: send_rime, value: enter, label: "确定" } }
 
   # ── 常用符号键盘（rows 行布局；中英共用一套，不再分中/英两段、没有 En 键）──
-  # 符号默认用**中文形态**（＠＃＄… 、＊“”！？），只有 `,` 与 `.` 保留半角 ASCII
-  #（写代码/英文时更顺手）。符号键是值键（点按直接上屏）；功能键 back / number(切数字面板) /
+  # 符号默认用**中文形态**（＃＄…、＊“”！？）；`@`、`,`、`.` 保留半角 ASCII
+  #（@ 需半角才能触发聊天工具的 @ 提醒；写代码/英文时 , . 更顺手）。
+  # 符号键是值键（点按直接上屏）；功能键 back / number(切数字面板) /
   # open_symbols / space_key(空格) / delete / enter 行为内置，keys.<id> 只用来覆盖宽度与键面文字。
   # 键间距沿用 keyboard.key.symbol（面板旧名，与段名不同，保持老配置兼容）。
   common_symbols:
@@ -1050,7 +1051,7 @@ keyboard:
     layout:
       rows:
         - [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
-        - ["＠", "＃", "＄", "＆", "＿", "－", "＋", "（", "）", "／"]
+        - ["@", "＃", "＄", "＆", "＿", "－", "＋", "（", "）", "／"]
         # 引号成对：左双引号 + 右双引号（旧配置误用了 左双 + 右单）
         - [open_symbols, "＊", "“", "”", "！", "？", ",", ".", delete]
         - [back, number, space_key, enter]
@@ -1103,13 +1104,13 @@ keyboard:
       # 其余（符号 / 运算符 / 功能列 delete·enter·space_key / 光标键 / back_right）都是标准键宽 = 1
 
   # 常用符号键盘（平板）：12 列 × 4 行，中英共用一套（与手机同一套字形：
-  # 符号默认中文形态，`,/` 与 `.` 保留半角）
+  # 符号默认中文形态，`@`、`,` 与 `.` 保留半角）
   common_symbols_tablet:
     type: full
     layout:
       rows:
         - [tab, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, delete]
-        - [caps, "＠", "＃", "＄", "＿", "＆", "－", "＋", "（", "）", enter]
+        - [caps, "@", "＃", "＄", "＿", "＆", "－", "＋", "（", "）", enter]
         # 与手机同序：符号（含平板多出的 ：；／），行尾固定 "， , ."（, 与 . 保留半角）
         - [open_symbols, "＊", "“", "”", "：", "；", "！", "？", "／", ",", "."]
         - [back, number, space_key, cursor_left, cursor_right, back_right]

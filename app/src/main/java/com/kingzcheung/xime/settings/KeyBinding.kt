@@ -11,6 +11,8 @@ import com.kingzcheung.xime.keyboard.GestureAction
  * @param icon 图标名（标签以 `@` 前缀书写时提取）
  * @param display 标签/气泡显示位置（key：画在键面；bubble：不画键面，留给气泡；both：都画）
  * @param bubble 运行时是否弹出该手势的内容气泡（与 display 无关，display 只管静态提示位置）
+ * @param explicitAction 是否在 YAML 中显式写了 `action`。用于区分「显式 action: commit」
+ *   （必须直接上屏、不经过引擎）与「槽位默认 commit」（字母区保持按键路由语义）。
  */
 class KeyAction(
     val action: GestureAction? = null,
@@ -19,6 +21,7 @@ class KeyAction(
     val icon: String = "",
     val display: DisplayMode = DisplayMode.BOTH,
     val bubble: Boolean = true,
+    val explicitAction: Boolean = false,
 )
 
 /**

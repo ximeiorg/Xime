@@ -454,8 +454,9 @@ internal fun invokeKeyAction(
 /**
  * 可上屏键（字母/数字等）的手势动作分发。
  *
- * - 未配置动作、COMMIT、SEND_RIME → 走 [onKeyPress]（沿用输入法组合/候选语义；调用方传入
- *   已按 shift 处理过的 [fallbackValue]，避免绕过大小写）；
+ * - 未配置动作、槽位默认的 COMMIT、SEND_RIME → 走 [onKeyPress]（沿用输入法组合/候选语义；
+ *   调用方传入已按 shift 处理过的 [fallbackValue]，避免绕过大小写）；
+ * - **显式** `action: commit` → 走 [onCommitText] 直接上屏，不经过引擎；
  * - NONE → 视为未绑定，不触发；
  * - 其余动作（复制/粘贴/光标移动/面板切换等）→ [invokeKeyAction]。
  */
@@ -466,9 +467,24 @@ internal fun dispatchKeyActionOrPress(
     onCommitText: ((String) -> Unit)?,
     onGestureAction: ((GestureAction, String) -> Unit)?,
 ) {
-    when (action?.action) {
-        null, GestureAction.COMMIT, GestureAction.SEND_RIME -> fallbackValue?.let(onKeyPress)
+    if (action == null) {
+        fallbackValue?.let(onKeyPress)
+        return
+    }
+    when (action.action) {
+        null -> fallbackValue?.let(onKeyPress)
         GestureAction.NONE -> Unit
+        GestureAction.COMMIT -> {
+            if (action.explicitAction) {
+                // 显式 commit 的语义就是直接上屏；值缺失时依次回退 label、按键默认值
+                val text = action.value.ifEmpty { action.label }.ifEmpty { fallbackValue.orEmpty() }
+                if (text.isNotEmpty()) (onCommitText ?: onKeyPress)(text)
+            } else {
+                // 槽位默认 commit（字符串简写 / 只写 value）：保持按键路由语义
+                fallbackValue?.let(onKeyPress)
+            }
+        }
+        GestureAction.SEND_RIME -> fallbackValue?.let(onKeyPress)
         else -> invokeKeyAction(action, onKeyPress, onCommitText, onGestureAction)
     }
 }
@@ -504,7 +520,8 @@ internal fun dispatchLongPressSelection(
  * - 未配置 swipe_up 且无旧默认表取值 → 返回 null（不检测上滑）；
  * - `action: none` → 生成空处理器「吸收」上滑（不上屏），与下滑/左右滑一致，
  *   避免竖向拖拽被落点点击判定误打出一个字符；
- * - 其余交给 [dispatchKeyActionOrPress]（COMMIT/未配置 → 原有上滑上屏；其它动作 → 手势分发）。
+ * - 其余交给 [dispatchKeyActionOrPress]（显式 commit / 各动作 → 手势分发；
+ *   槽位默认 commit/未配置 → 原有上滑按键路由）。
  */
 internal fun swipeUpHandlerFor(
     swipeUp: KeyAction?,

@@ -337,6 +337,7 @@ private fun parseKeyAction(
         var label = ""
         var iconName = ""
         var action: GestureAction? = defaultAction
+        var explicitAction = false
         var value = ""
         var display = "key"
         var bubble = true
@@ -352,6 +353,7 @@ private fun parseKeyAction(
                     }
                 }
                 "action" -> {
+                    explicitAction = true
                     val vStr = (v as? YamlScalar)?.content
                     if (vStr == null || vStr == "null") {
                         action = null
@@ -380,6 +382,7 @@ private fun parseKeyAction(
             icon = icon,
             display = DisplayMode.fromValue(display),
             bubble = bubble,
+            explicitAction = explicitAction,
         )
     }
     return KeyAction(action = null)
