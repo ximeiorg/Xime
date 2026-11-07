@@ -10,14 +10,18 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -25,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -68,61 +73,72 @@ fun VoiceKeyboardLayout(
     val accentColor = KeyboardThemes.getAccentColor(themeId, isDarkTheme)
     val inactiveColor = if (isDarkTheme) Color.Gray.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.9f)
     val activeColor = accentColor
-    
+    val contentScroll = rememberScrollState()
+    // 识别文字变长时自动滚到底部，优先展示最新内容；内容不超高时保持垂直居中
+    LaunchedEffect(contentScroll.maxValue) {
+        if (contentScroll.maxValue > 0) contentScroll.scrollTo(contentScroll.maxValue)
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(top = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            // 垂直居中：矮屏/大字缩放导致空间不足时内容对称分布，避免贴顶溢出被下方按钮行盖住（"文字只显示上半部分"）
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
+                .padding(top = 8.dp)
         ) {
-            if (pluginName.isNotEmpty()) {
+            val contentMinHeight = maxHeight
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(contentScroll)
+                    .heightIn(min = contentMinHeight),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                // 内容不超过可视区时居中；超出时可滚动，不再让文字顶出上/下边界被遮挡
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
+            ) {
+                if (pluginName.isNotEmpty()) {
+                    Text(
+                        text = pluginName,
+                        color = keyTextColor.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+
+                val statusText = when (recognitionState) {
+                    RecognitionState.IDLE -> tr(R.string.s_zhangankonggekaishishuohua)
+                    RecognitionState.LISTENING -> tr(R.string.s_zhengzailingting)
+                    RecognitionState.PROCESSING -> tr(R.string.s_zhengzaishibie)
+                    RecognitionState.ERROR -> tr(R.string.s_shibiechucuo)
+                }
+
                 Text(
-                    text = pluginName,
-                    color = keyTextColor.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    text = statusText,
+                    color = keyTextColor.copy(alpha = 0.8f),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
                 )
-            }
-            
-            val statusText = when (recognitionState) {
-                RecognitionState.IDLE -> tr(R.string.s_zhangankonggekaishishuohua)
-                RecognitionState.LISTENING -> tr(R.string.s_zhengzailingting)
-                RecognitionState.PROCESSING -> tr(R.string.s_zhengzaishibie)
-                RecognitionState.ERROR -> tr(R.string.s_shibiechucuo)
-            }
-            
-            Text(
-                text = statusText,
-                color = keyTextColor.copy(alpha = 0.8f),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center
-            )
-            
-            if (recognizedText.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = recognizedText,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
+
+                if (recognizedText.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = recognizedText,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
             }
         }
         
