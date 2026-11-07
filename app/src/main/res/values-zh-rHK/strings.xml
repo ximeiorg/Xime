@@ -83,7 +83,6 @@
     <string name="s_qingxianxiazaishouxiemoxing">請先下載手寫模型</string>
     <string name="s_cikubushuzhong_qingshaohouzaiq_7d5ce">詞庫部署中，請稍後再切換方案</string>
     <string name="s_fanganweibushu_qingzaifangangu_63cf5">方案未部署，請在方案管理中部署後再試</string>
-    <string name="s_yiqiehuanshurufangan">已切換輸入方案</string>
     <string name="s_zhengzaixiazai">正在下載 %1$s...</string>
     <string name="s_xiazaichenggong_qingdianjibushu">%1$s 下載成功，請點擊部署</string>
     <string name="s_xiazaishibai_2">%1$s 下載失敗</string>

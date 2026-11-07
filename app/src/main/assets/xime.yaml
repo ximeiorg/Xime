@@ -422,6 +422,13 @@ color_schemes:
 #   swipe_right: 右滑
 #   long_press:  长按（数组，弹出气泡后左右滑动选择）
 #
+# 每个按键还可单独覆盖外观（不写则沿用键盘级/主题默认，默认样式不变）：
+#   corner_radius:   该键圆角（dp），如 enter: { corner_radius: 14 }
+#   background:      该键背景色（0xRRGGBB / 0xAARRGGBB，亮色）
+#   background_dark: 该键背景色（暗色；不写则沿用 background）
+#   例：enter: { corner_radius: 14, background: 0x9FEF86, background_dark: 0x2F5A2F }
+#   背景改色后键面文字会按背景亮度自动取深/浅色。
+#
 # 左右滑与整片键盘滑动移动光标的关系：
 #   在键盘区域横向滑动默认用于移动光标；若某键配置了 swipe_left / swipe_right，
 #   该键上的横向滑动即由按键接管（执行配置动作），不再移动光标；未配置左右滑的键
@@ -492,6 +499,8 @@ keyboard:
   # （handwriting 手写键盘的键面尺寸写在代码里，圆角同样认 handwriting 这个名字）；
   # 平板设备档另可写 <键盘名>_tablet（平板上覆盖同名基础覆盖，见下方示例）。
   # 例如：t9: { corner_radius: 8, spacing_x: 1, spacing_y: 2 }
+  # 单个按键也可在对应键盘的 keys.<id> 下写 corner_radius / background / background_dark
+  # 覆盖外观（见下方「26 键全键盘手势配置」说明），未写则沿用这里的全局值。
   key:
     corner_radius: 8
     spacing_x: 2

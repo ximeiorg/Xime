@@ -289,7 +289,7 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
                     ascii, schemaId
                 )
             )
-            Toast.makeText(service, tr(R.string.s_yiqiehuanshurufangan), Toast.LENGTH_SHORT).show()
+            // 切换成功不弹 Toast：键盘/候选栏已经能看出当前方案，避免打断输入
         } catch (e: Exception) {
             FileLogger.e(XimeInputMethodService.TAG, "Failed to switch schema", e)
         }

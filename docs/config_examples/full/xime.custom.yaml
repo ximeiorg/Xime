@@ -69,6 +69,12 @@ color_schemes:
 #   swipe_down: 下滑
 #   long_press: 长按（数组，弹出气泡后左右滑动选择）
 #
+# 每个按键还可单独覆盖外观（不写则沿用键盘级/主题默认）：
+#   corner_radius:   该键圆角（dp）
+#   background:      该键背景色（0xRRGGBB / 0xAARRGGBB，亮色）
+#   background_dark: 该键背景色（暗色；不写则沿用 background）
+#   例：enter: { corner_radius: 14, background: 0x9FEF86, background_dark: 0x2F5A2F }
+#
 # 每个手势的值格式：
 #   - 字符串 "a" → 上屏该文本，显示也是它
 #   - { label, action, value }
