@@ -85,7 +85,6 @@ internal object UiTextFallback {
         R.string.s_qingxianxiazaishouxiemoxing to "请先下载手写模型",
         R.string.s_cikubushuzhong_qingshaohouzaiq_7d5ce to "词库部署中，请稍后再切换方案",
         R.string.s_fanganweibushu_qingzaifangangu_63cf5 to "方案未部署，请在方案管理中部署后再试",
-        R.string.s_yiqiehuanshurufangan to "已切换输入方案",
         R.string.s_zhengzaixiazai to "正在下载 %1\$s...",
         R.string.s_xiazaichenggong_qingdianjibushu to "%1\$s 下载成功，请点击部署",
         R.string.s_xiazaishibai_2 to "%1\$s 下载失败",

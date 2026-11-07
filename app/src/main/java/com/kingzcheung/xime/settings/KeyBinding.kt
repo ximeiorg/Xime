@@ -42,6 +42,9 @@ class LongPressAction(
  * 一个键的手势绑定表。
  *
  * @param width 布局宽度权重；null 时功能键用内置默认宽度、字母键为 1
+ * @param cornerRadius 该键的圆角半径（dp）；null = 沿用键盘级圆角
+ * @param background 该键背景色（0xRRGGBB / 0xAARRGGBB）；null = 沿用主题按键底色
+ * @param backgroundDark 暗色模式下的该键背景色；null = 沿用 [background]
  */
 class KeyBinding(
     val tap: KeyAction? = null,
@@ -52,7 +55,51 @@ class KeyBinding(
     val swipeLeft: KeyAction? = null,
     val swipeRight: KeyAction? = null,
     val width: Float? = null,
+    val cornerRadius: Int? = null,
+    val background: Long? = null,
+    val backgroundDark: Long? = null,
 )
+
+/** 只写了外观字段（corner_radius / background / background_dark）的覆盖。 */
+internal fun KeyBinding.isStyleOnlyOverride(): Boolean =
+    tap == null && doubleTap == null && longPress == null &&
+        swipeUp == null && swipeDown == null && swipeLeft == null && swipeRight == null &&
+        width == null && (cornerRadius != null || background != null || backgroundDark != null)
+
+/**
+ * 合并按键配置：
+ * - 只写外观字段时，保留基础键的 tap/长按/滑动/宽度，仅覆盖外观；
+ * - 写了任一行为字段时，沿用原有「键级整体替换」规则。
+ *
+ * 这样彩色键盘示例只写 background/corner_radius 也不会把上滑数字、长按候选等弄丢。
+ */
+internal fun mergeKeyBinding(base: KeyBinding?, override: KeyBinding): KeyBinding {
+    if (base == null || !override.isStyleOnlyOverride()) return override
+    return KeyBinding(
+        tap = base.tap,
+        doubleTap = base.doubleTap,
+        longPress = base.longPress,
+        swipeUp = base.swipeUp,
+        swipeDown = base.swipeDown,
+        swipeLeft = base.swipeLeft,
+        swipeRight = base.swipeRight,
+        width = base.width,
+        cornerRadius = override.cornerRadius ?: base.cornerRadius,
+        background = override.background ?: base.background,
+        backgroundDark = override.backgroundDark ?: base.backgroundDark,
+    )
+}
+
+/** 键级合并两组手势配置：custom 覆盖 default，外观-only 覆盖保留默认手势。 */
+internal fun mergeGestureMaps(
+    base: Map<String, KeyBinding>,
+    overrides: Map<String, KeyBinding>,
+): Map<String, KeyBinding> {
+    if (overrides.isEmpty()) return base
+    val merged = LinkedHashMap(base)
+    for ((key, override) in overrides) merged[key] = mergeKeyBinding(base[key], override)
+    return merged
+}
 
 /**
  * 面板段（数字/常用符号键盘）的布局描述。

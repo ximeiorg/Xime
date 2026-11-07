@@ -409,6 +409,82 @@ class KeyboardGestureConfigTest {
         assertTrue(binding.swipeUp!!.bubble)
     }
 
+    // ── 按键级外观覆盖（corner_radius / background） ──
+
+    @Test
+    fun `按键级圆角与背景可解析`() {
+        val kc = parse(
+            """enter: { tap: "enter", corner_radius: 14, background: 0x9FEF86, background_dark: 0x2F5A2F }"""
+        )["enter"]!!
+        assertEquals(14, kc.cornerRadius)
+        assertEquals(0x9FEF86L, kc.background)
+        assertEquals(0x2F5A2FL, kc.backgroundDark)
+    }
+
+    @Test
+    fun `按键级外观未配置时保持默认`() {
+        val kc = parse("""q: { tap: "q" }""")["q"]!!
+        assertNull(kc.cornerRadius)
+        assertNull(kc.background)
+        assertNull(kc.backgroundDark)
+    }
+
+    @Test
+    fun `按键级背景支持带透明度与非法值忽略`() {
+        val kc = parse(
+            """q: { background: 0x80FFFFFF, background_dark: "not-a-color", corner_radius: "x" }"""
+        )["q"]!!
+        assertEquals(0x80FFFFFFL, kc.background)
+        assertNull(kc.backgroundDark)
+        assertNull(kc.cornerRadius)
+    }
+
+    // ── 外观-only 覆盖的合并规则 ──
+
+    @Test
+    fun `只写外观覆盖时保留默认手势`() {
+        val default = """
+            keyboard:
+              qwerty:
+                keys:
+                  q: { tap: "q", swipe_up: "1", long_press: { display: bubble, values: ["q", "Q"] } }
+        """.trimIndent()
+        val custom = """
+            keyboard:
+              qwerty:
+                keys:
+                  q: { corner_radius: 20, background: 0xFFFF7043 }
+        """.trimIndent()
+        val (zh, _) = KeysConfigHelper.parseKeyboardGestureTexts(default, custom)!!
+        val q = zh["q"]!!
+        assertEquals("q", q.tap!!.value)
+        assertEquals("1", q.swipeUp!!.value)
+        assertEquals(2, q.longPress!!.values.size)
+        assertEquals(20, q.cornerRadius)
+        assertEquals(0xFFFF7043L, q.background)
+    }
+
+    @Test
+    fun `写行为字段时仍整体替换默认手势`() {
+        val default = """
+            keyboard:
+              qwerty:
+                keys:
+                  q: { tap: "q", swipe_up: "1", long_press: { display: bubble, values: ["q", "Q"] } }
+        """.trimIndent()
+        val custom = """
+            keyboard:
+              qwerty:
+                keys:
+                  q: { tap: "x" }
+        """.trimIndent()
+        val (zh, _) = KeysConfigHelper.parseKeyboardGestureTexts(default, custom)!!
+        val q = zh["q"]!!
+        assertEquals("x", q.tap!!.value)
+        assertNull(q.swipeUp)
+        assertNull(q.longPress)
+    }
+
     // ── 辅助 ──
 
     private fun parse(

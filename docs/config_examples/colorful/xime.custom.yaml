@@ -1,0 +1,125 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# 彩色键盘示例（按键级背景 / 圆角）
+#
+# 安装：保存为 Xime 用户目录的 rime/xime.custom.yaml
+#       （Android/data/com.kingzcheung.xime/files/rime/），
+#       然后在键盘设置里重新部署 / 重启输入法。
+#
+# 说明：
+#   · 只写 background / background_dark / corner_radius 时，会保留该键原有的
+#     点按、上滑数字、长按候选等手势；不需要把整套 keys 复制过来。
+#   · 默认主题不变：本文件只覆盖下面列出的键。
+#   · 适配 26 键中英文键盘与数字面板；九键 / 笔画 / 手写键盘暂不支持按键级外观。
+#     平板设备请把对应段改成 qwerty_tablet / qwerty_en_tablet / number_tablet。
+#   · 背景改色后键面文字会按亮度自动取深/浅色；暗色模式取 background_dark。
+#   · 符号面板保持默认，想改可照数字面板的写法加到 keyboard.common_symbols.keys。
+# ═══════════════════════════════════════════════════════════════════════════
+
+metadata:
+  app_name: Xime
+  config_version: 1
+
+keyboard:
+  # ── 中文 26 键 ──
+  qwerty:
+    keys:
+      # 第一行：红 → 橙 → 黄 → 绿 → 青 → 蓝 → 紫 → 粉
+      q: { corner_radius: 12, background: 0xFFFF8A80, background_dark: 0xFFB71C1C }
+      w: { corner_radius: 12, background: 0xFFFFB74D, background_dark: 0xFFE65100 }
+      e: { corner_radius: 12, background: 0xFFFFD54F, background_dark: 0xFFF57F17 }
+      r: { corner_radius: 12, background: 0xFFAED581, background_dark: 0xFF33691E }
+      t: { corner_radius: 12, background: 0xFF81C784, background_dark: 0xFF1B5E20 }
+      y: { corner_radius: 12, background: 0xFF4DD0E1, background_dark: 0xFF006064 }
+      u: { corner_radius: 12, background: 0xFF64B5F6, background_dark: 0xFF0D47A1 }
+      i: { corner_radius: 12, background: 0xFF7986CB, background_dark: 0xFF1A237E }
+      o: { corner_radius: 12, background: 0xFFBA68C8, background_dark: 0xFF4A148C }
+      p: { corner_radius: 12, background: 0xFFF06292, background_dark: 0xFF880E4F }
+
+      # 第二行
+      a: { corner_radius: 12, background: 0xFFFFAB91, background_dark: 0xFFBF360C }
+      s: { corner_radius: 12, background: 0xFFFFCC80, background_dark: 0xFFE65100 }
+      d: { corner_radius: 12, background: 0xFFFFF59D, background_dark: 0xFFF9A825 }
+      f: { corner_radius: 12, background: 0xFFC5E1A5, background_dark: 0xFF558B2F }
+      g: { corner_radius: 12, background: 0xFFA5D6A7, background_dark: 0xFF2E7D32 }
+      h: { corner_radius: 12, background: 0xFF80DEEA, background_dark: 0xFF00838F }
+      j: { corner_radius: 12, background: 0xFF90CAF9, background_dark: 0xFF1565C0 }
+      k: { corner_radius: 12, background: 0xFF9FA8DA, background_dark: 0xFF283593 }
+      l: { corner_radius: 12, background: 0xFFCE93D8, background_dark: 0xFF6A1B9A }
+
+      # 第三行
+      z: { corner_radius: 12, background: 0xFFEF9A9A, background_dark: 0xFFC62828 }
+      x: { corner_radius: 12, background: 0xFFFFAB91, background_dark: 0xFFD84315 }
+      c: { corner_radius: 12, background: 0xFFFFE082, background_dark: 0xFFFF8F00 }
+      v: { corner_radius: 12, background: 0xFFE6EE9C, background_dark: 0xFF9E9D24 }
+      b: { corner_radius: 12, background: 0xFFC5E1A5, background_dark: 0xFF33691E }
+      n: { corner_radius: 12, background: 0xFF80CBC4, background_dark: 0xFF00695C }
+      m: { corner_radius: 12, background: 0xFF90CAF9, background_dark: 0xFF1565C0 }
+
+      # 功能键
+      shift: { corner_radius: 14, background: 0xFFE1BEE7, background_dark: 0xFF6A1B9A }
+      delete: { corner_radius: 14, background: 0xFFFFCDD2, background_dark: 0xFFB71C1C }
+      mode_change: { corner_radius: 14, background: 0xFFFFE082, background_dark: 0xFFE65100 }
+      comma: { corner_radius: 12, background: 0xFFF5F5F5, background_dark: 0xFF424242 }
+      space: { corner_radius: 22, background: 0xFFA5D6A7, background_dark: 0xFF2E7D32 }
+      earth: { corner_radius: 14, background: 0xFFB2EBF2, background_dark: 0xFF00838F }
+      enter: { corner_radius: 16, background: 0xFF90CAF9, background_dark: 0xFF1565C0 }
+
+  # ── 英文 26 键：与中文键盘同一套配色 ──
+  qwerty_en:
+    keys:
+      q: { corner_radius: 12, background: 0xFFFF8A80, background_dark: 0xFFB71C1C }
+      w: { corner_radius: 12, background: 0xFFFFB74D, background_dark: 0xFFE65100 }
+      e: { corner_radius: 12, background: 0xFFFFD54F, background_dark: 0xFFF57F17 }
+      r: { corner_radius: 12, background: 0xFFAED581, background_dark: 0xFF33691E }
+      t: { corner_radius: 12, background: 0xFF81C784, background_dark: 0xFF1B5E20 }
+      y: { corner_radius: 12, background: 0xFF4DD0E1, background_dark: 0xFF006064 }
+      u: { corner_radius: 12, background: 0xFF64B5F6, background_dark: 0xFF0D47A1 }
+      i: { corner_radius: 12, background: 0xFF7986CB, background_dark: 0xFF1A237E }
+      o: { corner_radius: 12, background: 0xFFBA68C8, background_dark: 0xFF4A148C }
+      p: { corner_radius: 12, background: 0xFFF06292, background_dark: 0xFF880E4F }
+
+      a: { corner_radius: 12, background: 0xFFFFAB91, background_dark: 0xFFBF360C }
+      s: { corner_radius: 12, background: 0xFFFFCC80, background_dark: 0xFFE65100 }
+      d: { corner_radius: 12, background: 0xFFFFF59D, background_dark: 0xFFF9A825 }
+      f: { corner_radius: 12, background: 0xFFC5E1A5, background_dark: 0xFF558B2F }
+      g: { corner_radius: 12, background: 0xFFA5D6A7, background_dark: 0xFF2E7D32 }
+      h: { corner_radius: 12, background: 0xFF80DEEA, background_dark: 0xFF00838F }
+      j: { corner_radius: 12, background: 0xFF90CAF9, background_dark: 0xFF1565C0 }
+      k: { corner_radius: 12, background: 0xFF9FA8DA, background_dark: 0xFF283593 }
+      l: { corner_radius: 12, background: 0xFFCE93D8, background_dark: 0xFF6A1B9A }
+
+      z: { corner_radius: 12, background: 0xFFEF9A9A, background_dark: 0xFFC62828 }
+      x: { corner_radius: 12, background: 0xFFFFAB91, background_dark: 0xFFD84315 }
+      c: { corner_radius: 12, background: 0xFFFFE082, background_dark: 0xFFFF8F00 }
+      v: { corner_radius: 12, background: 0xFFE6EE9C, background_dark: 0xFF9E9D24 }
+      b: { corner_radius: 12, background: 0xFFC5E1A5, background_dark: 0xFF33691E }
+      n: { corner_radius: 12, background: 0xFF80CBC4, background_dark: 0xFF00695C }
+      m: { corner_radius: 12, background: 0xFF90CAF9, background_dark: 0xFF1565C0 }
+
+      shift: { corner_radius: 14, background: 0xFFE1BEE7, background_dark: 0xFF6A1B9A }
+      delete: { corner_radius: 14, background: 0xFFFFCDD2, background_dark: 0xFFB71C1C }
+      mode_change: { corner_radius: 14, background: 0xFFFFE082, background_dark: 0xFFE65100 }
+      comma: { corner_radius: 12, background: 0xFFF5F5F5, background_dark: 0xFF424242 }
+      space: { corner_radius: 22, background: 0xFFA5D6A7, background_dark: 0xFF2E7D32 }
+      earth: { corner_radius: 14, background: 0xFFB2EBF2, background_dark: 0xFF00838F }
+      enter: { corner_radius: 16, background: 0xFF90CAF9, background_dark: 0xFF1565C0 }
+
+  # ── 数字面板 ──
+  number:
+    keys:
+      "1": { background: 0xFFFF8A80, background_dark: 0xFFB71C1C }
+      "2": { background: 0xFFFFB74D, background_dark: 0xFFE65100 }
+      "3": { background: 0xFFFFD54F, background_dark: 0xFFF57F17 }
+      "4": { background: 0xFFAED581, background_dark: 0xFF33691E }
+      "5": { background: 0xFF81C784, background_dark: 0xFF1B5E20 }
+      "6": { background: 0xFF4DD0E1, background_dark: 0xFF006064 }
+      "7": { background: 0xFF64B5F6, background_dark: 0xFF0D47A1 }
+      "8": { background: 0xFF7986CB, background_dark: 0xFF1A237E }
+      "9": { background: 0xFFBA68C8, background_dark: 0xFF4A148C }
+      "0": { background: 0xFFF06292, background_dark: 0xFF880E4F }
+      back: { corner_radius: 14, background: 0xFFE1BEE7, background_dark: 0xFF6A1B9A }
+      delete: { corner_radius: 14, background: 0xFFFFCDD2, background_dark: 0xFFB71C1C }
+      open_symbols: { corner_radius: 14, background: 0xFFFFE082, background_dark: 0xFFE65100 }
+      space_bar: { corner_radius: 22, background: 0xFFA5D6A7, background_dark: 0xFF2E7D32 }
+      emoji: { corner_radius: 14, background: 0xFFB2EBF2, background_dark: 0xFF00838F }
+      enter: { corner_radius: 16, background: 0xFF90CAF9, background_dark: 0xFF1565C0 }

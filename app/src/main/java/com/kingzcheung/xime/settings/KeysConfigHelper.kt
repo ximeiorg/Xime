@@ -224,8 +224,12 @@ internal fun parseKeyBinding(
     var swipeLeft: KeyAction? = null
     var swipeRight: KeyAction? = null
     var width: Float? = null
+    var cornerRadius: Int? = null
+    var background: Long? = null
+    var backgroundDark: Long? = null
     for ((kNode, vNode) in map.entries) {
         val name = (kNode as? com.charleskorn.kaml.YamlScalar)?.content ?: continue
+        val scalar = (vNode as? com.charleskorn.kaml.YamlScalar)?.content
         when (name) {
             "tap" -> tap = parseKeyAction(vNode, GestureAction.SEND_RIME, presets)
             "double_tap" -> doubleTap = parseKeyAction(vNode, GestureAction.COMMIT, presets)
@@ -234,11 +238,20 @@ internal fun parseKeyBinding(
             "swipe_down" -> swipeDown = parseKeyAction(vNode, GestureAction.COMMIT, presets)
             "swipe_left" -> swipeLeft = parseKeyAction(vNode, GestureAction.COMMIT, presets)
             "swipe_right" -> swipeRight = parseKeyAction(vNode, GestureAction.COMMIT, presets)
-            "width" -> width = (vNode as? com.charleskorn.kaml.YamlScalar)?.content?.toFloatOrNull()
+            "width" -> width = scalar?.toFloatOrNull()
+            // 按键级外观覆盖：不写则完全沿用键盘级/主题默认，默认样式不变
+            "corner_radius" -> cornerRadius = scalar?.toIntOrNull()
+            "background" -> background = scalar?.let(::parseHexColor)
+            "background_dark" -> backgroundDark = scalar?.let(::parseHexColor)
         }
     }
-    return KeyBinding(tap, doubleTap, longPress, swipeUp, swipeDown, swipeLeft, swipeRight, width)
+    return KeyBinding(tap, doubleTap, longPress, swipeUp, swipeDown, swipeLeft, swipeRight, width,
+        cornerRadius, background, backgroundDark)
 }
+
+/** 解析 0xRRGGBB / 0xAARRGGBB；非法值返回 null（视为未配置）。 */
+private fun parseHexColor(value: String): Long? =
+    value.removePrefix("0x").removePrefix("0X").takeIf { it.isNotEmpty() }?.toLongOrNull(16)
 
 /**
  * 解析 long_press。支持两种写法：`{ display?, values: [...] }` 与单项直写 `{ action?, value?, ... }`。
@@ -1279,8 +1292,8 @@ object KeysConfigHelper {
             ?: emptyMap()
         val customZh: Map<String, KeyBinding>? = customText?.let { parseKeyboardYamlSection(it, zhSection, presets) }
         val customEn: Map<String, KeyBinding>? = customText?.let { parseKeyboardYamlSection(it, enSection, presets) }
-        val zh = if (customZh != null) defaultZh + customZh else defaultZh
-        val en = if (customEn != null) defaultEn + customEn else defaultEn
+        val zh = if (customZh != null) mergeGestureMaps(defaultZh, customZh) else defaultZh
+        val en = if (customEn != null) mergeGestureMaps(defaultEn, customEn) else defaultEn
         return Pair(zh, en)
     }
 
@@ -1779,7 +1792,7 @@ object KeysConfigHelper {
         val customPresets = customText?.let { parseKeyboardActionsYamlText(it) } ?: emptyMap()
         val presets = defaultPresets + customPresets
         val custom = customText?.let { parseKeyboardYamlSection(it, section, presets) }
-        return if (custom != null) default + custom else default
+        return if (custom != null) mergeGestureMaps(default, custom) else default
     }
 
     /**
@@ -1930,7 +1943,7 @@ object KeysConfigHelper {
             val default = parse(defaultText, resolvedSection)
                 ?: parse(defaultText, baseSection)
                 ?: emptyMap()
-            return default + custom
+            return mergeGestureMaps(default, custom)
         }
         return parse(defaultText, resolvedSection)
             ?: parse(defaultText, baseSection)
