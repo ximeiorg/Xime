@@ -225,8 +225,8 @@ internal fun parseKeyBinding(
     var swipeRight: KeyAction? = null
     var width: Float? = null
     var cornerRadius: Int? = null
-    var background: Long? = null
-    var backgroundDark: Long? = null
+    var background: KeyColor? = null
+    var backgroundDark: KeyColor? = null
     for ((kNode, vNode) in map.entries) {
         val name = (kNode as? com.charleskorn.kaml.YamlScalar)?.content ?: continue
         val scalar = (vNode as? com.charleskorn.kaml.YamlScalar)?.content
@@ -241,17 +241,30 @@ internal fun parseKeyBinding(
             "width" -> width = scalar?.toFloatOrNull()
             // 按键级外观覆盖：不写则完全沿用键盘级/主题默认，默认样式不变
             "corner_radius" -> cornerRadius = scalar?.toIntOrNull()
-            "background" -> background = scalar?.let(::parseHexColor)
-            "background_dark" -> backgroundDark = scalar?.let(::parseHexColor)
+            "background" -> background = scalar?.let(::parseKeyColor)
+            "background_dark" -> backgroundDark = scalar?.let(::parseKeyColor)
         }
     }
     return KeyBinding(tap, doubleTap, longPress, swipeUp, swipeDown, swipeLeft, swipeRight, width,
         cornerRadius, background, backgroundDark)
 }
 
-/** 解析 0xRRGGBB / 0xAARRGGBB；非法值返回 null（视为未配置）。 */
-private fun parseHexColor(value: String): Long? =
-    value.removePrefix("0x").removePrefix("0X").takeIf { it.isNotEmpty() }?.toLongOrNull(16)
+/**
+ * 解析按键背景：
+ * - 0xRRGGBB / 0xAARRGGBB → 固定颜色
+ * - accent / primary / special / key / keyboard（可带 theme. 前缀）→ 主题色记号
+ * - 其它值视为未配置，保持默认背景
+ */
+private fun parseKeyColor(value: String): KeyColor? {
+    val trimmed = value.trim()
+    if (trimmed.isEmpty()) return null
+    val hex = trimmed.removePrefix("0x").removePrefix("0X")
+    if (hex.length in 6..8 && hex.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) {
+        return hex.toLongOrNull(16)?.let(KeyColor::Hex)
+    }
+    val token = trimmed.lowercase().removePrefix("theme.")
+    return token.takeIf { it in KEY_COLOR_TOKENS }?.let(KeyColor::Token)
+}
 
 /**
  * 解析 long_press。支持两种写法：`{ display?, values: [...] }` 与单项直写 `{ action?, value?, ... }`。

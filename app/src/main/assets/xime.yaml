@@ -424,9 +424,14 @@ color_schemes:
 #
 # 每个按键还可单独覆盖外观（不写则沿用键盘级/主题默认，默认样式不变）：
 #   corner_radius:   该键圆角（dp），如 enter: { corner_radius: 14 }
-#   background:      该键背景色（0xRRGGBB / 0xAARRGGBB，亮色）
-#   background_dark: 该键背景色（暗色；不写则沿用 background）
-#   例：enter: { corner_radius: 14, background: 0x9FEF86, background_dark: 0x2F5A2F }
+#   background:      该键背景色。可写固定色 0xRRGGBB / 0xAARRGGBB，
+#                    也可写主题色记号，随用户切换主题自动变化：
+#                      accent / primary  主题强调色
+#                      special           特殊键底色
+#                      key               普通键底色
+#                      keyboard          键盘背景色
+#   background_dark: 暗色背景；不写时主题色记号会自动取暗色主题对应色
+#   例：enter: { corner_radius: 14, background: accent }
 #   背景改色后键面文字会按背景亮度自动取深/浅色。
 #
 # 左右滑与整片键盘滑动移动光标的关系：

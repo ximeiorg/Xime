@@ -39,11 +39,28 @@ class LongPressAction(
 )
 
 /**
+ * 按键背景色配置：
+ * - [Hex] 固定颜色（0xRRGGBB / 0xAARRGGBB）
+ * - [Token] 主题色记号，渲染时按当前主题/明暗解析，跟随用户切换主题
+ */
+sealed interface KeyColor {
+    data class Hex(val argb: Long) : KeyColor
+
+    /** [name] 已规范化为小写，例如 accent / primary / special / key / keyboard。 */
+    data class Token(val name: String) : KeyColor
+}
+
+/** 支持的主题色记号（也接受 theme. 前缀，解析时去掉）。 */
+internal val KEY_COLOR_TOKENS: Set<String> = setOf(
+    "accent", "primary", "special", "key", "keyboard",
+)
+
+/**
  * 一个键的手势绑定表。
  *
  * @param width 布局宽度权重；null 时功能键用内置默认宽度、字母键为 1
  * @param cornerRadius 该键的圆角半径（dp）；null = 沿用键盘级圆角
- * @param background 该键背景色（0xRRGGBB / 0xAARRGGBB）；null = 沿用主题按键底色
+ * @param background 该键背景色（固定颜色或主题色记号）；null = 沿用主题按键底色
  * @param backgroundDark 暗色模式下的该键背景色；null = 沿用 [background]
  */
 class KeyBinding(
@@ -56,8 +73,8 @@ class KeyBinding(
     val swipeRight: KeyAction? = null,
     val width: Float? = null,
     val cornerRadius: Int? = null,
-    val background: Long? = null,
-    val backgroundDark: Long? = null,
+    val background: KeyColor? = null,
+    val backgroundDark: KeyColor? = null,
 )
 
 /** 只写了外观字段（corner_radius / background / background_dark）的覆盖。 */

@@ -616,7 +616,7 @@ internal data class QwertyRowEnv(
     val landscape: Boolean = false,
     val fontSize: TextUnit = TextUnit.Unspecified,
     val swipeFontSize: TextUnit = 9.sp,
-    /** 面板文本功能键字号（返回/123/符号/确定/空格）；null = KeyButton 默认字号。主键盘不使用。 */
+    /** 面板文本功能键字号（返回/123/符号/空格）；null = KeyButton 默认字号。主键盘不使用。 */
     val ctrlFontSize: TextUnit? = null,
     /** 手势/宽度配置来源段名（主键盘 = "qwerty"；面板 = number / common_symbols…）。 */
     val section: String = "qwerty",
@@ -928,7 +928,7 @@ internal fun FunctionKeyCell(id: String, env: QwertyRowEnv, modifier: Modifier) 
             "comma" -> CommaCell(keyEnv, modifier)
             "space" -> SpaceCell(keyEnv, modifier)
             "earth" -> EarthCell(keyEnv, modifier)
-            "enter" -> EnterCell(keyEnv, modifier, keyEnv.ctrlFontSize)
+            "enter" -> EnterCell(keyEnv, modifier)
             "symbol" -> PanelActionCell(
                 "symbol", GestureAction.TOGGLE_SYMBOLS, "", rememberVectorPainter(Icons.TwoTone.KeyboardAlt), keyEnv, modifier,
             )
@@ -1253,8 +1253,12 @@ private fun SpaceCell(env: QwertyRowEnv, modifier: Modifier) {
     )
 }
 
+/**
+ * 回车键。字号不再由面板单独传参，统一走 [SwipeableKeyButton] 默认规则，
+ * 保证全键盘、数字面板、常用符号面板的「确定/换行」字号一致。
+ */
 @Composable
-private fun EnterCell(env: QwertyRowEnv, modifier: Modifier, fontSize: TextUnit? = null) {
+private fun EnterCell(env: QwertyRowEnv, modifier: Modifier) {
     val enterBinding = KeysConfigHelper.getGestureFor(env.section, "enter", env.isAsciiMode)
     val enterAction = enterBinding?.tap ?: KeyAction(GestureAction.ENTER)
     val enterKeyValue = enterAction.value.ifEmpty { "enter" }
@@ -1285,7 +1289,6 @@ private fun EnterCell(env: QwertyRowEnv, modifier: Modifier, fontSize: TextUnit?
         shadowEnabled = env.shadowEnabled,
         shadowElevation = env.shadowElevation,
         shadowShapeRadius = env.shadowShapeRadius,
-        fontSize = fontSize ?: androidx.compose.ui.unit.TextUnit.Unspecified,
     )
 }
 

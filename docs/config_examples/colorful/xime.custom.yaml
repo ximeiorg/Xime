@@ -12,6 +12,9 @@
 #   · 适配 26 键中英文键盘与数字面板；九键 / 笔画 / 手写键盘暂不支持按键级外观。
 #     平板设备请把对应段改成 qwerty_tablet / qwerty_en_tablet / number_tablet。
 #   · 背景改色后键面文字会按亮度自动取深/浅色；暗色模式取 background_dark。
+#   · 想让按键跟随主题色，把 background 写成 accent / primary（强调色）、
+#     special（特殊键色）、key（普通键底色）、keyboard（键盘背景色）即可，
+#     切换主题时会自动变化。例：enter: { background: accent }。
 #   · 符号面板保持默认，想改可照数字面板的写法加到 keyboard.common_symbols.keys。
 # ═══════════════════════════════════════════════════════════════════════════
 
