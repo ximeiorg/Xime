@@ -1,11 +1,32 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { EditorView, basicSetup } from 'codemirror'
+import { yaml } from '@codemirror/lang-yaml'
+import { keymap } from '@codemirror/view'
+import { Prec } from '@codemirror/state'
 import logo from './assets/logo.png'
 
 const ACCEPT = '.yaml,.zip,.tar.gz,.tgz,.gram,.jpg,.jpeg,.png,.xipk,.ttf,.otf,.woff,.woff2'
 const SUPPORTED = /\.(yaml|zip|tar\.gz|tgz|gram|jpe?g|png|xipk|ttf|otf|woff2?)$/i
 
+/** 可在浏览器里编辑的文本类型；与 Android 端 WirelessTextFilePolicy 保持一致。 */
+const EDITABLE = /\.(yaml|yml|txt|md|json|conf|lua)$/i
+/** 服务端只允许写 files/rime 下的文件，其它目录即使扩展名匹配也不提供「编辑」。 */
+const RIME_PATH = /\/files\/rime\//
+const EDIT_MAX_BYTES = 2 * 1024 * 1024
+/** 只读预览上限：更大的词典/binary 请下载查看，避免整文件塞进页面。 */
+const VIEW_MAX_BYTES = 1024 * 1024
+
 function supported(name) {
   return SUPPORTED.test(name)
+}
+
+function editable(node) {
+  return (
+    !node.isDir &&
+    RIME_PATH.test(node.path) &&
+    EDITABLE.test(node.name) &&
+    (Number(node.size) || 0) <= EDIT_MAX_BYTES
+  )
 }
 
 function uid() {
@@ -92,6 +113,7 @@ function countStats(node) {
 
 export default function App() {
   const inputRef = useRef(null)
+  const previewRef = useRef(null)
   const [files, setFiles] = useState([])
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -101,6 +123,7 @@ export default function App() {
   const [treeErr, setTreeErr] = useState(null)
   const [expanded, setExpanded] = useState({})
   const [preview, setPreview] = useState(null)
+  const [editing, setEditing] = useState(null)
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState({ dirs: 0, files: 0, totalBytes: 0 })
 
@@ -197,20 +220,63 @@ export default function App() {
     return () => clearInterval(t)
   }, [refreshTree])
 
+  // 预览面板在长目录树之后：打开文件后滚到可见位置，否则手机上要手动翻很久。
+  useEffect(() => {
+    if (preview) previewRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [preview])
+
   const toggleDir = useCallback((node) => {
     if (!node.isDir) return
     setExpanded((prev) => ({ ...prev, [node.path]: !prev[node.path] }))
   }, [])
 
+  const readText = useCallback(async (node) => {
+    const res = await fetch(`/read?path=${encodeURIComponent(node.path)}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.text()
+  }, [])
+
   const openFile = useCallback(async (node) => {
+    if ((Number(node.size) || 0) > VIEW_MAX_BYTES) {
+      alert('文件较大，请在右侧下载后查看')
+      return
+    }
     try {
-      const res = await fetch(`/read?path=${encodeURIComponent(node.path)}`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setPreview({ node, text: await res.text() })
+      setPreview({ node, text: await readText(node) })
     } catch (e) {
       alert('打开文件失败: ' + (e.message || e))
     }
-  }, [])
+  }, [readText])
+
+  const openEditor = useCallback(async (node) => {
+    if (!editable(node)) {
+      alert('该文件不支持编辑（仅限 2MB 内的 yaml / txt / md / json / conf / lua）')
+      return
+    }
+    try {
+      const text = await readText(node)
+      setEditing({ node, text })
+      setPreview(null)
+    } catch (e) {
+      alert('打开文件失败: ' + (e.message || e))
+    }
+  }, [readText])
+
+  const saveText = useCallback(async (node, content) => {
+    const res = await fetch('/write', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: node.path, content }),
+    })
+    let data = {}
+    try {
+      data = await res.json()
+    } catch (_) { /* ignore */ }
+    if (!res.ok || data.success !== true) {
+      throw new Error(data.error || `HTTP ${res.status}`)
+    }
+    refreshTree()
+  }, [refreshTree])
 
   const downloadFile = useCallback((node) => {
     const a = document.createElement('a')
@@ -242,19 +308,23 @@ export default function App() {
   }, [refreshTree])
 
   return (
-    <div className="flex h-full">
+    <div className="flex min-h-full flex-col md:h-full md:flex-row">
       {/* 左栏：Logo + 上传，贴左、占满高度 */}
-      <div className="flex h-full w-[480px] shrink-0 flex-col border-r border-gray-200 bg-white p-8">
-        <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <img src={logo} alt="Xime 输入法" className="h-28 w-28 rounded-3xl object-contain" />
-          <div>
-            <div className="text-xl font-semibold text-gray-900">Xime 输入法</div>
-            <div className="text-sm text-gray-400">无线导入方案</div>
+      <div className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-white p-5 md:h-full md:w-[480px] md:border-b-0 md:border-r md:p-8">
+        <div className="mb-5 flex items-center gap-3 md:mb-8 md:flex-col md:gap-3 md:text-center">
+          <img
+            src={logo}
+            alt="Xime 输入法"
+            className="h-14 w-14 shrink-0 rounded-2xl object-contain md:h-28 md:w-28 md:rounded-3xl"
+          />
+          <div className="text-left md:text-center">
+            <div className="text-lg font-semibold text-gray-900 md:text-xl">Xime 输入法</div>
+            <div className="text-xs text-gray-400 md:text-sm">无线导入方案</div>
           </div>
         </div>
 
-        <h1 className="mb-2 text-center text-xl font-semibold text-gray-900">导入输入方案</h1>
-        <p className="mb-6 text-center text-sm text-gray-500">
+        <h1 className="mb-2 text-center text-lg font-semibold text-gray-900 md:text-xl">导入输入方案</h1>
+        <p className="mb-4 text-center text-xs text-gray-500 md:mb-6 md:text-sm">
           将方案压缩包或者 xime.custom.yaml 拖拽到下方，或点击选择
         </p>
 
@@ -264,7 +334,7 @@ export default function App() {
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
           className={
-            'flex min-h-[20rem] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center transition-all ' +
+            'flex min-h-[8rem] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-5 text-center transition-all md:min-h-[20rem] md:p-10 ' +
             (dragOver
               ? 'border-blue-500 bg-blue-50'
               : files.length
@@ -272,7 +342,7 @@ export default function App() {
                 : 'border-gray-300')
           }
         >
-          <div className="mb-3 text-4xl text-gray-400">📄</div>
+          <div className="mb-2 text-3xl text-gray-400 md:mb-3 md:text-4xl">📄</div>
           <div className="text-sm text-gray-400">拖拽文件到此处</div>
           <div className="mt-2 text-xs text-gray-300">          支持 .yaml / .zip / .tar.gz / 插件(.xipk) / 图片(.jpg/.png) / 字体(.ttf/.otf)</div>
         </div>
@@ -308,7 +378,7 @@ export default function App() {
           {uploading ? '上传中...' : '上传'}
         </button>
 
-        <div className="mt-4 rounded-lg bg-gray-100 p-2.5 text-left text-xs leading-relaxed text-gray-400">
+        <div className="mt-4 hidden rounded-lg bg-gray-100 p-2.5 text-left text-xs leading-relaxed text-gray-400 md:block">
           <div>💡 上传文件会自动分类放置：</div>
           <div>· 方案压缩包(.zip/.tar.gz) → market 目录</div>
           <div>· 配置文件(.yaml) → rime 目录</div>
@@ -330,8 +400,8 @@ export default function App() {
       </div>
 
       {/* 右栏：数据目录，填满剩余空间 */}
-      <div className="flex h-full min-w-0 flex-1 flex-col p-6">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="flex min-w-0 flex-1 flex-col p-4 md:h-full md:p-6">
+        <div className="mb-3 flex items-center justify-between md:mb-4">
           <h2 className="text-base font-semibold text-gray-900">数据目录</h2>
           <div className="flex items-center gap-2">
             {loading && <span className="text-xs text-gray-400">刷新中...</span>}
@@ -345,14 +415,14 @@ export default function App() {
         </div>
 
         {tree && (
-          <div className="mb-4 flex gap-5 text-sm text-gray-500">
+          <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500 md:mb-4 md:text-sm">
             <span className="inline-flex items-center gap-1.5"><span className="text-gray-400">📁</span>{stats.dirs} 目录</span>
             <span className="inline-flex items-center gap-1.5"><span className="text-gray-400">📄</span>{stats.files} 文件</span>
             <span className="inline-flex items-center gap-1.5"><span className="text-gray-400">📦</span>{formatSize(stats.totalBytes)}</span>
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-auto rounded-2xl bg-white p-4 shadow-lg">
+        <div className="min-h-[14rem] flex-1 overflow-auto rounded-2xl bg-white p-3 shadow-lg md:min-h-0 md:p-4">
           {treeErr ? (
             <div className="rounded-lg bg-red-50 py-3 text-center text-sm text-red-500">加载失败: {treeErr}</div>
           ) : tree ? (
@@ -363,6 +433,7 @@ export default function App() {
                 expanded={expanded}
                 onToggle={toggleDir}
                 onOpen={openFile}
+                onEdit={openEditor}
                 onDelete={deleteNode}
                 onDownload={downloadFile}
               />
@@ -372,10 +443,26 @@ export default function App() {
           )}
 
           {preview && (
-            <div className="mt-4 rounded-xl border border-gray-200">
+            <div ref={previewRef} className="mt-4 rounded-xl border border-gray-200">
               <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs">
-                <span className="font-medium text-gray-700">{preview.node.path}</span>
-                <button onClick={() => setPreview(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+                <span className="min-w-0 truncate font-medium text-gray-700">{preview.node.path}</span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => downloadFile(preview.node)}
+                    className="rounded px-1.5 text-emerald-600 hover:bg-emerald-50"
+                  >
+                    下载
+                  </button>
+                  {editable(preview.node) && (
+                    <button
+                      onClick={() => openEditor(preview.node)}
+                      className="rounded px-1.5 text-blue-600 hover:bg-blue-50"
+                    >
+                      编辑
+                    </button>
+                  )}
+                  <button onClick={() => setPreview(null)} className="px-1 text-gray-400 hover:text-gray-600">✕</button>
+                </span>
               </div>
               <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all p-3 text-xs text-gray-700">
                 {preview.text}
@@ -384,18 +471,29 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {editing && (
+        <EditorDialog
+          key={editing.node.path}
+          file={editing.node}
+          initialText={editing.text}
+          onClose={() => setEditing(null)}
+          onSave={(content) => saveText(editing.node, content)}
+          onReload={() => readText(editing.node)}
+        />
+      )}
     </div>
   )
 }
 
-function FileTreeNode({ node, depth, expanded, onToggle, onOpen, onDelete, onDownload }) {
+function FileTreeNode({ node, depth, expanded, onToggle, onOpen, onEdit, onDelete, onDownload }) {
   const isExpanded = expanded[node.path]
   const padding = { paddingLeft: `${depth * 20 + 4}px` }
 
   return (
     <div>
       <div
-        className="group flex items-center gap-2 rounded-md py-2 pr-2 hover:bg-gray-100"
+        className="group flex items-center gap-1.5 rounded-md py-2 pr-1 hover:bg-gray-100 md:gap-2 md:pr-2"
         style={padding}
       >
         {node.isDir ? (
@@ -437,10 +535,18 @@ function FileTreeNode({ node, depth, expanded, onToggle, onOpen, onDelete, onDow
           {formatTime(node.mtime)}
         </span>
 
+        {!node.isDir && editable(node) && (
+          <button
+            onClick={() => onEdit(node)}
+            className="hidden whitespace-nowrap rounded px-1.5 text-xs text-blue-600 hover:bg-blue-50 group-hover:inline-flex pointer-coarse:inline-flex md:text-sm"
+          >
+            编辑
+          </button>
+        )}
         {!node.isDir && (
           <button
             onClick={() => onOpen(node)}
-            className="hidden rounded px-1.5 text-sm text-blue-500 hover:bg-blue-50 group-hover:inline"
+            className="hidden whitespace-nowrap rounded px-1.5 text-xs text-gray-500 hover:bg-gray-100 group-hover:inline-flex md:text-sm"
           >
             查看
           </button>
@@ -448,14 +554,14 @@ function FileTreeNode({ node, depth, expanded, onToggle, onOpen, onDelete, onDow
         {!node.isDir && (
           <button
             onClick={() => onDownload(node)}
-            className="hidden rounded px-1.5 text-sm text-emerald-600 hover:bg-emerald-50 group-hover:inline"
+            className="hidden whitespace-nowrap rounded px-1.5 text-xs text-emerald-600 hover:bg-emerald-50 group-hover:inline-flex md:text-sm"
           >
             下载
           </button>
         )}
         <button
           onClick={() => onDelete(node)}
-          className="hidden rounded px-1.5 text-sm text-red-500 hover:bg-red-50 group-hover:inline"
+          className="hidden whitespace-nowrap rounded px-1.5 text-xs text-red-500 hover:bg-red-50 group-hover:inline-flex pointer-coarse:inline-flex md:text-sm"
         >
           删除
         </button>
@@ -475,6 +581,7 @@ function FileTreeNode({ node, depth, expanded, onToggle, onOpen, onDelete, onDow
                 expanded={expanded}
                 onToggle={onToggle}
                 onOpen={onOpen}
+                onEdit={onEdit}
                 onDelete={onDelete}
                 onDownload={onDownload}
               />
@@ -484,4 +591,181 @@ function FileTreeNode({ node, depth, expanded, onToggle, onOpen, onDelete, onDow
       )}
     </div>
   )
+}
+
+function EditorDialog({ file, initialText, onClose, onSave, onReload }) {
+  const [editorText, setEditorText] = useState(initialText)
+  const [draft, setDraft] = useState(initialText)
+  const [saved, setSaved] = useState(initialText)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [notice, setNotice] = useState(null)
+  const [editorKey, setEditorKey] = useState(0)
+  const dirty = draft !== saved
+
+  const close = () => {
+    if (dirty && !window.confirm('有未保存的修改，确定关闭吗？')) return
+    onClose()
+  }
+
+  const save = async () => {
+    if (saving || !dirty) return
+    setSaving(true)
+    setError(null)
+    setNotice(null)
+    try {
+      await onSave(draft)
+      setSaved(draft)
+      setNotice('已保存，请回手机点「部署」')
+    } catch (e) {
+      setError(String(e.message || e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const reload = async () => {
+    if (saving) return
+    if (dirty && !window.confirm('放弃未保存的修改并重新加载？')) return
+    setError(null)
+    setNotice(null)
+    try {
+      const text = await onReload()
+      setEditorText(text)
+      setDraft(text)
+      setSaved(text)
+      setEditorKey((k) => k + 1)
+    } catch (e) {
+      setError(String(e.message || e))
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 sm:p-6">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-[85vh] sm:max-w-5xl sm:rounded-2xl">
+        <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-semibold text-gray-900">{file.name}</span>
+              {dirty && (
+                <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-700">
+                  未保存
+                </span>
+              )}
+            </div>
+            <div className="truncate text-xs text-gray-400">{file.path}</div>
+          </div>
+          <button
+            onClick={close}
+            aria-label="关闭"
+            className="shrink-0 rounded-lg px-2 py-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <TextEditor
+            key={editorKey}
+            initialValue={editorText}
+            fileName={file.name}
+            onChange={setDraft}
+            onSave={save}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 px-4 py-3">
+          <span className="min-w-0 flex-1 text-xs">
+            {error ? (
+              <span className="text-red-500">保存失败：{error}</span>
+            ) : notice ? (
+              <span className="text-green-600">{notice}</span>
+            ) : (
+              <span className="text-gray-400">{draft.length} 字符 · 上限 2MB</span>
+            )}
+          </span>
+          <button
+            onClick={reload}
+            disabled={saving}
+            className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:text-gray-300"
+          >
+            重新加载
+          </button>
+          <button
+            onClick={close}
+            disabled={saving}
+            className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 disabled:text-gray-300"
+          >
+            关闭
+          </button>
+          <button
+            onClick={save}
+            disabled={saving || !dirty}
+            className="rounded-lg bg-blue-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-600 disabled:cursor-default disabled:bg-gray-300"
+          >
+            {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TextEditor({ initialValue, fileName, onChange, onSave }) {
+  const hostRef = useRef(null)
+  const onChangeRef = useRef(onChange)
+  const onSaveRef = useRef(onSave)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+    onSaveRef.current = onSave
+  })
+
+  useEffect(() => {
+    if (!hostRef.current) return
+
+    const extensions = [
+      basicSetup,
+      EditorView.lineWrapping,
+      Prec.highest(
+        keymap.of([
+          {
+            key: 'Mod-s',
+            preventDefault: true,
+            run: () => {
+              onSaveRef.current?.()
+              return true
+            },
+          },
+        ]),
+      ),
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) onChangeRef.current?.(update.state.doc.toString())
+      }),
+      EditorView.theme({
+        '&': { height: '100%', fontSize: '13px', backgroundColor: '#ffffff' },
+        '.cm-scroller': {
+          fontFamily:
+            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+          lineHeight: '1.6',
+        },
+        '.cm-content': { padding: '12px 0' },
+        '.cm-gutters': { backgroundColor: '#fafafa', borderRight: '1px solid #eeeeee' },
+        '&.cm-focused': { outline: 'none' },
+      }),
+    ]
+    if (/\.ya?ml$/i.test(fileName)) extensions.push(yaml())
+
+    const view = new EditorView({
+      doc: initialValue,
+      extensions,
+      parent: hostRef.current,
+    })
+    view.focus()
+    return () => view.destroy()
+    // initialValue/fileName 只在对话框打开（或重新加载）时变化，由外层 key 控制重挂载
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return <div ref={hostRef} className="h-full w-full overflow-hidden" />
 }

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -166,6 +167,52 @@ class WirelessImportHelper(private val context: Context) {
                             if (ok) """{"success":true}""" else """{"success":false,"error":"Delete failed"}""",
                             ContentType.Application.Json)
                     }
+                }
+                // 保存文本文件（浏览器端编辑器）。只允许 rime 目录下的配置/文本，
+                // 编译产物、用户词典和二进制文件由策略层拒绝。
+                post("/write") {
+                    // JSON 转义可能让文本体积翻倍，给请求体留 8MB 上限，避免大包占内存
+                    if ((call.request.contentLength() ?: 0L) > 8L * 1024 * 1024) {
+                        call.respondText(
+                            """{"success":false,"error":"Body too large"}""",
+                            ContentType.Application.Json, HttpStatusCode.PayloadTooLarge)
+                        return@post
+                    }
+                    val body = call.receiveText()
+                    val obj = try {
+                        configJson.parseToJsonElement(body).jsonObject
+                    } catch (_: Exception) {
+                        null
+                    }
+                    val rawPath = obj?.get("path")?.jsonPrimitive?.contentOrNull
+                    val content = obj?.get("content")?.jsonPrimitive?.contentOrNull
+                    if (rawPath.isNullOrBlank() || content == null) {
+                        call.respondText(
+                            """{"success":false,"error":"Missing path or content"}""",
+                            ContentType.Application.Json, HttpStatusCode.BadRequest)
+                        return@post
+                    }
+                    if (content.toByteArray(Charsets.UTF_8).size >
+                        WirelessTextFilePolicy.MAX_WRITE_BYTES) {
+                        call.respondText(
+                            """{"success":false,"error":"File too large"}""",
+                            ContentType.Application.Json, HttpStatusCode.PayloadTooLarge)
+                        return@post
+                    }
+                    val f = safeResolve(rawPath)
+                    val rimeDir = File(context.filesDir, "rime")
+                    if (f == null || !WirelessTextFilePolicy.isWritableTarget(rimeDir, f)) {
+                        call.respondText(
+                            """{"success":false,"error":"Not writable"}""",
+                            ContentType.Application.Json, HttpStatusCode.Forbidden)
+                        return@post
+                    }
+                    val ok = WirelessTextFilePolicy.writeTextAtomically(f, content)
+                    call.respondText(
+                        if (ok) """{"success":true}"""
+                        else """{"success":false,"error":"Write failed"}""",
+                        ContentType.Application.Json,
+                        if (ok) HttpStatusCode.OK else HttpStatusCode.InternalServerError)
                 }
                 post("/upload") {
                     val rimeDir = File(context.filesDir, "rime")
