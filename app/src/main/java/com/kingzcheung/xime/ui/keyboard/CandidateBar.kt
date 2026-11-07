@@ -150,7 +150,8 @@ fun CandidateBar(
     // 圆形图标按钮底色（logo / 返回 / 收起）：深色下与按键同材质——按键就是半透明白叠在
     // 键盘背景上；若仍用 surface 与 primary 混色，surface 在深色下只有 6% 亮度，混出的圆底
     // 与键盘背景几乎同色，圆底等于不存在。亮色下按键是纯白，图标按钮改用混合色更耐看。
-    val iconButtonContainer = if (visuals.isDarkTheme && visuals.keyBgColor != Color.Unspecified) {
+    // 统一限制最大不透明度：图片/渐变/彩色键盘背景下不形成实心圆，透出背景更自然。
+    val iconButtonBase = if (visuals.isDarkTheme && visuals.keyBgColor != Color.Unspecified) {
         visuals.keyBgColor
     } else {
         androidx.compose.ui.graphics.lerp(
@@ -159,6 +160,9 @@ fun CandidateBar(
             0.15f
         )
     }
+    val iconButtonContainer = iconButtonBase.copy(
+        alpha = iconButtonBase.alpha.coerceAtMost(0.5f)
+    )
     val iconButtonTint = MaterialTheme.colorScheme.onSurfaceVariant
     val showComments = SettingsPreferences.showCandidateComments(context)
     val inputTextLocation = SettingsPreferences.getInputTextLocation(context)
