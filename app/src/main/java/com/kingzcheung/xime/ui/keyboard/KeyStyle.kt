@@ -1,11 +1,27 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.KeyBinding
+import com.kingzcheung.xime.settings.KeyColor
 import com.kingzcheung.xime.settings.KeysConfigHelper
+
+/**
+ * 当前主题下可用于按键级样式的颜色。
+ * 在 KeyboardLayoutScreen 统一解析一次，避免每个键重复算主题色。
+ */
+internal data class KeyStyleColors(
+    val accent: Color = Color.Unspecified,
+    val special: Color = Color.Unspecified,
+    val key: Color = Color.Unspecified,
+    val keyboard: Color = Color.Unspecified,
+)
+
+internal val LocalKeyStyleColors = staticCompositionLocalOf { KeyStyleColors() }
 
 /**
  * 单个按键的外观覆盖（`keyboard.<section>.keys.<id>` 的 corner_radius / background）。
@@ -19,21 +35,36 @@ internal data class KeyStyleOverride(
     val isEmpty: Boolean get() = cornerRadius == null && background == null
 }
 
+@Composable
 internal fun keyStyleOverride(
     section: String,
     id: String,
     isAsciiMode: Boolean,
     isDarkTheme: Boolean,
 ): KeyStyleOverride =
-    KeysConfigHelper.getGestureFor(section, id, isAsciiMode)?.toKeyStyle(isDarkTheme) ?: KeyStyleOverride()
+    KeysConfigHelper.getGestureFor(section, id, isAsciiMode)
+        ?.toKeyStyle(isDarkTheme, LocalKeyStyleColors.current)
+        ?: KeyStyleOverride()
 
-internal fun KeyBinding.toKeyStyle(isDarkTheme: Boolean): KeyStyleOverride {
-    val bg = (if (isDarkTheme) backgroundDark ?: background else background)?.let(::keyColor)
+internal fun KeyBinding.toKeyStyle(isDarkTheme: Boolean, colors: KeyStyleColors): KeyStyleOverride {
+    val spec = if (isDarkTheme) backgroundDark ?: background else background
+    val bg = spec?.resolve(colors)
     return KeyStyleOverride(
         cornerRadius = cornerRadius?.takeIf { it >= 0 }?.dp,
         background = bg,
         textColor = bg?.let(::contrastTextColor),
     )
+}
+
+private fun KeyColor.resolve(colors: KeyStyleColors): Color? = when (this) {
+    is KeyColor.Hex -> keyColor(argb)
+    is KeyColor.Token -> when (name) {
+        "accent", "primary" -> colors.accent.takeIf { it != Color.Unspecified }
+        "special" -> colors.special.takeIf { it != Color.Unspecified }
+        "key" -> colors.key.takeIf { it != Color.Unspecified }
+        "keyboard" -> colors.keyboard.takeIf { it != Color.Unspecified }
+        else -> null
+    }
 }
 
 /** 0xRRGGBB 补足不透明通道；0xAARRGGBB 原样使用。 */

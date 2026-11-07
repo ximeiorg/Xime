@@ -1,0 +1,39 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# 按键跟随主题色示例
+#
+# 安装：保存为 Xime 用户目录的 rime/xime.custom.yaml，
+#       然后在键盘设置里重新部署 / 重启输入法。
+#
+# 主题色记号（切换主题/明暗模式时自动变化，不需要写死颜色）：
+#   accent / primary  主题强调色
+#   special           特殊键底色
+#   key               普通键底色
+#   keyboard          键盘背景色
+#
+# 也可以混用固定色：background: 0x9FEF86；暗色单独指定用 background_dark。
+# 只写 background / corner_radius 不会覆盖按键原有手势。
+# ═══════════════════════════════════════════════════════════════════════════
+
+metadata:
+  app_name: Xime
+  config_version: 1
+
+keyboard:
+  qwerty:
+    keys:
+      space: { corner_radius: 22, background: accent }
+      enter: { corner_radius: 16, background: primary }
+      shift: { corner_radius: 14, background: accent }
+      # 也可以写 special / key / keyboard，分别取特殊键色 / 普通键色 / 键盘背景色
+      delete: { corner_radius: 14, background: accent }
+  qwerty_en:
+    keys:
+      space: { corner_radius: 22, background: accent }
+      enter: { corner_radius: 16, background: primary }
+      shift: { corner_radius: 14, background: accent }
+      delete: { corner_radius: 14, background: accent }
+  number:
+    keys:
+      enter: { corner_radius: 16, background: accent }
+      space_bar: { corner_radius: 22, background: primary }
+      delete: { corner_radius: 14, background: accent }

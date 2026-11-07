@@ -417,8 +417,16 @@ class KeyboardGestureConfigTest {
             """enter: { tap: "enter", corner_radius: 14, background: 0x9FEF86, background_dark: 0x2F5A2F }"""
         )["enter"]!!
         assertEquals(14, kc.cornerRadius)
-        assertEquals(0x9FEF86L, kc.background)
-        assertEquals(0x2F5A2FL, kc.backgroundDark)
+        assertEquals(KeyColor.Hex(0x9FEF86L), kc.background)
+        assertEquals(KeyColor.Hex(0x2F5A2FL), kc.backgroundDark)
+    }
+
+    @Test
+    fun `按键级背景支持主题色记号`() {
+        assertEquals(KeyColor.Token("accent"), parse("""q: { background: accent }""")["q"]!!.background)
+        assertEquals(KeyColor.Token("primary"), parse("""q: { background: theme.primary }""")["q"]!!.background)
+        assertEquals(KeyColor.Token("special"), parse("""q: { background: SPECIAL }""")["q"]!!.background)
+        assertNull(parse("""q: { background: not-a-color }""")["q"]!!.background)
     }
 
     @Test
@@ -434,7 +442,7 @@ class KeyboardGestureConfigTest {
         val kc = parse(
             """q: { background: 0x80FFFFFF, background_dark: "not-a-color", corner_radius: "x" }"""
         )["q"]!!
-        assertEquals(0x80FFFFFFL, kc.background)
+        assertEquals(KeyColor.Hex(0x80FFFFFFL), kc.background)
         assertNull(kc.backgroundDark)
         assertNull(kc.cornerRadius)
     }
@@ -461,7 +469,7 @@ class KeyboardGestureConfigTest {
         assertEquals("1", q.swipeUp!!.value)
         assertEquals(2, q.longPress!!.values.size)
         assertEquals(20, q.cornerRadius)
-        assertEquals(0xFFFF7043L, q.background)
+        assertEquals(KeyColor.Hex(0xFFFF7043L), q.background)
     }
 
     @Test
