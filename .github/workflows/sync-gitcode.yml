@@ -2,6 +2,9 @@ name: Sync Release to GitCode
 
 # 手动把 GitHub Release 镜像到 GitCode（镜像仓库的代码与 tag 由 GitCode 侧自动同步，
 # 这里只补 release 页面与附件）。日常发布由 release.yml 自动触发，本流程用于补传历史版本。
+#
+# 注意：GitCode v5 接口对只读镜像仓库有限制，脚本会自动尝试 v2 Web API 创建 Release；
+# 若 v2 也失败，用 vars.GITCODE_RELEASE_REPO 指向普通仓库。
 
 on:
   workflow_dispatch:
@@ -41,6 +44,7 @@ jobs:
         env:
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITCODE_RELEASE_REPO: ${{ vars.GITCODE_RELEASE_REPO }}
           TAGS: ${{ inputs.tag }}
           EXCLUDE: ${{ inputs.exclude }}
           INCLUDE_PRE: ${{ inputs.include_prerelease }}
@@ -54,6 +58,7 @@ jobs:
           fi
 
           common=()
+          if [ -n "${GITCODE_RELEASE_REPO:-}" ]; then common+=(--gitcode-repo "$GITCODE_RELEASE_REPO"); fi
           if [ "$INCLUDE_PRE" = "true" ]; then common+=(--include-prerelease); fi
           if [ "$DRY_RUN" = "true" ]; then common+=(--dry-run); fi
           if [ -n "${EXCLUDE:-}" ]; then
