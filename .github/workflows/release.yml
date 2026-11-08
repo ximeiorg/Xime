@@ -246,6 +246,8 @@ jobs:
 
   # 把完整 Release（正文 + 全部附件）镜像到 GitCode。
   # 放在 publish-xipm 之后，确保 xipm 二进制也在同步范围内。
+  # 注意：GitCode v5 接口对只读镜像仓库有限制，脚本会自动尝试 v2 Web API 创建 Release；
+  # 若 v2 也失败，用 vars.GITCODE_RELEASE_REPO 指向普通仓库。
   sync-gitcode:
     runs-on: ubuntu-latest
     needs: [build, publish-xipm]
@@ -275,5 +277,10 @@ jobs:
         env:
           GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITCODE_RELEASE_REPO: ${{ vars.GITCODE_RELEASE_REPO }}
         run: |
-          python3 scripts/sync-release-to-gitcode.py --tag "${GITHUB_REF#refs/tags/}"
+          args=(--tag "${GITHUB_REF#refs/tags/}")
+          if [ -n "${GITCODE_RELEASE_REPO:-}" ]; then
+            args+=(--gitcode-repo "$GITCODE_RELEASE_REPO")
+          fi
+          python3 scripts/sync-release-to-gitcode.py "${args[@]}"

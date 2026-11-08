@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本地把 GitHub Release 回填到 GitCode 镜像仓库。
+# 本地把 GitHub Release 回填到 GitCode 普通仓库（只读镜像仓库不支持 Release）。
 #
 #   bash scripts/backfill-gitcode.sh              # 预览：v2.7.1 之后缺失的版本
 #   bash scripts/backfill-gitcode.sh --yes        # 实际执行
@@ -10,6 +10,7 @@
 #   GITCODE_TOKEN=xxxx   # https://gitcode.com/setting/token-classic  勾选 api、write_repository
 #   GITHUB_TOKEN=xxxx    # https://github.com/setting/tokens  只读仓库即可
 # GITHUB_TOKEN 本地批量强烈建议配置：未认证时每小时只有 60 次 API 配额。
+# 目标仓库可用 GITCODE_RELEASE_REPO=owner/repo 指定；不设则用脚本默认值。
 #
 # 已同步过的版本按「同名同大小」跳过，中断后重跑是安全的。
 set -euo pipefail
@@ -36,6 +37,9 @@ done
 
 if [ ${#args[@]} -eq 0 ]; then
   args=(--since "$BASE_TAG")
+fi
+if [ -n "${GITCODE_RELEASE_REPO:-}" ]; then
+  args+=(--gitcode-repo "$GITCODE_RELEASE_REPO")
 fi
 if [ "$run" -eq 0 ]; then
   echo "== 预览模式，不写入 GitCode；确认无误后加 --yes 执行 =="
