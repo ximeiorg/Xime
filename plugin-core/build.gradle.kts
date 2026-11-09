@@ -59,7 +59,7 @@ dependencies {
     api(libs.androidx.lifecycle.runtime.compose)
 
     // JS 脚本插件运行时（QuickJS，main.js 沙箱执行）
-    api("io.github.dokar3:quickjs-kt-android:1.0.15")
+    api("io.github.dokar3:quickjs-kt-android:1.0.17")
     // manifest.json 解析（kotlinx Json 宽松模式：注释 + 尾逗号；不用 kaml，插件链路与 JS 生态对齐）
     implementation(libs.kotlinx.serialization.json)
     
