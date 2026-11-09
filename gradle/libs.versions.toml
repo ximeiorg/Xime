@@ -2,7 +2,7 @@
 agp = "9.4.1"
 kotlin = "2.4.21"
 kotlinSerialization = "2.4.21"
-ksp = "2.3.12"
+ksp = "2.3.13"
 room = "3.0.0"
 coreKtx = "1.19.1"
 junit = "4.13.2"
