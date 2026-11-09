@@ -91,6 +91,8 @@ import com.kingzcheung.xime.viewmodel.KeyboardViewModel
 import com.kingzcheung.xime.association.AssociationService
 import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.clipboard.sync.ClipboardSyncBridge
+import com.kingzcheung.xime.clipboard.sync.P2pClipboardPlugin
+import com.kingzcheung.xime.p2p.P2pSyncController
 import com.kingzcheung.xime.plugin.ActivePluginSelection
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.ToolPlugin
@@ -140,6 +142,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -239,6 +242,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal lateinit var clipboardManager: ClipboardManager
 
     internal var clipboardSyncBridge: ClipboardSyncBridge? = null
+    /** 局域网直连的 2 秒拉取循环（插件通道不跑这个循环）。 */
+    private var p2pPullJob: Job? = null
     
     internal lateinit var keyboardContainer: VoiceKeyboardContainer
     
@@ -616,6 +621,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     stopClipboardSync()
                     updateClipboardSync()
                 }
+                SettingsPreferences.KEY_CLIPBOARD_SYNC_TRANSPORT,
+                SettingsPreferences.KEY_CLIPBOARD_SYNC_PEERS_REVISION -> {
+                    stopClipboardSync()
+                    updateClipboardSync()
+                }
                 SettingsPreferences.KEY_HARDWARE_KEYBOARD_DETECTION_ENABLED -> {
                     hasHardwareKeyboard = SettingsPreferences.isHardwareKeyboardDetectionEnabled(this@XimeInputMethodService) &&
                         resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS
@@ -949,6 +959,12 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 Log.d(TAG, "Clipboard sync disabled in settings")
                 return
             }
+            if (SettingsPreferences.getClipboardSyncTransport(this) ==
+                SettingsPreferences.ClipboardSyncTransport.P2P
+            ) {
+                startP2pClipboardSync()
+                return
+            }
             val enabled = ExtensionManager.getEnabledClipboardSyncPlugins(this)
             if (enabled.isEmpty()) return
             val preferredId = SettingsPreferences.getClipboardSyncPluginId(this)
@@ -992,22 +1008,72 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private fun stopClipboardSync() {
+        p2pPullJob?.cancel()
+        p2pPullJob = null
         clipboardSyncBridge?.release()
         clipboardSyncBridge = null
+        P2pSyncController.stop()
         uiState.value = uiState.value.copy(clipboardSyncEnabled = false)
+    }
+
+    /** 局域网直连：节点在输入法进程内启停，bridge 只负责去重、回声抑制与写回。 */
+    private fun startP2pClipboardSync() {
+        if (!P2pSyncController.start(this)) {
+            Log.d(TAG, "P2P 节点未启动（无已配对设备或原生库缺失）")
+            return
+        }
+        clipboardSyncBridge = ClipboardSyncBridge(
+            clipboardManager,
+            P2pClipboardPlugin(),
+            pluginId = P2pSyncController.PLUGIN_ID,
+            supportsAttachments = false,
+            // 直连没有插件配置：2 秒轮询一次事件队列
+            pullIntervalSeconds = { "2" }
+        )
+        clipboardSyncBridge?.start()
+        startP2pPullLoop()
+        uiState.value = uiState.value.copy(clipboardSyncEnabled = true)
+        Log.d(TAG, "Clipboard sync started: p2p (paired=${P2pSyncController.pairedCount})")
+    }
+
+    private fun startP2pPullLoop() {
+        p2pPullJob?.cancel()
+        p2pPullJob = serviceScope.launch {
+            while (isActive) {
+                delay(2_000)
+                val bridge = clipboardSyncBridge ?: break
+                if (bridge.pluginId != P2pSyncController.PLUGIN_ID) break
+                bridge.pullOnce()
+            }
+        }
     }
 
     /** 剪贴板同步设置或插件状态变化时调用，按条件动态启停。 */
     private fun updateClipboardSync() {
         if (!::clipboardManager.isInitialized) return
+        if (!SettingsPreferences.isClipboardSyncEnabled(this)) {
+            stopClipboardSync()
+            return
+        }
+        val transport = SettingsPreferences.getClipboardSyncTransport(this)
+        val p2pBridge = clipboardSyncBridge?.pluginId == P2pSyncController.PLUGIN_ID
+        if (transport == SettingsPreferences.ClipboardSyncTransport.P2P) {
+            if (!p2pBridge) {
+                stopClipboardSync()
+                startClipboardSyncIfEnabled()
+            }
+            return
+        }
+        if (p2pBridge) {
+            stopClipboardSync()
+            startClipboardSyncIfEnabled()
+            return
+        }
         if (clipboardSyncBridge == null) {
             startClipboardSyncIfEnabled()
             return
         }
-        if (
-            !SettingsPreferences.isClipboardSyncEnabled(this) ||
-            ExtensionManager.getEnabledClipboardSyncPlugins(this).isEmpty()
-        ) {
+        if (ExtensionManager.getEnabledClipboardSyncPlugins(this).isEmpty()) {
             stopClipboardSync()
             return
         }

@@ -1083,4 +1083,38 @@
     <string name="s_fuzzy_conflict_en_eng_ong">en = eng 与 eng = ong 同时开启时，en/eng/ong 会互通。</string>
     <string name="s_fuzzy_conflict_un_on_ong">un = ong 与 on = ong 同时开启时，un/on/ong 会互通。</string>
     <string name="s_fuzzy_conflict_uan_huang">uan = uang 与 huang = wang 同时开启时，wan/wang/huang 会互通。</string>
+
+    <!-- 设备互联（局域网直连） -->
+    <string name="s_shebeihulian">设备互联</string>
+    <string name="s_shebeihulian_shuoming">局域网直连，不经过服务器；两台设备需在同一 WiFi。</string>
+    <string name="s_benjibiaoshi">本机标识</string>
+    <string name="s_peidui">配对</string>
+    <string name="s_xianshipeiduima">显示配对码</string>
+    <string name="s_shurupeiduima">输入配对码</string>
+    <string name="s_peiduima">配对码</string>
+    <string name="s_peiduimatishi">输入对端显示的 6 位配对码</string>
+    <string name="s_dengdaiduifangshuru">等待对端输入配对码…</string>
+    <string name="s_peiduichenggong">配对成功：%1$s</string>
+    <string name="s_peiduishibai">配对失败：%1$s</string>
+    <string name="s_chongxinshengcheng">重新生成</string>
+    <string name="s_yipeiduishebei">已配对设备</string>
+    <string name="s_zanwuyipeiduishebei">还没有已配对设备。先与电脑端「设备关联」完成配对。</string>
+    <string name="s_yuanshengkuweijiazai">P2P 原生库未加载，当前安装包不包含设备互联能力。</string>
+    <string name="s_jintongbuwenzi">仅同步文本</string>
+    <string name="s_lianjie">连接</string>
+    <string name="s_miaohouzidongshixiao">%1$d 秒后失效</string>
+    <string name="s_shanchuipeidui">删除该设备</string>
+
+    <!-- 剪贴板同步传输方式 -->
+    <string name="s_chuanshufangshi">传输方式</string>
+    <string name="s_tongbuchajian">同步插件</string>
+    <string name="s_tongbuchajian_shuoming">通过 WebDAV、ximed 等插件同步</string>
+    <string name="s_juyuwangzhilian">局域网直连</string>
+    <string name="s_juyuwangzhilian_shuoming">不经过服务器，直接连接已配对设备</string>
+
+    <string name="s_weipeidui">未配对设备</string>
+    <string name="s_yipeidui_tai">已配对 %1$d 台</string>
+
+    <string name="s_weiqidong">未启动</string>
+    <string name="s_weilianjiedaoshebei">未连接到设备</string>
 </resources>

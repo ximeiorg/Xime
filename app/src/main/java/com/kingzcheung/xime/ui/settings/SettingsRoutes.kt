@@ -34,6 +34,7 @@ object SettingsRoutes {
     const val HandwritingCapture = "handwriting_capture"
     const val Clipboard = "clipboard"
     const val ClipboardSync = "clipboard_sync"
+    const val DeviceLink = "device_link"
     const val Backup = "backup"
     const val SchemaDictBrowser = "schema_dict_browser"
     const val RimeFileBrowser = "rime_file_browser"

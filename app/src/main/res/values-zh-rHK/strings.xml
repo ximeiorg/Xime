@@ -1082,4 +1082,38 @@
     <string name="s_fuzzy_conflict_en_eng_ong">en = eng 與 eng = ong 同時開啟時，en/eng/ong 會互通。</string>
     <string name="s_fuzzy_conflict_un_on_ong">un = ong 與 on = ong 同時開啟時，un/on/ong 會互通。</string>
     <string name="s_fuzzy_conflict_uan_huang">uan = uang 與 huang = wang 同時開啟時，wan/wang/huang 會互通。</string>
+
+    <!-- 裝置互聯（區域網路直連） -->
+    <string name="s_shebeihulian">裝置互聯</string>
+    <string name="s_shebeihulian_shuoming">區域網路直連，不經過伺服器；兩台裝置需在同一個 Wi-Fi。</string>
+    <string name="s_benjibiaoshi">本機標識</string>
+    <string name="s_peidui">配對</string>
+    <string name="s_xianshipeiduima">顯示配對碼</string>
+    <string name="s_shurupeiduima">輸入配對碼</string>
+    <string name="s_peiduima">配對碼</string>
+    <string name="s_peiduimatishi">輸入對端顯示的 6 位配對碼</string>
+    <string name="s_dengdaiduifangshuru">等待對端輸入配對碼…</string>
+    <string name="s_peiduichenggong">配對成功：%1$s</string>
+    <string name="s_peiduishibai">配對失敗：%1$s</string>
+    <string name="s_chongxinshengcheng">重新產生</string>
+    <string name="s_yipeiduishebei">已配對裝置</string>
+    <string name="s_zanwuyipeiduishebei">還沒有已配對裝置。先與電腦端「裝置關聯」完成配對。</string>
+    <string name="s_yuanshengkuweijiazai">P2P 原生庫未載入，目前安裝檔不包含裝置互聯能力。</string>
+    <string name="s_jintongbuwenzi">僅同步文字</string>
+    <string name="s_lianjie">連線</string>
+    <string name="s_miaohouzidongshixiao">%1$d 秒後失效</string>
+    <string name="s_shanchuipeidui">刪除該裝置</string>
+
+    <!-- 剪貼簿同步傳輸方式 -->
+    <string name="s_chuanshufangshi">傳輸方式</string>
+    <string name="s_tongbuchajian">同步外掛</string>
+    <string name="s_tongbuchajian_shuoming">透過 WebDAV、ximed 等外掛同步</string>
+    <string name="s_juyuwangzhilian">區域網路直連</string>
+    <string name="s_juyuwangzhilian_shuoming">不經過伺服器，直接連線已配對裝置</string>
+
+    <string name="s_weipeidui">未配對裝置</string>
+    <string name="s_yipeidui_tai">已配對 %1$d 台</string>
+
+    <string name="s_weiqidong">未啟動</string>
+    <string name="s_weilianjiedaoshebei">未連線到裝置</string>
 </resources>

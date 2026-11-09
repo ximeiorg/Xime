@@ -26,3 +26,5 @@
 -dontwarn java.lang.management.RuntimeMXBean
 
 -processkotlinnullchecks remove
+# 跨设备剪贴板 P2P：JNI 按类名/方法名查找符号，混淆后 native 方法会失联
+-keep class com.kingzcheung.xime.p2p.P2pNative { *; }

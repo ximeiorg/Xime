@@ -810,6 +810,32 @@ object SettingsPreferences {
 
     const val KEY_CLIPBOARD_SYNC_ENABLED = "clipboard_sync_enabled"
     const val KEY_CLIPBOARD_SYNC_PLUGIN_ID = "clipboard_sync_plugin_id"
+    /** 传输方式：插件（WebDAV/ximed）或局域网直连。缺省 PLUGIN，升级行为零变化。 */
+    const val KEY_CLIPBOARD_SYNC_TRANSPORT = "clipboard_sync_transport"
+
+    enum class ClipboardSyncTransport { PLUGIN, P2P }
+
+    fun getClipboardSyncTransport(context: Context): ClipboardSyncTransport {
+        val raw = getPrefs(context).getString(KEY_CLIPBOARD_SYNC_TRANSPORT, null)
+        return if (raw == ClipboardSyncTransport.P2P.name) {
+            ClipboardSyncTransport.P2P
+        } else {
+            ClipboardSyncTransport.PLUGIN
+        }
+    }
+
+    fun setClipboardSyncTransport(context: Context, transport: ClipboardSyncTransport) {
+        getPrefs(context).edit().putString(KEY_CLIPBOARD_SYNC_TRANSPORT, transport.name).apply()
+    }
+
+    /** 配对表变更信号：输入法服务据此重启直连节点（配对/删除设备后写一次）。 */
+    const val KEY_CLIPBOARD_SYNC_PEERS_REVISION = "clipboard_sync_peers_revision"
+
+    fun bumpClipboardSyncPeersRevision(context: Context) {
+        getPrefs(context).edit()
+            .putLong(KEY_CLIPBOARD_SYNC_PEERS_REVISION, System.currentTimeMillis())
+            .apply()
+    }
 
     fun isClipboardSyncEnabled(context: Context): Boolean {
         return getPrefs(context).getBoolean(KEY_CLIPBOARD_SYNC_ENABLED, false)

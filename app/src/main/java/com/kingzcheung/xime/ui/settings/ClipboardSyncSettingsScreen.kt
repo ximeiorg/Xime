@@ -17,13 +17,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.twotone.Devices
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -59,7 +63,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ClipboardSyncSettingsContent(
     onBack: () -> Unit,
-    onNavigateToMarket: () -> Unit
+    onNavigateToMarket: () -> Unit,
+    onNavigateToDeviceLink: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -84,6 +89,9 @@ fun ClipboardSyncSettingsContent(
     val clipboardPlugins = remember { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
     // 切换服务走单选对话框（插件多时页面长度恒定，不随插件数量变长）
     var showServicePicker by remember { mutableStateOf(false) }
+    var transport by remember {
+        mutableStateOf(SettingsPreferences.getClipboardSyncTransport(context))
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -122,53 +130,125 @@ fun ClipboardSyncSettingsContent(
                 )
             }
 
-            SettingsSection(
-                title = tr(R.string.s_tongbufuwu),
-                content = {
-                    if (clipboardPlugins.isEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = tr(R.string.s_weianzhuangjiantiebantongbucha_9bf61),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+            SettingsSection(title = tr(R.string.s_chuanshufangshi)) {
+                TransportOption(
+                    selected = transport == SettingsPreferences.ClipboardSyncTransport.PLUGIN,
+                    title = tr(R.string.s_tongbuchajian),
+                    subtitle = tr(R.string.s_tongbuchajian_shuoming),
+                    onClick = {
+                        if (transport != SettingsPreferences.ClipboardSyncTransport.PLUGIN) {
+                            SettingsPreferences.setClipboardSyncTransport(
+                                context,
+                                SettingsPreferences.ClipboardSyncTransport.PLUGIN
                             )
-                            Button(
-                                onClick = onNavigateToMarket,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(tr(R.string.s_qianwangkuozhanshangdian))
-                            }
+                            transport = SettingsPreferences.ClipboardSyncTransport.PLUGIN
                         }
-                    } else {
-                        // 入口始终可见：只装 1 个插件时也能点开确认候选/协议与配置，
-                        // 藏起来会让"当前生效的是谁、能不能换"在页面上无处可查
-                        CurrentServiceItem(
-                            pluginInfo = installedPlugins.find { it.id == activePlugin?.first },
-                            pluginId = activePlugin?.first,
-                            plugin = activePlugin?.second,
-                            onClick = { showServicePicker = true }
+                    }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 56.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+                TransportOption(
+                    selected = transport == SettingsPreferences.ClipboardSyncTransport.P2P,
+                    title = tr(R.string.s_juyuwangzhilian),
+                    subtitle = tr(R.string.s_juyuwangzhilian_shuoming),
+                    onClick = {
+                        if (transport != SettingsPreferences.ClipboardSyncTransport.P2P) {
+                            SettingsPreferences.setClipboardSyncTransport(
+                                context,
+                                SettingsPreferences.ClipboardSyncTransport.P2P
+                            )
+                            transport = SettingsPreferences.ClipboardSyncTransport.P2P
+                        }
+                    }
+                )
+            }
+
+            SettingsSection(title = tr(R.string.s_shebeihulian)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onNavigateToDeviceLink)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.TwoTone.Devices,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = tr(R.string.s_shebeihulian),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = tr(R.string.s_shebeihulian_shuoming),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            )
+            }
 
-            activePlugin?.let { selected ->
-                val pluginId = selected.first
-                val pluginName = installedPlugins.find { it.id == pluginId }?.name ?: pluginId
-                PluginConfigFormScreen(
-                    pluginId = pluginId,
-                    plugin = selected.second,
-                    pluginName = pluginName,
-                    onBack = {},
-                    embedded = true,
-                    // 配置卡标题带上插件名：明确"在配谁"
-                    fallbackSectionTitle = tr(R.string.s_peizhi_2, pluginName)
+            if (transport == SettingsPreferences.ClipboardSyncTransport.PLUGIN) {
+                SettingsSection(
+                    title = tr(R.string.s_tongbufuwu),
+                    content = {
+                        if (clipboardPlugins.isEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = tr(R.string.s_weianzhuangjiantiebantongbucha_9bf61),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Button(
+                                    onClick = onNavigateToMarket,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(tr(R.string.s_qianwangkuozhanshangdian))
+                                }
+                            }
+                        } else {
+                            // 入口始终可见：只装 1 个插件时也能点开确认候选/协议与配置，
+                            // 藏起来会让"当前生效的是谁、能不能换"在页面上无处可查
+                            CurrentServiceItem(
+                                pluginInfo = installedPlugins.find { it.id == activePlugin?.first },
+                                pluginId = activePlugin?.first,
+                                plugin = activePlugin?.second,
+                                onClick = { showServicePicker = true }
+                            )
+                        }
+                    }
                 )
+
+                activePlugin?.let { selected ->
+                    val pluginId = selected.first
+                    val pluginName = installedPlugins.find { it.id == pluginId }?.name ?: pluginId
+                    PluginConfigFormScreen(
+                        pluginId = pluginId,
+                        plugin = selected.second,
+                        pluginName = pluginName,
+                        onBack = {},
+                        embedded = true,
+                        // 配置卡标题带上插件名：明确"在配谁"
+                        fallbackSectionTitle = tr(R.string.s_peizhi_2, pluginName)
+                    )
+                }
             }
         }
     }
@@ -218,6 +298,37 @@ fun ClipboardSyncSettingsContent(
             },
             onDismiss = { showServicePicker = false }
         )
+    }
+}
+
+@Composable
+private fun TransportOption(
+    selected: Boolean,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
