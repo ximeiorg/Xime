@@ -2182,6 +2182,18 @@ private fun LandscapeKeyboardContent(
 }
 
 
+/**
+ * 空格键抬手是否算作点击（上屏空格）。
+ *
+ * 父层光标手势接管本次横向滑动后，拖拽位移已被父层消费，不能再补一个空格；
+ * 已判为滑动或长按已触发时同理由对应分支处理。见 issue #1262。
+ */
+internal fun shouldCommitSpaceTap(
+    longPressTriggered: Boolean,
+    swipeDirection: String?,
+    cursorGestureActive: Boolean,
+): Boolean = !longPressTriggered && swipeDirection == null && !cursorGestureActive
+
 /** QWERTY 空格键 */
 @Composable
 private fun SpaceKey(
@@ -2218,6 +2230,8 @@ private fun SpaceKey(
     val currentLongPressItems by rememberUpdatedState(longPressItems)
     val currentLongPressDrawableIds by rememberUpdatedState(longPressDrawableIds)
     val view = LocalView.current
+    // 父层光标手势是否已接管本次横向滑动（接管后不再算点击，见 issue #1262）
+    val cursorGestureActive = LocalCursorGestureActive.current
     var buttonBounds by remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
     val currentOnVoiceModeChange by rememberUpdatedState(onVoiceModeChange)
     val currentOnTap by rememberUpdatedState(onTap)
@@ -2302,8 +2316,11 @@ private fun SpaceKey(
                                     }
                                     if (isRelease) {
                                         completed = true
-                                        if (currentOnTap != null) currentOnTap?.invoke()
-                                        else currentOnKeyPress("space")
+                                        // 横向拖动已被父层光标手势接管时，抬手不算点击
+                                        if (!cursorGestureActive.value) {
+                                            if (currentOnTap != null) currentOnTap?.invoke()
+                                            else currentOnKeyPress("space")
+                                        }
                                     }
                                     continue
                                 }
@@ -2334,7 +2351,7 @@ private fun SpaceKey(
                             longPressJob.cancel()
                             onSwipeStateChange?.invoke(SwipeState(), buttonBounds)
                             // 没等到抬手就结束（触摸流取消/协程被重挂）时兜底上屏空格
-                            if (!completed && !triggered) {
+                            if (!completed && !triggered && !cursorGestureActive.value) {
                                 if (currentOnTap != null) currentOnTap?.invoke()
                                 else currentOnKeyPress("space")
                             }
@@ -2373,7 +2390,7 @@ private fun SpaceKey(
 
                     if (dir != null && currentOnSwipe != null) {
                         currentOnSwipe?.invoke(dir)
-                    } else if (!longPressTriggered) {
+                    } else if (shouldCommitSpaceTap(longPressTriggered, dir, cursorGestureActive.value)) {
                         if (currentOnTap != null) currentOnTap?.invoke() else currentOnKeyPress("space")
                     }
                 }
