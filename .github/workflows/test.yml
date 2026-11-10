@@ -179,7 +179,14 @@ jobs:
             
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-        
+
+      - name: Set up Rust (P2P JNI)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build P2P native libs
+        # P2pNativeSmokeTest 断言包内 .so 真的链进去了，缺这一步必红
+        run: bash scripts/build-p2p-android.sh
+
       - name: Run Instrumented Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:

@@ -82,6 +82,13 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Set up Rust (P2P JNI)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build P2P native libs
+        # 四个 ABI 的 libxime_p2p_jni.so 不入库，发布包必须现场交叉编译。
+        run: bash scripts/build-p2p-android.sh
+
       - name: Build Release APKs (Signed)
         run: ./gradlew assembleRelease --no-daemon
 

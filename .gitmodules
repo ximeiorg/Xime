@@ -21,3 +21,6 @@
 [submodule "app/src/main/assets/rime"]
 	path = app/src/main/assets/rime
 	url = https://github.com/kingzcheung/rime-wubi.git
+[submodule "third_party/libximep2p"]
+	path = third_party/libximep2p
+	url = https://github.com/ximeiorg/libximep2p.git

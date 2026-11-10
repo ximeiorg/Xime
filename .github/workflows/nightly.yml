@@ -126,6 +126,12 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Set up Rust (P2P JNI)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build P2P native libs
+        run: bash scripts/build-p2p-android.sh
+
       - name: Build Nightly APKs (Unsigned)
         run: |
           DATE=$(date +'%Y%m%d')
