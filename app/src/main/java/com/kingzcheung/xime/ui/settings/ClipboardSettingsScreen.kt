@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui.settings
 
 import com.kingzcheung.xime.R
+import com.kingzcheung.xime.clipboard.sync.ChannelPolicy
 
 import com.kingzcheung.xime.i18n.tr
 
@@ -94,11 +95,11 @@ fun ClipboardSettingsContent(
     }
     var usage by remember { mutableStateOf<ImageUsage?>(null) }
     var syncOn by remember { mutableStateOf(syncEnabled) }
-    val syncTransport = remember { SettingsPreferences.getClipboardSyncTransport(context) }
+    val syncChannels = remember { SettingsPreferences.getClipboardSyncChannels(context) }
     var p2pPairedCount by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(syncTransport) {
-        if (syncTransport == SettingsPreferences.ClipboardSyncTransport.P2P) {
+    LaunchedEffect(syncChannels) {
+        if (syncChannels.contains(ChannelPolicy.CHANNEL_P2P)) {
             p2pPairedCount = withContext(Dispatchers.IO) {
                 P2pBridge.peers(P2pBridge.dir(context)).size
             }
@@ -269,7 +270,7 @@ fun ClipboardSettingsContent(
                     val activePlugin = activeSyncPlugin
                     val subtitle = when {
                         !syncOn -> tr(R.string.s_tongguochajianyuyuanduanshebei_430fe)
-                        syncTransport == SettingsPreferences.ClipboardSyncTransport.P2P ->
+                        syncChannels.contains(ChannelPolicy.CHANNEL_P2P) ->
                             tr(R.string.s_juyuwangzhilian) + " · " + if (p2pPairedCount > 0) {
                                 tr(R.string.s_yipeidui_tai, p2pPairedCount)
                             } else {

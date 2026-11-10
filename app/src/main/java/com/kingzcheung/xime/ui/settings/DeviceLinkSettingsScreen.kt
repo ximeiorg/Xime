@@ -104,9 +104,8 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
     var codeInput by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var deviceName by remember { mutableStateOf("") }
-    // 总开关：与「剪贴板同步」页共用同一份偏好，不另立状态源，
-    // 否则两处开关会互相覆盖，用户改了一处另一处却不变。
-    var linkEnabled by remember { mutableStateOf(false) }
+    // 本页只负责配对与设备管理：同步开关、通道选择都在「剪贴板同步」页，
+    // 否则一个页面里的开关会同时改全局状态，语义对不上。
 
     fun refreshPeers() {
         scope.launch(Dispatchers.IO) {
@@ -121,32 +120,8 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
         SettingsPreferences.setDeviceLinkName(context, resolved)
     }
 
-    fun setLinkEnabled(enabled: Boolean) {
-        if (enabled) {
-            // 先写传输方式再写总开关：输入法侧监听总开关变化后立刻按 P2P 启动
-            SettingsPreferences.setClipboardSyncTransport(
-                context,
-                SettingsPreferences.ClipboardSyncTransport.P2P
-            )
-            SettingsPreferences.setClipboardSyncEnabled(context, true)
-        } else {
-            SettingsPreferences.setClipboardSyncEnabled(context, false)
-        }
-        linkEnabled = enabled
-        if (!enabled && mode != PairMode.None) {
-            scope.launch(Dispatchers.IO) { P2pBridge.pairCancel() }
-            mode = PairMode.None
-            code = null
-            phase = "idle"
-            peerName = null
-        }
-    }
-
     LaunchedEffect(Unit) {
         deviceName = SettingsPreferences.getDeviceLinkName(context).ifBlank { defaultDeviceName() }
-        linkEnabled = SettingsPreferences.isClipboardSyncEnabled(context) &&
-            SettingsPreferences.getClipboardSyncTransport(context) ==
-            SettingsPreferences.ClipboardSyncTransport.P2P
         if (!available) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             val identity = P2pBridge.identity(dir)
@@ -178,7 +153,7 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
     }
 
     fun startDisplay() {
-        if (!available || !linkEnabled) return
+        if (!available) return
         saveDeviceName()
         scope.launch {
             busy = true
@@ -196,7 +171,7 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
     }
 
     fun startInput() {
-        if (!available || !linkEnabled) return
+        if (!available) return
         val digits = codeInput.filter(Char::isDigit)
         if (digits.length != 6) return
         saveDeviceName()
@@ -269,14 +244,13 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                 }
             }
 
-            // ── 功能开关 ──────────────────────────────────────────
-            SettingsSection(title = tr(R.string.s_gongnengkaiguan)) {
-                SettingsToggleItem(
-                    icon = Icons.TwoTone.AutoAwesome,
-                    title = tr(R.string.s_qiyongshebeihulian),
-                    subtitle = tr(R.string.s_qiyongshebeihulian_shuoming),
-                    checked = linkEnabled,
-                    onCheckedChange = ::setLinkEnabled
+            // ── 说明：配对只是建立信任关系 ─────────────────────────
+            SettingsSection(title = tr(R.string.s_peidui_shuoming)) {
+                Text(
+                    text = tr(R.string.s_peidui_shuoming_neirong),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp)
                 )
             }
 
@@ -311,7 +285,6 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                         )
                         Text(
                             text = when {
-                                !linkEnabled -> tr(R.string.s_weiqiyong)
                                 did.isNullOrEmpty() -> tr(R.string.s_jiuzhongzhong)
                                 else -> did!!.take(16)
                             },
@@ -330,13 +303,7 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (!linkEnabled) {
-                        Text(
-                            text = tr(R.string.s_shebeihulian_yiguanbi),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
+                    run {
                         when (mode) {
                             PairMode.Display -> DisplayPanel(
                                 code = code,
@@ -453,7 +420,8 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                         R.string.s_shuoming_1,
                         R.string.s_shuoming_2,
                         R.string.s_shuoming_3,
-                        R.string.s_shuoming_4
+                        R.string.s_shuoming_4,
+                        R.string.s_shuoming_5
                     ).forEach { id ->
                         Text(
                             text = tr(id),
@@ -586,6 +554,6 @@ private fun PairStatusText(phase: String, peerName: String?, error: String?) {
     )
 }
 
-/** 默认设备名：取机型名，便于在电脑端列表里一眼分辨。 */
+/** 默认设备名：取机型名，便于在对方设备列表里一眼分辨。 */
 private fun defaultDeviceName(): String =
     Build.MODEL?.trim().takeUnless { it.isNullOrEmpty() }?.take(32) ?: "Android"

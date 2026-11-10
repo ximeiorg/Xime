@@ -1101,12 +1101,14 @@
     <string name="s_zanwuyipeiduishebei">还没有已配对设备。先与另一台设备完成配对。</string>
     <string name="s_yuanshengkuweijiazai">P2P 原生库未加载，当前安装包不包含设备互联能力。</string>
     <string name="s_qiyongshebeihulian">启用设备互联</string>
-    <string name="s_qiyongshebeihulian_shuoming">在同一 Wi-Fi 下与其他设备互传剪贴板，内容端到端加密，不经过任何服务器</string>
+    <string name="s_qiyongshebeihulian_shuoming">在同一 Wi-Fi 下与其他设备直连互传剪贴板，内容端到端加密；已装同步插件时离开局域网会自动改走插件</string>
     <string name="s_benji">本机</string>
     <string name="s_shebeimingcheng">设备名称</string>
     <string name="s_shebeimingcheng_shuoming">配对时在对方设备上显示的名字</string>
     <string name="s_shebeibiaoqi">设备标识</string>
     <string name="s_peiduishoubei">配对设备</string>
+    <string name="s_peidui_shuoming">关于配对</string>
+    <string name="s_peidui_shuoming_neirong">配对只建立设备之间的信任关系（认证），不决定同步什么。哪些功能用这条通道，在「剪贴板同步」等对应功能页里勾选。</string>
     <string name="s_zaijisuanjianshang_xianshi_peiduima">在另一台设备上打开配对界面，选择「输入配对码」，填入上面的数字（60 秒内有效）</string>
     <string name="s_kaishipeidui">开始配对</string>
     <string name="s_shurujisuanjianshang_dema">输入配对码</string>
@@ -1119,14 +1121,19 @@
     <string name="s_shuoming_1">• 需要在系统设置中启用本输入法，设备互联依赖输入法服务常驻运行。</string>
     <string name="s_shuoming_2">• 同步在键盘使用时进行：打开键盘后会自动连上已配对的设备，并取回对方最新的剪贴板内容。</string>
     <string name="s_shuoming_3">• 剪贴板内容只在两台设备之间加密传输，不经过任何第三方服务器，也不保存历史。</string>
-    <string name="s_shuoming_4">• 只同步纯文本；与 WebDAV 等同步方式互斥，本功能开启时不要同时使用其他剪贴板同步。</string>
+    <string name="s_shuoming_4">• 只同步纯文本；内容在设备之间端到端加密，默认走局域网直连，不经过服务器。</string>
+    <string name="s_shuoming_5">• 若已安装剪贴板同步插件：离开同一网络或对端离线时自动改走插件，回到局域网后自动切回直连。</string>
     <string name="s_jintongbuwenzi">仅同步文本</string>
     <string name="s_lianjie">连接</string>
     <string name="s_miaohouzidongshixiao">%1$d 秒后失效</string>
     <string name="s_shanchuipeidui">删除该设备</string>
 
     <!-- 剪贴板同步传输方式 -->
-    <string name="s_chuanshufangshi">传输方式</string>
+    <string name="s_chuanshufangshi">同步通道</string>
+    <string name="s_youxian">优先</string>
+    <string name="s_qingzhishao_gouxuan_yigetongdao">至少勾选一个通道才能同步</string>
+    <string name="s_zidong_tuijian">自动（推荐）</string>
+    <string name="s_zidong_shuoming">优先局域网直连，连不上时自动改走同步插件</string>
     <string name="s_tongbuchajian">同步插件</string>
     <string name="s_tongbuchajian_shuoming">通过 WebDAV、ximed 等插件同步</string>
     <string name="s_juyuwangzhilian">局域网直连</string>

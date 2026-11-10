@@ -1,6 +1,11 @@
 package com.kingzcheung.xime.ui.settings
 
 import com.kingzcheung.xime.R
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.withContext
+import com.kingzcheung.xime.p2p.P2pBridge
+import com.kingzcheung.xime.clipboard.sync.ChannelPolicy
 
 import com.kingzcheung.xime.i18n.tr
 
@@ -33,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,8 +95,19 @@ fun ClipboardSyncSettingsContent(
     val clipboardPlugins = remember { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
     // 切换服务走单选对话框（插件多时页面长度恒定，不随插件数量变长）
     var showServicePicker by remember { mutableStateOf(false) }
-    var transport by remember {
-        mutableStateOf(SettingsPreferences.getClipboardSyncTransport(context))
+    var channels by remember {
+        mutableStateOf(SettingsPreferences.getClipboardSyncChannels(context))
+    }
+    var pairedCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        pairedCount = withContext(Dispatchers.IO) {
+            runCatching { P2pBridge.peers(P2pBridge.dir(context)).size }.getOrDefault(0)
+        }
+    }
+
+    fun toggleChannel(id: String, checked: Boolean) {
+        channels = if (checked) channels + id else channels - id
+        SettingsPreferences.setClipboardSyncChannels(context, channels)
     }
 
     Scaffold(
@@ -131,39 +148,38 @@ fun ClipboardSyncSettingsContent(
             }
 
             SettingsSection(title = tr(R.string.s_chuanshufangshi)) {
-                TransportOption(
-                    selected = transport == SettingsPreferences.ClipboardSyncTransport.PLUGIN,
-                    title = tr(R.string.s_tongbuchajian),
-                    subtitle = tr(R.string.s_tongbuchajian_shuoming),
-                    onClick = {
-                        if (transport != SettingsPreferences.ClipboardSyncTransport.PLUGIN) {
-                            SettingsPreferences.setClipboardSyncTransport(
-                                context,
-                                SettingsPreferences.ClipboardSyncTransport.PLUGIN
-                            )
-                            transport = SettingsPreferences.ClipboardSyncTransport.PLUGIN
-                        }
-                    }
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 56.dp),
-                    thickness = 0.5.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                )
-                TransportOption(
-                    selected = transport == SettingsPreferences.ClipboardSyncTransport.P2P,
+                ChannelRow(
                     title = tr(R.string.s_juyuwangzhilian),
-                    subtitle = tr(R.string.s_juyuwangzhilian_shuoming),
-                    onClick = {
-                        if (transport != SettingsPreferences.ClipboardSyncTransport.P2P) {
-                            SettingsPreferences.setClipboardSyncTransport(
-                                context,
-                                SettingsPreferences.ClipboardSyncTransport.P2P
-                            )
-                            transport = SettingsPreferences.ClipboardSyncTransport.P2P
-                        }
-                    }
+                    subtitle = if (pairedCount > 0) {
+                        tr(R.string.s_yipeidui_tai, pairedCount) + " · " + tr(R.string.s_youxian)
+                    } else {
+                        tr(R.string.s_weipeidui)
+                    },
+                    checked = channels.contains(ChannelPolicy.CHANNEL_P2P),
+                    onCheckedChange = { toggleChannel(ChannelPolicy.CHANNEL_P2P, it) }
                 )
+                syncPlugins.forEach { (id, _) ->
+                    val name = installedPlugins.find { it.id == id }?.name ?: id
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    ChannelRow(
+                        title = name,
+                        subtitle = tr(R.string.s_tongbuchajian_shuoming),
+                        checked = channels.contains(id),
+                        onCheckedChange = { toggleChannel(id, it) }
+                    )
+                }
+                if (channels.isEmpty()) {
+                    Text(
+                        text = tr(R.string.s_qingzhishao_gouxuan_yigetongdao),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
             }
 
             SettingsSection(title = tr(R.string.s_shebeihulian)) {
@@ -200,7 +216,7 @@ fun ClipboardSyncSettingsContent(
                 }
             }
 
-            if (transport == SettingsPreferences.ClipboardSyncTransport.PLUGIN) {
+            if (channels.any { it != ChannelPolicy.CHANNEL_P2P }) {
                 SettingsSection(
                     title = tr(R.string.s_tongbufuwu),
                     content = {
@@ -302,20 +318,20 @@ fun ClipboardSyncSettingsContent(
 }
 
 @Composable
-private fun TransportOption(
-    selected: Boolean,
+private fun ChannelRow(
     title: String,
     subtitle: String,
-    onClick: () -> Unit,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable { onCheckedChange(!checked) }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RadioButton(selected = selected, onClick = onClick)
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

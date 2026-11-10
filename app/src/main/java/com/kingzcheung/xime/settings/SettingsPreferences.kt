@@ -810,22 +810,24 @@ object SettingsPreferences {
 
     const val KEY_CLIPBOARD_SYNC_ENABLED = "clipboard_sync_enabled"
     const val KEY_CLIPBOARD_SYNC_PLUGIN_ID = "clipboard_sync_plugin_id"
-    /** 传输方式：插件（WebDAV/ximed）或局域网直连。缺省 PLUGIN，升级行为零变化。 */
-    const val KEY_CLIPBOARD_SYNC_TRANSPORT = "clipboard_sync_transport"
+    /** 剪贴板同步启用的通道（逗号分隔，首个为优先通道）。 */
+    const val KEY_CLIPBOARD_SYNC_CHANNELS = "clipboard_sync_channels"
 
-    enum class ClipboardSyncTransport { PLUGIN, P2P }
-
-    fun getClipboardSyncTransport(context: Context): ClipboardSyncTransport {
-        val raw = getPrefs(context).getString(KEY_CLIPBOARD_SYNC_TRANSPORT, null)
-        return if (raw == ClipboardSyncTransport.P2P.name) {
-            ClipboardSyncTransport.P2P
-        } else {
-            ClipboardSyncTransport.PLUGIN
-        }
+    /**
+     * 剪贴板同步启用的通道列表（有序，前者优先）。
+     *
+     * 通道是数据：`"p2p"` 是内置的局域网直连，其它值是可用的剪贴板同步插件 id。
+     * 「功能 × 通道」两个维度正交：剪贴板同步可任选组合，以后新增的同步功能复用同一套通道。
+     */
+    fun getClipboardSyncChannels(context: Context): List<String> {
+        val raw = getPrefs(context).getString(KEY_CLIPBOARD_SYNC_CHANNELS, null) ?: return emptyList()
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
     }
 
-    fun setClipboardSyncTransport(context: Context, transport: ClipboardSyncTransport) {
-        getPrefs(context).edit().putString(KEY_CLIPBOARD_SYNC_TRANSPORT, transport.name).apply()
+    fun setClipboardSyncChannels(context: Context, channels: List<String>) {
+        getPrefs(context).edit()
+            .putString(KEY_CLIPBOARD_SYNC_CHANNELS, channels.distinct().joinToString(","))
+            .apply()
     }
 
     /** 配对表变更信号：输入法服务据此重启直连节点（配对/删除设备后写一次）。 */
