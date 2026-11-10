@@ -19,17 +19,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.twotone.Devices
+import androidx.compose.material.icons.twotone.AutoAwesome
 import androidx.compose.material.icons.twotone.Link
-import androidx.compose.material.icons.twotone.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -48,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -73,11 +71,18 @@ private enum class PairMode { None, Display, Input }
 private const val PAIR_TIMEOUT_SECONDS = 60
 
 /**
- * 设备互联（局域网直连）的配对页。
+ * 设备互联（局域网直连）设置页。
  *
- * 协议、握手与配对表全在 Rust 侧；这一页只做三件事：展示本机 did、生成/输入
- * 6 位配对码并轮询进度、列出/删除已配对设备。同步开关不在这里——配对完成后
- * 回「剪贴板同步」选择传输方式。
+ * 页面结构与鸿蒙版（`ximeharmony` 的 `DeviceLinkPage.ets`）保持一致：
+ * 功能开关 → 本机 → 配对设备 → 已配对设备（N）→ 说明。
+ * 两端文案与操作顺序也一致，避免用户在两个平台上学习两套心智模型。
+ *
+ * 分工：本页只做**配对**，协议、握手与配对表都在 Rust 侧；剪贴板同步由输入法
+ * 服务常驻的同步节点负责，配对完成后回「剪贴板同步」选择传输方式即可生效。
+ *
+ * 与鸿蒙版的差异只有一处：这里没有「存储位置」一行。鸿蒙的主 App 与输入法扩展
+ * 是两个进程，必须确认共享沙箱；Android 端两者同属一个应用、同一份目录，
+ * 不存在这个问题，写上去反而是噪音。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,6 +103,10 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
     var secondsLeft by remember { mutableIntStateOf(0) }
     var codeInput by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var deviceName by remember { mutableStateOf("") }
+    // 总开关：与「剪贴板同步」页共用同一份偏好，不另立状态源，
+    // 否则两处开关会互相覆盖，用户改了一处另一处却不变。
+    var linkEnabled by remember { mutableStateOf(false) }
 
     fun refreshPeers() {
         scope.launch(Dispatchers.IO) {
@@ -106,7 +115,38 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
         }
     }
 
+    fun saveDeviceName() {
+        val resolved = deviceName.trim().ifEmpty { defaultDeviceName() }
+        if (resolved != deviceName) deviceName = resolved
+        SettingsPreferences.setDeviceLinkName(context, resolved)
+    }
+
+    fun setLinkEnabled(enabled: Boolean) {
+        if (enabled) {
+            // 先写传输方式再写总开关：输入法侧监听总开关变化后立刻按 P2P 启动
+            SettingsPreferences.setClipboardSyncTransport(
+                context,
+                SettingsPreferences.ClipboardSyncTransport.P2P
+            )
+            SettingsPreferences.setClipboardSyncEnabled(context, true)
+        } else {
+            SettingsPreferences.setClipboardSyncEnabled(context, false)
+        }
+        linkEnabled = enabled
+        if (!enabled && mode != PairMode.None) {
+            scope.launch(Dispatchers.IO) { P2pBridge.pairCancel() }
+            mode = PairMode.None
+            code = null
+            phase = "idle"
+            peerName = null
+        }
+    }
+
     LaunchedEffect(Unit) {
+        deviceName = SettingsPreferences.getDeviceLinkName(context).ifBlank { defaultDeviceName() }
+        linkEnabled = SettingsPreferences.isClipboardSyncEnabled(context) &&
+            SettingsPreferences.getClipboardSyncTransport(context) ==
+            SettingsPreferences.ClipboardSyncTransport.P2P
         if (!available) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             val identity = P2pBridge.identity(dir)
@@ -138,11 +178,12 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
     }
 
     fun startDisplay() {
-        if (!available) return
+        if (!available || !linkEnabled) return
+        saveDeviceName()
         scope.launch {
             busy = true
             val result = withContext(Dispatchers.IO) {
-                P2pBridge.pairDisplay(dir, deviceName(), PAIR_TIMEOUT_SECONDS)
+                P2pBridge.pairDisplay(dir, deviceName, PAIR_TIMEOUT_SECONDS)
             }
             busy = false
             code = result.code
@@ -155,13 +196,14 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
     }
 
     fun startInput() {
-        if (!available) return
+        if (!available || !linkEnabled) return
         val digits = codeInput.filter(Char::isDigit)
         if (digits.length != 6) return
+        saveDeviceName()
         scope.launch {
             busy = true
             val result = withContext(Dispatchers.IO) {
-                P2pBridge.pairInput(dir, deviceName(), digits, "", PAIR_TIMEOUT_SECONDS)
+                P2pBridge.pairInput(dir, deviceName, digits, "", PAIR_TIMEOUT_SECONDS)
             }
             busy = false
             phase = if (result.ok) "waiting" else "failed"
@@ -227,99 +269,132 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                 }
             }
 
-            SettingsSection(title = tr(R.string.s_shebeihulian)) {
-                Text(
-                    text = tr(R.string.s_shebeihulian_shuoming),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)
+            // ── 功能开关 ──────────────────────────────────────────
+            SettingsSection(title = tr(R.string.s_gongnengkaiguan)) {
+                SettingsToggleItem(
+                    icon = Icons.TwoTone.AutoAwesome,
+                    title = tr(R.string.s_qiyongshebeihulian),
+                    subtitle = tr(R.string.s_qiyongshebeihulian_shuoming),
+                    checked = linkEnabled,
+                    onCheckedChange = ::setLinkEnabled
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            }
+
+            // ── 本机 ──────────────────────────────────────────────
+            SettingsSection(title = tr(R.string.s_benji)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.TwoTone.Devices,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = tr(R.string.s_benjibiaoshi),
+                            text = tr(R.string.s_shebeimingcheng),
                             style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
+                            modifier = Modifier.width(88.dp)
+                        )
+                        OutlinedTextField(
+                            value = deviceName,
+                            onValueChange = { deviceName = it.take(32) },
+                            placeholder = { Text(tr(R.string.s_shebeimingcheng_shuoming)) },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .weight(1f)
+                                .onFocusChanged { state -> if (!state.isFocused) saveDeviceName() }
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = tr(R.string.s_shebeibiaoqi),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.width(88.dp)
                         )
                         Text(
-                            text = did ?: "—",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = when {
+                                !linkEnabled -> tr(R.string.s_weiqiyong)
+                                did.isNullOrEmpty() -> tr(R.string.s_jiuzhongzhong)
+                                else -> did!!.take(16)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
                             fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            // ── 配对设备 ──────────────────────────────────────────
+            SettingsSection(title = tr(R.string.s_peiduishoubei)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (!linkEnabled) {
+                        Text(
+                            text = tr(R.string.s_shebeihulian_yiguanbi),
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    } else {
+                        when (mode) {
+                            PairMode.Display -> DisplayPanel(
+                                code = code,
+                                phase = phase,
+                                peerName = peerName,
+                                error = error,
+                                secondsLeft = secondsLeft,
+                                busy = busy,
+                                onRegenerate = ::startDisplay,
+                                onCancel = ::cancelPairing
+                            )
+
+                            PairMode.Input -> InputPanel(
+                                value = codeInput,
+                                onValueChange = { codeInput = it.filter(Char::isDigit).take(6) },
+                                phase = phase,
+                                peerName = peerName,
+                                error = error,
+                                busy = busy,
+                                onConnect = ::startInput,
+                                onCancel = ::cancelPairing
+                            )
+
+                            PairMode.None -> {
+                                Button(
+                                    onClick = ::startDisplay,
+                                    enabled = available && !busy,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        Icons.TwoTone.Link,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(tr(R.string.s_zaijisuanjianshang_daima))
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        mode = PairMode.Input
+                                        phase = "idle"
+                                        error = null
+                                        peerName = null
+                                    },
+                                    enabled = available && !busy,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(tr(R.string.s_shurujisuanjianshang_dema))
+                                }
+                            }
+                        }
                     }
+                    PairStatusText(phase = phase, peerName = peerName, error = error)
                 }
             }
 
-            SettingsSection(title = tr(R.string.s_peidui)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Button(
-                        onClick = ::startDisplay,
-                        enabled = available && !busy,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.TwoTone.Link, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(tr(R.string.s_xianshipeiduima))
-                    }
-                    Button(
-                        onClick = {
-                            mode = PairMode.Input
-                            phase = "idle"
-                            error = null
-                            peerName = null
-                        },
-                        enabled = available && !busy,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(tr(R.string.s_shurupeiduima))
-                    }
-                }
-
-                when (mode) {
-                    PairMode.Display -> DisplayPanel(
-                        code = code,
-                        phase = phase,
-                        peerName = peerName,
-                        error = error,
-                        secondsLeft = secondsLeft,
-                        busy = busy,
-                        onRegenerate = ::startDisplay,
-                        onCancel = ::cancelPairing
-                    )
-
-                    PairMode.Input -> InputPanel(
-                        value = codeInput,
-                        onValueChange = { codeInput = it.filter(Char::isDigit).take(6) },
-                        phase = phase,
-                        peerName = peerName,
-                        error = error,
-                        busy = busy,
-                        onConnect = ::startInput,
-                        onCancel = ::cancelPairing
-                    )
-
-                    PairMode.None -> Unit
-                }
-            }
-
-            SettingsSection(title = tr(R.string.s_yipeiduishebei)) {
+            // ── 已配对设备 ────────────────────────────────────────
+            SettingsSection(title = tr(R.string.s_yipeiduishebei_shuliang, peers.size)) {
                 if (peers.isEmpty()) {
                     Text(
                         text = tr(R.string.s_zanwuyipeiduishebei),
@@ -328,26 +403,13 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                         modifier = Modifier.padding(16.dp)
                     )
                 } else {
-                    peers.forEachIndexed { index, peer ->
-                        if (index > 0) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 56.dp),
-                                thickness = 0.5.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                            )
-                        }
+                    peers.forEach { peer ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.TwoTone.Sync,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = peer.name.ifBlank { peer.did.take(8) },
@@ -355,36 +417,49 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    text = buildString {
-                                        append(peer.did.take(16))
-                                        peer.lastAddr?.takeIf { it.isNotBlank() }?.let {
-                                            append(" · ")
-                                            append(it)
-                                        }
-                                    },
+                                    text = peer.did.take(8),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            IconButton(
-                                onClick = {
-                                    scope.launch(Dispatchers.IO) {
-                                        P2pBridge.forget(dir, peer.did)
-                                        SettingsPreferences.bumpClipboardSyncPeersRevision(context)
-                                        val latest = P2pBridge.peers(dir)
-                                        withContext(Dispatchers.Main) { peers = latest }
+                            Text(
+                                text = tr(R.string.s_jiechu),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .clickable(enabled = available) {
+                                        scope.launch(Dispatchers.IO) {
+                                            P2pBridge.forget(dir, peer.did)
+                                            SettingsPreferences.bumpClipboardSyncPeersRevision(context)
+                                            val latest = P2pBridge.peers(dir)
+                                            withContext(Dispatchers.Main) { peers = latest }
+                                        }
                                     }
-                                },
-                                enabled = available
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Delete,
-                                    contentDescription = tr(R.string.s_shanchuipeidui),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
+                                    .padding(8.dp)
+                            )
                         }
+                    }
+                }
+            }
+
+            // ── 说明 ──────────────────────────────────────────────
+            SettingsSection(title = tr(R.string.s_shuoming)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    listOf(
+                        R.string.s_shuoming_1,
+                        R.string.s_shuoming_2,
+                        R.string.s_shuoming_3,
+                        R.string.s_shuoming_4
+                    ).forEach { id ->
+                        Text(
+                            text = tr(id),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -401,53 +476,44 @@ private fun DisplayPanel(
     secondsLeft: Int,
     busy: Boolean,
     onRegenerate: () -> Unit,
-    onCancel: () -> Unit,
+    onCancel: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Text(
+            text = code?.chunked(3)?.joinToString(" ") ?: "——— ———",
+            fontSize = 30.sp,
+            letterSpacing = 4.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = tr(R.string.s_zaijisuanjianshang_xianshi_peiduima),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        if (phase == "waiting" && secondsLeft > 0) {
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = tr(R.string.s_peiduima),
-                style = MaterialTheme.typography.labelMedium,
+                text = tr(R.string.s_miaohouzidongshixiao, secondsLeft),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = code?.chunked(3)?.joinToString(" ") ?: "——— ———",
-                style = MaterialTheme.typography.displaySmall,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 4.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            PairStatusText(phase = phase, peerName = peerName, error = error)
-            if (phase == "waiting" && secondsLeft > 0) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = tr(R.string.s_miaohouzidongshixiao, secondsLeft),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TextButton(onClick = onRegenerate, enabled = !busy) {
+                Text(tr(R.string.s_chongxinshengcheng))
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onRegenerate, enabled = !busy) {
-                    Text(tr(R.string.s_chongxinshengcheng))
-                }
-                TextButton(onClick = onCancel) {
-                    Text(tr(R.string.s_quxiao))
-                }
+            OutlinedButton(onClick = onCancel) {
+                Text(tr(R.string.s_quxiao))
             }
         }
     }
@@ -462,42 +528,38 @@ private fun InputPanel(
     error: String?,
     busy: Boolean,
     onConnect: () -> Unit,
-    onCancel: () -> Unit,
+    onCancel: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                label = { Text(tr(R.string.s_peiduima)) },
-                placeholder = { Text(tr(R.string.s_peiduimatishi)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                modifier = Modifier.fillMaxWidth()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(tr(R.string.s_peiduima)) },
+            placeholder = { Text(tr(R.string.s_peiduimatishi)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+            textStyle = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        if (phase == "waiting") {
+            Text(
+                text = tr(R.string.s_zhengzaicha_shebei),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onConnect,
-                    enabled = !busy && value.length == 6,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(tr(R.string.s_lianjie))
-                }
-                TextButton(onClick = onCancel) {
-                    Text(tr(R.string.s_quxiao))
-                }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                Text(tr(R.string.s_quxiao))
             }
-            PairStatusText(phase = phase, peerName = peerName, error = error)
+        } else {
+            Button(
+                onClick = onConnect,
+                enabled = !busy && value.length == 6,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(tr(R.string.s_kaishipeidui))
+            }
         }
     }
 }
@@ -520,11 +582,10 @@ private fun PairStatusText(phase: String, peerName: String?, error: String?) {
         style = MaterialTheme.typography.bodyMedium,
         color = color,
         textAlign = TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp)
+        modifier = Modifier.fillMaxWidth()
     )
 }
 
-private fun deviceName(): String =
+/** 默认设备名：取机型名，便于在电脑端列表里一眼分辨。 */
+private fun defaultDeviceName(): String =
     Build.MODEL?.trim().takeUnless { it.isNullOrEmpty() }?.take(32) ?: "Android"

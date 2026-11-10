@@ -51,6 +51,7 @@ fun SettingsScreen(
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
                 onNavigateToClipboard = { navController.navigate(SettingsRoutes.Clipboard) },
+                onNavigateToDeviceLink = { navController.navigate(SettingsRoutes.DeviceLink) },
                 onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) }
             )
         }

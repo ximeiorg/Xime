@@ -853,6 +853,20 @@ object SettingsPreferences {
         getPrefs(context).edit().putString(KEY_CLIPBOARD_SYNC_PLUGIN_ID, pluginId).apply()
     }
 
+    // ── 设备互联（局域网直连） ──────────────────────────────
+
+    /** 本机设备名：配对时写进对方配对表、显示在对方「已配对设备」列表里。 */
+    const val KEY_DEVICE_LINK_NAME = "device_link_name"
+
+    /** 读取本机设备名；空串表示尚未设置（调用方回落到机型名）。 */
+    fun getDeviceLinkName(context: Context): String {
+        return getPrefs(context).getString(KEY_DEVICE_LINK_NAME, "") ?: ""
+    }
+
+    fun setDeviceLinkName(context: Context, name: String) {
+        getPrefs(context).edit().putString(KEY_DEVICE_LINK_NAME, name).apply()
+    }
+
     // ── 剪贴板图片（Phase 2：采集开关 + 单张上限可配） ──────────────
 
     /** 是否采集复制到剪贴板的图片（默认开，见 docs/clipboard-image-plan.md 决策 D1）。 */
