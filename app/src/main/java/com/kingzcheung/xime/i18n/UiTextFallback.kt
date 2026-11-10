@@ -534,6 +534,7 @@ internal object UiTextFallback {
         R.string.s_jietu to "截图",
         R.string.s_bujuyuxianshi to "布局与显示",
         R.string.s_jianpanbuju to "键盘布局",
+        R.string.s_qwerty_letter_size to "26 键字母字号（%1\$d%%）",
         R.string.s_shitijianpanjiance to "实体键盘检测",
         R.string.s_guanbihoubujianceshitijianpan_6aaf1 to "关闭后不检测实体键盘，始终使用屏幕键盘",
         R.string.s_hengpingshiyongfentijianpan to "横屏使用分体键盘",

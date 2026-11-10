@@ -42,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -180,6 +181,9 @@ fun KeyboardLayout(
     var landscapeSplitKeyboardEnabled by remember {
         mutableStateOf(SettingsPreferences.isLandscapeSplitKeyboardEnabled(context))
     }
+    var letterSizeLevel by remember(context) {
+        mutableIntStateOf(SettingsPreferences.getQwertyLetterSizeLevel(context))
+    }
 
     // 监听设置变化
     DisposableEffect(context) {
@@ -190,6 +194,8 @@ fun KeyboardLayout(
                     SettingsPreferences.KEY_LANDSCAPE_SPLIT_KEYBOARD_ENABLED ->
                         landscapeSplitKeyboardEnabled =
                             SettingsPreferences.isLandscapeSplitKeyboardEnabled(context)
+                    SettingsPreferences.KEY_QWERTY_LETTER_SIZE_LEVEL ->
+                        letterSizeLevel = SettingsPreferences.getQwertyLetterSizeLevel(context)
                 }
             }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -246,6 +252,7 @@ fun KeyboardLayout(
 
     CompositionLocalProvider(
         LocalKeyCornerRadius provides qwertyCornerRadius,
+        LocalQwertyLetterScale provides (SettingsPreferences.qwertyLetterSizePercent(letterSizeLevel) / 100f),
         // 键面提示档与主键盘同一规则（退格的「清空」等提示的放大倍率与画法）
         LocalSwipeHintCorner provides swipeHintCornerFor(isLandscape, tabletParams),
         // 平板键面提示统一放大（字母上标/退格"清空"等所有键组件一致），手机为 1f
@@ -1715,6 +1722,8 @@ private fun DummyKeyButton(
     )
 }
 
+private val LocalQwertyLetterScale = compositionLocalOf { 1f }
+
 @Composable
 fun KeyboardRowWithConfig(
     keys: List<String>,
@@ -1780,6 +1789,13 @@ fun KeyboardRowWithConfig(
                 commitValue
             } else {
                 KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode)
+            }
+            val labelScale = if (key.length == 1 && key[0].lowercaseChar() in 'a'..'z' &&
+                displayText.length == 1 && displayText[0].lowercaseChar() in 'a'..'z'
+            ) {
+                LocalQwertyLetterScale.current
+            } else {
+                1f
             }
 
             // tap 动作接线：非 COMMIT/SEND_RIME 的动作（复制/粘贴/面板切换等）走手势分发，
@@ -1872,6 +1888,7 @@ fun KeyboardRowWithConfig(
                         onLongPressSelect = onLongPressSelect,
                         longPressItems = longPressLabels,
                         fontSize = config.fontSize,
+                        labelScale = labelScale,
                         swipeFontSize = config.swipeFontSize,
                         shadowEnabled = config.shadowEnabled,
                         shadowElevation = config.shadowElevation,
@@ -1901,6 +1918,7 @@ fun KeyboardRowWithConfig(
                     onLongPressSelect = onLongPressSelect,
                     longPressItems = longPressLabels,
                     fontSize = config.fontSize,
+                    labelScale = labelScale,
                     swipeFontSize = config.swipeFontSize,
                     shadowEnabled = config.shadowEnabled,
                     shadowElevation = config.shadowElevation,

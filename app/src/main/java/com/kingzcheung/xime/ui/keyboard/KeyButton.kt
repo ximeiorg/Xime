@@ -489,6 +489,7 @@ fun SwipeableKeyButton(
     a11yDescription: String? = null,
     /** TalkBack 状态播报 */
     a11yState: String? = null,
+    labelScale: Float = 1f,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     var dragOffsetY by remember { mutableStateOf(0f) }
@@ -871,7 +872,7 @@ fun SwipeableKeyButton(
                     Text(
                         text = text,
                         color = textColor,
-                        fontSize = ((if (fontSize != androidx.compose.ui.unit.TextUnit.Unspecified) fontSize.value else if (text.length > 2) 13f else 16f) * contentScale).sp,
+                        fontSize = ((if (fontSize != androidx.compose.ui.unit.TextUnit.Unspecified) fontSize.value else if (text.length > 2) 13f else 16f) * contentScale * labelScale).sp,
                         fontWeight = if (text.length > 2) FontWeight.Medium else FontWeight.Normal,
                         textAlign = TextAlign.Start,
                         maxLines = 1,
@@ -947,7 +948,7 @@ fun SwipeableKeyButton(
                     Text(
                         text = text,
                         color = textColor,
-                        fontSize = ((if (fontSize != androidx.compose.ui.unit.TextUnit.Unspecified) fontSize.value else if (text.length > 2) 14f else 18f) * contentScale).sp,
+                        fontSize = ((if (fontSize != androidx.compose.ui.unit.TextUnit.Unspecified) fontSize.value else if (text.length > 2) 14f else 18f) * contentScale * labelScale).sp,
                         // 平板大键（hintExtraScale > 1）单字母也用 Medium，避免大键面上 Normal 显细
                         fontWeight = if (text.length > 2 || hintExtraScale > 1f) FontWeight.Medium else FontWeight.Normal,
                         textAlign = TextAlign.Center,
@@ -1746,6 +1747,7 @@ fun SwipeableKeyButtonLandscape(
     shadowEnabled: Boolean = true,
     shadowElevation: Dp = 1.dp,
     shadowShapeRadius: Dp = 8.dp,
+    labelScale: Float = 1f,
 ) {
     var isPressed by remember { mutableStateOf(false) }
     var dragOffsetY by remember { mutableStateOf(0f) }
@@ -2100,7 +2102,7 @@ fun SwipeableKeyButtonLandscape(
         val hintScale = adaptiveHintScale(contentScale)
         val effectiveFontSize = (
             if (fontSize != androidx.compose.ui.unit.TextUnit.Unspecified) fontSize.value else 14f
-        ) * contentScale
+        ) * contentScale * labelScale
         val effectiveSwipeFontSize = swipeFontSize.value * hintScale
 
         Box(

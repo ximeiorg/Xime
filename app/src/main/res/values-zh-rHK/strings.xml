@@ -532,6 +532,7 @@
     <string name="s_jietu">截圖</string>
     <string name="s_bujuyuxianshi">佈局與顯示</string>
     <string name="s_jianpanbuju">鍵盤佈局</string>
+    <string name="s_qwerty_letter_size">26 鍵字母字級（%1$d%%）</string>
     <string name="s_shitijianpanjiance">實體鍵盤檢測</string>
     <string name="s_guanbihoubujianceshitijianpan_6aaf1">關閉後不檢測實體鍵盤，始終使用螢幕鍵盤</string>
     <string name="s_hengpingshiyongfentijianpan">橫向使用分體鍵盤</string>

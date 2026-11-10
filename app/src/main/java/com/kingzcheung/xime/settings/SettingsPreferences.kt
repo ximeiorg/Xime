@@ -125,6 +125,7 @@ object SettingsPreferences {
     private const val KEY_INPUT_TEXT_LOCATION = "input_text_location"
     private const val KEY_PAGE_SIZE = "page_size"
     private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
+    const val KEY_QWERTY_LETTER_SIZE_LEVEL = "qwerty_letter_size_level"
     const val INPUT_TEXT_INPUT_BOX = "input_box"
     const val INPUT_TEXT_CANDIDATE_BAR = "candidate_bar"
     const val DEFAULT_PAGE_SIZE = 20 // 手机候选栏每页候选词数；schema 里的 page_size 来自 PC 版（5），太短，默认用 20
@@ -799,6 +800,19 @@ object SettingsPreferences {
     }
 
     const val DEFAULT_CANDIDATE_TEXT_SIZE = 19
+
+    val QWERTY_LETTER_SIZE_LEVELS = -2..2
+
+    fun qwertyLetterSizePercent(level: Int): Int = 100 + level * 10
+
+    fun getQwertyLetterSizeLevel(context: Context): Int =
+        getPrefs(context).getInt(KEY_QWERTY_LETTER_SIZE_LEVEL, 0).coerceIn(QWERTY_LETTER_SIZE_LEVELS)
+
+    fun setQwertyLetterSizeLevel(context: Context, level: Int) {
+        getPrefs(context).edit()
+            .putInt(KEY_QWERTY_LETTER_SIZE_LEVEL, level.coerceIn(QWERTY_LETTER_SIZE_LEVELS))
+            .apply()
+    }
 
     fun getCandidateTextSize(context: Context): Int {
         return getPrefs(context).getInt(KEY_CANDIDATE_TEXT_SIZE, DEFAULT_CANDIDATE_TEXT_SIZE)
