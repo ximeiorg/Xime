@@ -498,7 +498,8 @@ def parse_args(argv=None):
                         help="批量同步时只处理匹配此正则的 tag，默认仅正式版；传空字符串关闭过滤")
     parser.add_argument("--github-repo", default="ximeiorg/Xime")
     parser.add_argument("--gitcode-repo",
-                        default=os.environ.get("GITCODE_RELEASE_REPO", "ximeiorg/Xime"),
+                        # CI 里未配置仓库变量时环境变量存在但为空串，需按「未设置」处理
+                        default=os.environ.get("GITCODE_RELEASE_REPO") or "ximeiorg/Xime",
                         help="GitCode 的 owner/repo；必须是普通仓库，只读镜像仓库不支持 Release")
     parser.add_argument("--github-token", default=os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN", ""),
                         help="GitHub 令牌，读取 GITHUB_TOKEN / GH_TOKEN；本地批量同步必需，否则会触发 60 次/小时的限流")
@@ -511,11 +512,24 @@ def parse_args(argv=None):
     parser.add_argument("--dry-run", action="store_true", help="只打印计划，不写入")
     args = parser.parse_args(argv)
 
-    if "/" not in args.gitcode_repo:
-        parser.error("--gitcode-repo 需要 owner/repo 格式")
+    # 允许 CI 变量带首尾空白或尾斜杠；URL / SSH 形式直接拒绝，避免后面 API 层报看不懂的错
+    repo = args.gitcode_repo.strip().rstrip("/")
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    if "://" in repo or repo.startswith("git@"):
+        parser.error(
+            "--gitcode-repo 只需 owner/repo，不要带协议或域名"
+            f"（当前为 {args.gitcode_repo!r}）"
+        )
+    if "/" not in repo:
+        parser.error(
+            "--gitcode-repo 需要 owner/repo 格式"
+            f"（当前为 {args.gitcode_repo!r}；"
+            "可设置仓库变量 GITCODE_RELEASE_REPO 或传 --gitcode-repo 指定）"
+        )
     if sum([bool(args.tag), args.all, bool(args.last), bool(args.since)]) > 1:
         parser.error("--tag / --all / --last / --since 只能选一个")
-    args.gitcode_owner, args.gitcode_repo = args.gitcode_repo.split("/", 1)
+    args.gitcode_owner, args.gitcode_repo = repo.split("/", 1)
     args.exclude_regex = [re.compile(p) for p in args.exclude]
     args.tag_regex = re.compile(args.tag_filter) if args.tag_filter else None
     if not args.token and not args.dry_run:
