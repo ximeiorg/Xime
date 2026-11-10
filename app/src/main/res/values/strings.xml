@@ -532,6 +532,7 @@
     <string name="s_jietu">截图</string>
     <string name="s_bujuyuxianshi">布局与显示</string>
     <string name="s_jianpanbuju">键盘布局</string>
+    <string name="s_qwerty_letter_size">26 键字母字号（%1$d%%）</string>
     <string name="s_shitijianpanjiance">实体键盘检测</string>
     <string name="s_guanbihoubujianceshitijianpan_6aaf1">关闭后不检测实体键盘，始终使用屏幕键盘</string>
     <string name="s_hengpingshiyongfentijianpan">横屏使用分体键盘</string>

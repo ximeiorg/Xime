@@ -32,6 +32,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kingzcheung.xime.settings.SettingsPreferences
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -162,6 +164,35 @@ fun LayoutDisplaySettingsContent(
                                 keyboardFlushBottom = enabled
                                 SettingsPreferences.setKeyboardFlushBottom(context, enabled)
                             }
+                        )
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 16.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    var letterSizeLevel by remember(context) {
+                        mutableIntStateOf(SettingsPreferences.getQwertyLetterSizeLevel(context))
+                    }
+                    val letterSizeLevels = SettingsPreferences.QWERTY_LETTER_SIZE_LEVELS
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text(
+                            text = tr(
+                                R.string.s_qwerty_letter_size,
+                                SettingsPreferences.qwertyLetterSizePercent(letterSizeLevel),
+                            ),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Slider(
+                            value = letterSizeLevel.toFloat(),
+                            onValueChange = { letterSizeLevel = it.roundToInt() },
+                            onValueChangeFinished = {
+                                SettingsPreferences.setQwertyLetterSizeLevel(context, letterSizeLevel)
+                            },
+                            valueRange = letterSizeLevels.first.toFloat()..letterSizeLevels.last.toFloat(),
+                            steps = letterSizeLevels.last - letterSizeLevels.first - 1,
                         )
                     }
 
