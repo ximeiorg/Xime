@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+          Compose UI 测试的宿主 Activity。
+
+          createComposeRule() / createEmptyComposeRule() 需要一个能承载被测 Composable
+          的 Activity；测试进程跑在被测应用里，所以这个声明必须放在 app 自身的
+          manifest 里。只放在 src/debug 下，release / F-Droid 构建不受影响。
+        -->
+        <activity
+            android:name="androidx.activity.ComponentActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar" />
+    </application>
+</manifest>

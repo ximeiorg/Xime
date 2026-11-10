@@ -1,0 +1,17 @@
+[package]
+name = "xime-p2p-jni"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+description = "xime-p2p 的 Android JNI 绑定（仅供 Xime 安卓输入法使用）"
+
+# 只在 scripts/build-p2p-android.sh 生成的裁剪工作区里编译：
+# 脚本会把本目录拷到 crates/xime-p2p-jni，旁边的路径依赖才成立。
+[lib]
+name = "xime_p2p_jni"
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = { version = "0.21", default-features = false }
+xime-p2p-c = { path = "../xime-p2p-c" }

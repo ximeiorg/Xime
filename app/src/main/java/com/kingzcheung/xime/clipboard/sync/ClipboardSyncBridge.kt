@@ -11,9 +11,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * 剪贴板同步引擎（仿 ximed SyncEngine）。
@@ -58,6 +62,9 @@ class ClipboardSyncBridge(
         private const val TAG = "ClipboardSync"
         private const val PUSH_RETRY_BACKOFF_MS = 5_000L
 
+        /** 待重发的条目最多留这么久：剪贴板是单值资源，太旧的补发没有意义且可能覆盖新内容。 */
+        private const val PENDING_TTL_MS = 10 * 60 * 1000L
+
         /** 拉取间隔配置在插件 configStore 中的 key（插件 settings.schema 需声明同名 NUMBER 字段）。 */
         const val CONFIG_KEY_PULL_INTERVAL_SECONDS = "pull_interval_seconds"
 
@@ -97,6 +104,20 @@ class ClipboardSyncBridge(
     @Volatile
     private var retryUntil = 0L
 
+    /**
+     * 推送失败且还没补发成功的条目。
+     *
+     * 只有剪贴板变化才会触发推送，失败一次就丢会让「断网期间复制的内容」永远发不出去；
+     * 这里留最新一条，由 [start] 里的补发循环按退避重试。
+     */
+    @Volatile
+    private var pending: PendingPush? = null
+
+    private data class PendingPush(val text: String, val hash: String, val at: Long)
+
+    /** 推送互斥：剪贴板变化流与补发循环都会调 [pushLocal]，避免同一条重复发。 */
+    private val pushMutex = Mutex()
+
     /** 上次真正发起拉取的时间（pullOnce 节流基准）。 */
     @Volatile
     private var lastPullAt = 0L
@@ -135,6 +156,37 @@ class ClipboardSyncBridge(
             lastPullAt = System.currentTimeMillis()
             pullRemote()
         }
+
+        // 3. 补发循环：推送失败（离线/服务器不可达）时留住最新一条，退避后重试。
+        //    否则「复制了但没发出去」只能等下一次剪贴板变化才可能补上。
+        scope.launch {
+            while (isActive) {
+                delay(PUSH_RETRY_BACKOFF_MS)
+                val item = pending ?: continue
+                if (!running) continue
+                if (System.currentTimeMillis() - item.at > PENDING_TTL_MS) {
+                    pending = null
+                    continue
+                }
+                pushLocal(item.text, item.hash)
+            }
+        }
+    }
+
+    /**
+     * 切换通道后调用：把当前剪贴板补推一次。
+     *
+     * 新通道还没见过这条内容，而推送只由「剪贴板变化」触发——不补推的话，
+     * 切换瞬间正在同步的那一条会停在旧通道上。
+     */
+    fun pushCurrent() {
+        if (!running) return
+        scope.launch {
+            val text = clipboardManager.getCurrentClipboardText() ?: return@launch
+            if (text.isBlank()) return@launch
+            val hash = ClipboardProfile.sha256Hex(text.toByteArray(Charsets.UTF_8))
+            pushLocal(text, hash)
+        }
     }
 
     fun stop() {
@@ -165,15 +217,15 @@ class ClipboardSyncBridge(
         }
     }
 
-    private suspend fun pushLocal(text: String, hash: String) {
-        if (!running) return
+    private suspend fun pushLocal(text: String, hash: String) = pushMutex.withLock {
+        if (!running) return@withLock
         if (hash == lastHash) {
             Log.d(TAG, "No change, skip push")
-            return
+            return@withLock
         }
         if (System.currentTimeMillis() < retryUntil) {
             Log.d(TAG, "Push backoff active, skip")
-            return
+            return@withLock
         }
         val profile = ClipboardProfile.fromText(text)
         val ok = try {
@@ -185,8 +237,10 @@ class ClipboardSyncBridge(
         if (ok) {
             lastHash = hash
             retryUntil = 0L
+            pending = null
         } else {
             retryUntil = System.currentTimeMillis() + PUSH_RETRY_BACKOFF_MS
+            pending = PendingPush(text, hash, System.currentTimeMillis())
         }
     }
 

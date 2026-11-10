@@ -1083,4 +1083,65 @@
     <string name="s_fuzzy_conflict_en_eng_ong">en = eng 与 eng = ong 同时开启时，en/eng/ong 会互通。</string>
     <string name="s_fuzzy_conflict_un_on_ong">un = ong 与 on = ong 同时开启时，un/on/ong 会互通。</string>
     <string name="s_fuzzy_conflict_uan_huang">uan = uang 与 huang = wang 同时开启时，wan/wang/huang 会互通。</string>
+
+    <!-- 设备互联（局域网直连） -->
+    <string name="s_shebeihulian">设备互联</string>
+    <string name="s_shebeihulian_shuoming">局域网直连，不经过服务器；两台设备需在同一 WiFi。</string>
+    <string name="s_benjibiaoshi">本机标识</string>
+    <string name="s_peidui">配对</string>
+    <string name="s_xianshipeiduima">显示配对码</string>
+    <string name="s_shurupeiduima">输入配对码</string>
+    <string name="s_peiduima">配对码</string>
+    <string name="s_peiduimatishi">输入对端显示的 6 位配对码</string>
+    <string name="s_dengdaiduifangshuru">等待对端输入配对码…</string>
+    <string name="s_peiduichenggong">配对成功：%1$s</string>
+    <string name="s_peiduishibai">配对失败：%1$s</string>
+    <string name="s_chongxinshengcheng">重新生成</string>
+    <string name="s_yipeiduishebei">已配对设备</string>
+    <string name="s_zanwuyipeiduishebei">还没有已配对设备。先与另一台设备完成配对。</string>
+    <string name="s_yuanshengkuweijiazai">P2P 原生库未加载，当前安装包不包含设备互联能力。</string>
+    <string name="s_qiyongshebeihulian">启用设备互联</string>
+    <string name="s_qiyongshebeihulian_shuoming">在同一 Wi-Fi 下与其他设备直连互传剪贴板，内容端到端加密；已装同步插件时离开局域网会自动改走插件</string>
+    <string name="s_benji">本机</string>
+    <string name="s_shebeimingcheng">设备名称</string>
+    <string name="s_shebeimingcheng_shuoming">配对时在对方设备上显示的名字</string>
+    <string name="s_shebeibiaoqi">设备标识</string>
+    <string name="s_peiduishoubei">配对设备</string>
+    <string name="s_peidui_shuoming">关于配对</string>
+    <string name="s_peidui_shuoming_neirong">配对只建立设备之间的信任关系（认证），不决定同步什么。哪些功能用这条通道，在「剪贴板同步」等对应功能页里勾选。</string>
+    <string name="s_zaijisuanjianshang_xianshi_peiduima">在另一台设备上打开配对界面，选择「输入配对码」，填入上面的数字（60 秒内有效）</string>
+    <string name="s_kaishipeidui">开始配对</string>
+    <string name="s_shurujisuanjianshang_dema">输入配对码</string>
+    <string name="s_zhengzaicha_shebei">正在查找设备…请在对方设备上保持配对界面打开</string>
+    <string name="s_zaijisuanjianshang_daima">生成配对码</string>
+    <string name="s_shebeihulian_yiguanbi">设备互联已关闭：先开启上方开关，再来配对。</string>
+    <string name="s_jiuzhongzhong">（就绪中）</string>
+    <string name="s_yipeiduishebei_shuliang">已配对设备（%1$d）</string>
+    <string name="s_jiechu">解除</string>
+    <string name="s_shuoming_1">• 需要在系统设置中启用本输入法，设备互联依赖输入法服务常驻运行。</string>
+    <string name="s_shuoming_2">• 同步在键盘使用时进行：打开键盘后会自动连上已配对的设备，并取回对方最新的剪贴板内容。</string>
+    <string name="s_shuoming_3">• 剪贴板内容只在两台设备之间加密传输，不经过任何第三方服务器，也不保存历史。</string>
+    <string name="s_shuoming_4">• 只同步纯文本；内容在设备之间端到端加密，默认走局域网直连，不经过服务器。</string>
+    <string name="s_shuoming_5">• 若已安装剪贴板同步插件：离开同一网络或对端离线时自动改走插件，回到局域网后自动切回直连。</string>
+    <string name="s_jintongbuwenzi">仅同步文本</string>
+    <string name="s_lianjie">连接</string>
+    <string name="s_miaohouzidongshixiao">%1$d 秒后失效</string>
+    <string name="s_shanchuipeidui">删除该设备</string>
+
+    <!-- 剪贴板同步传输方式 -->
+    <string name="s_chuanshufangshi">同步通道</string>
+    <string name="s_youxian">优先</string>
+    <string name="s_qingzhishao_gouxuan_yigetongdao">至少勾选一个通道才能同步</string>
+    <string name="s_zidong_tuijian">自动（推荐）</string>
+    <string name="s_zidong_shuoming">优先局域网直连，连不上时自动改走同步插件</string>
+    <string name="s_tongbuchajian">同步插件</string>
+    <string name="s_tongbuchajian_shuoming">通过 WebDAV、ximed 等插件同步</string>
+    <string name="s_juyuwangzhilian">局域网直连</string>
+    <string name="s_juyuwangzhilian_shuoming">不经过服务器，直接连接已配对设备</string>
+
+    <string name="s_weipeidui">未配对设备</string>
+    <string name="s_yipeidui_tai">已配对 %1$d 台</string>
+
+    <string name="s_weiqidong">未启动</string>
+    <string name="s_weilianjiedaoshebei">未连接到设备</string>
 </resources>

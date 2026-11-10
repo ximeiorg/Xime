@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.ui.settings
 
 import com.kingzcheung.xime.R
+import com.kingzcheung.xime.clipboard.sync.ChannelPolicy
 
 import com.kingzcheung.xime.i18n.tr
 
@@ -37,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,6 +51,7 @@ import com.kingzcheung.xime.clipboard.ClipboardManager
 import com.kingzcheung.xime.clipboard.ImageUsage
 import com.kingzcheung.xime.plugin.ActivePluginSelection
 import com.kingzcheung.xime.plugin.ExtensionManager
+import com.kingzcheung.xime.p2p.P2pBridge
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -92,6 +95,16 @@ fun ClipboardSettingsContent(
     }
     var usage by remember { mutableStateOf<ImageUsage?>(null) }
     var syncOn by remember { mutableStateOf(syncEnabled) }
+    val syncChannels = remember { SettingsPreferences.getClipboardSyncChannels(context) }
+    var p2pPairedCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(syncChannels) {
+        if (syncChannels.contains(ChannelPolicy.CHANNEL_P2P)) {
+            p2pPairedCount = withContext(Dispatchers.IO) {
+                P2pBridge.peers(P2pBridge.dir(context)).size
+            }
+        }
+    }
 
     // 占用统计读的是数据库 + 图片目录，放到 IO 线程
     LaunchedEffect(Unit) {
@@ -257,6 +270,12 @@ fun ClipboardSettingsContent(
                     val activePlugin = activeSyncPlugin
                     val subtitle = when {
                         !syncOn -> tr(R.string.s_tongguochajianyuyuanduanshebei_430fe)
+                        syncChannels.contains(ChannelPolicy.CHANNEL_P2P) ->
+                            tr(R.string.s_juyuwangzhilian) + " · " + if (p2pPairedCount > 0) {
+                                tr(R.string.s_yipeidui_tai, p2pPairedCount)
+                            } else {
+                                tr(R.string.s_weipeidui)
+                            }
                         activePlugin == null -> tr(R.string.s_yiqiyong_weixuanzetongbufuwu_d_e4fe4)
                         else -> {
                             // 能力按实际生效插件说明，避免出现"文案说仅文字、其实能同步图片"

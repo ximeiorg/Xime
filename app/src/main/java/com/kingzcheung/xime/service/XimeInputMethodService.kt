@@ -90,7 +90,11 @@ import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
 import com.kingzcheung.xime.association.AssociationService
 import com.kingzcheung.xime.clipboard.ClipboardManager
+import com.kingzcheung.xime.clipboard.sync.ChannelPolicy
 import com.kingzcheung.xime.clipboard.sync.ClipboardSyncBridge
+import com.kingzcheung.xime.clipboard.sync.P2pClipboardPlugin
+import com.kingzcheung.xime.clipboard.sync.SyncHealth
+import com.kingzcheung.xime.p2p.P2pSyncController
 import com.kingzcheung.xime.plugin.ActivePluginSelection
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.core.api.ToolPlugin
@@ -140,6 +144,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -239,6 +244,17 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal lateinit var clipboardManager: ClipboardManager
 
     internal var clipboardSyncBridge: ClipboardSyncBridge? = null
+    /** 局域网直连的 2 秒拉取循环（插件通道不跑这个循环）。 */
+    private var p2pPullJob: Job? = null
+
+    // ── 同步通道（剪贴板同步启用哪些通道，首个优先）──
+    /** 决策 tick：每 2 秒采一次健康度并按通道列表决定是否切换。 */
+    private var channelJob: Job? = null
+    /** 当前活跃通道 id；`null` 表示还没建起来。 */
+    private var activeChannel: String? = null
+    /** 上次切换时间（最短驻留判定）。 */
+    private var channelSwitchedAt = 0L
+    private val channelHealth = SyncHealth()
     
     internal lateinit var keyboardContainer: VoiceKeyboardContainer
     
@@ -616,6 +632,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                     stopClipboardSync()
                     updateClipboardSync()
                 }
+                SettingsPreferences.KEY_CLIPBOARD_SYNC_CHANNELS,
+                SettingsPreferences.KEY_CLIPBOARD_SYNC_PEERS_REVISION -> {
+                    stopClipboardSync()
+                    updateClipboardSync()
+                }
                 SettingsPreferences.KEY_HARDWARE_KEYBOARD_DETECTION_ENABLED -> {
                     hasHardwareKeyboard = SettingsPreferences.isHardwareKeyboardDetectionEnabled(this@XimeInputMethodService) &&
                         resources.configuration.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS
@@ -943,89 +964,174 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     private fun startClipboardSyncIfEnabled() {
-        if (clipboardSyncBridge != null) return
+        if (channelJob != null) return
         try {
             if (!SettingsPreferences.isClipboardSyncEnabled(this)) {
                 Log.d(TAG, "Clipboard sync disabled in settings")
                 return
             }
-            val enabled = ExtensionManager.getEnabledClipboardSyncPlugins(this)
-            if (enabled.isEmpty()) return
-            val preferredId = SettingsPreferences.getClipboardSyncPluginId(this)
-            // 与插件管理页共用同一判定规则（ActivePluginSelection），避免"引擎在跑、页面显示未使用"
-            val resolvedId = ActivePluginSelection.resolve(preferredId, enabled.map { it.first })
-            val selected = enabled.firstOrNull { it.first == resolvedId } ?: enabled.first()
-            // 偏好为空或指向未启用插件时回填实际选中项：让状态收敛，而不是长期并存两种"真相"
-            if (resolvedId != preferredId) {
-                SettingsPreferences.setClipboardSyncPluginId(this, selected.first)
-                Log.d(TAG, "Clipboard sync plugin id resolved: '$preferredId' -> '${selected.first}'")
-            }
-            // 能力声明校验：未声明同步协议的插件不启动（manifest.capabilities.clipboard_sync.protocols）
-            val clipboardSyncCapabilities = ExtensionManager.getAllInstalledPlugins()
-                .firstOrNull { it.id == selected.first }
-                ?.capabilities?.clipboardSync
-            if (clipboardSyncCapabilities?.protocols.isNullOrEmpty()) {
-                FileLogger.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
+            val channels = SettingsPreferences.getClipboardSyncChannels(this)
+            if (channels.isEmpty()) {
+                Log.d(TAG, "未选择同步通道")
                 return
             }
-            val plugin = selected.second
-            // 拉取间隔由所选插件的配置提供（插件 settings.schema 声明 pull_interval_seconds），
-            // 每次拉取节流时动态读取，插件设置修改后即时生效
-            val syncConfigStore = PluginManager.configStoreFactory
-                .create(applicationContext as android.app.Application, selected.first)
-            clipboardSyncBridge = ClipboardSyncBridge(
-                clipboardManager,
-                plugin,
-                pluginId = selected.first,
-                // 未声明 attachments 的插件自动降级为仅文本同步（图片不推送、远端图片不落盘）
-                supportsAttachments = clipboardSyncCapabilities.attachments,
-                pullIntervalSeconds = {
-                    syncConfigStore.get(ClipboardSyncBridge.CONFIG_KEY_PULL_INTERVAL_SECONDS)
+            // 有 p2p 通道才需要起节点：插件通道自带 HTTP，与配对无关
+            if (channels.contains(ChannelPolicy.CHANNEL_P2P)) {
+                P2pSyncController.start(this)
+            }
+            channelHealth.started(System.currentTimeMillis())
+            activeChannel = null
+            channelSwitchedAt = 0L
+            channelJob = serviceScope.launch {
+                while (isActive) {
+                    delay(2_000)
+                    tickChannels()
                 }
-            )
-            clipboardSyncBridge?.start()
-            uiState.value = uiState.value.copy(clipboardSyncEnabled = true)
-            Log.d(TAG, "Clipboard sync started: ${selected.first}")
+            }
+            // 首通道不必等第一个 tick：启动即决策，否则前 2 秒是空窗
+            tickChannels()
+            Log.d(TAG, "Clipboard sync started: channels=$channels")
         } catch (e: Exception) {
             FileLogger.e(TAG, "Failed to start clipboard sync", e)
         }
     }
 
-    private fun stopClipboardSync() {
+    /**
+     * 按插件 id 建 bridge；不传 id 时用当前偏好的插件。
+     *
+     * 通道与功能解耦后，插件只是「通道」的一种实现：同一份构造逻辑既要给
+     * 「用户只选了一个插件」用，也要给「多通道切换」用。
+     */
+    private fun createPluginClipboardBridge(pluginId: String? = null): ClipboardSyncBridge? {
+        val enabled = ExtensionManager.getEnabledClipboardSyncPlugins(this)
+        if (enabled.isEmpty()) return null
+        val preferredId = pluginId ?: SettingsPreferences.getClipboardSyncPluginId(this)
+        // 与插件管理页共用同一判定规则（ActivePluginSelection），避免"引擎在跑、页面显示未使用"
+        val resolvedId = ActivePluginSelection.resolve(preferredId, enabled.map { it.first })
+        val selected = enabled.firstOrNull { it.first == resolvedId } ?: enabled.first()
+        if (pluginId == null && resolvedId != preferredId) {
+            SettingsPreferences.setClipboardSyncPluginId(this, selected.first)
+            Log.d(TAG, "Clipboard sync plugin id resolved: '$preferredId' -> '${selected.first}'")
+        }
+        // 能力声明校验：未声明同步协议的插件不启动（manifest.capabilities.clipboard_sync.protocols）
+        val clipboardSyncCapabilities = ExtensionManager.getAllInstalledPlugins()
+            .firstOrNull { it.id == selected.first }
+            ?.capabilities?.clipboardSync
+        if (clipboardSyncCapabilities?.protocols.isNullOrEmpty()) {
+            FileLogger.w(TAG, "Clipboard sync plugin ${selected.first} 未声明同步协议，拒绝启动")
+            return null
+        }
+        val syncConfigStore = PluginManager.configStoreFactory
+            .create(applicationContext as android.app.Application, selected.first)
+        return ClipboardSyncBridge(
+            clipboardManager,
+            selected.second,
+            pluginId = selected.first,
+            // 未声明 attachments 的插件自动降级为仅文本同步（图片不推送、远端图片不落盘）
+            supportsAttachments = clipboardSyncCapabilities.attachments,
+            pullIntervalSeconds = {
+                syncConfigStore.get(ClipboardSyncBridge.CONFIG_KEY_PULL_INTERVAL_SECONDS)
+            }
+        )
+    }
+
+    /** 每 2 秒采一次健康度，按通道列表决定是否换通道。 */
+    private fun tickChannels() {
+        val now = System.currentTimeMillis()
+        val channels = SettingsPreferences.getClipboardSyncChannels(this)
+        if (channels.isEmpty()) {
+            stopClipboardSync()
+            return
+        }
+        // 非 p2p 活跃时 P2P 事件没人消费：主动排空只为刷新连接状态，内容丢弃
+        if (activeChannel != ChannelPolicy.CHANNEL_P2P) {
+            P2pSyncController.pollRemote()
+        }
+        channelHealth.note(P2pSyncController.isConnected, now)
+        val dwellOk = channelSwitchedAt == 0L ||
+            now - channelSwitchedAt >= ChannelPolicy.MIN_DWELL_MS
+        val want = ChannelPolicy.decide(channels, activeChannel, channelHealth, dwellOk, now)
+        if (want == null || want == activeChannel) return
+        val from = activeChannel ?: "无"
+        if (switchChannel(want)) {
+            channelSwitchedAt = now
+            Log.d(TAG, "同步通道 $from → $want")
+        } else {
+            Log.d(TAG, "同步通道 $from → $want 建立失败，下一轮重试")
+        }
+    }
+
+    /** 切换通道：释放旧 bridge（杜绝双推）→ 建新的 → 补拉一次并把当前剪贴板补推出去。 */
+    private fun switchChannel(channel: String): Boolean {
+        p2pPullJob?.cancel()
+        p2pPullJob = null
         clipboardSyncBridge?.release()
         clipboardSyncBridge = null
+
+        val bridge = if (channel == ChannelPolicy.CHANNEL_P2P) {
+            ClipboardSyncBridge(
+                clipboardManager,
+                P2pClipboardPlugin(),
+                pluginId = P2pSyncController.PLUGIN_ID,
+                supportsAttachments = false,
+                // 直连没有插件配置：2 秒轮询一次事件队列
+                pullIntervalSeconds = { "2" }
+            )
+        } else {
+            createPluginClipboardBridge(channel)
+        } ?: return false
+
+        bridge.start()
+        clipboardSyncBridge = bridge
+        activeChannel = channel
+        if (channel == ChannelPolicy.CHANNEL_P2P) startP2pPullLoop()
+        // 新通道还没见过当前内容：不补推的话，切换瞬间正在同步的那一条会漏在旧通道上
+        bridge.pushCurrent()
+        uiState.value = uiState.value.copy(clipboardSyncEnabled = true)
+        return true
+    }
+
+    private fun stopClipboardSync() {
+        channelJob?.cancel()
+        channelJob = null
+        activeChannel = null
+        channelSwitchedAt = 0L
+        p2pPullJob?.cancel()
+        p2pPullJob = null
+        clipboardSyncBridge?.release()
+        clipboardSyncBridge = null
+        P2pSyncController.stop()
         uiState.value = uiState.value.copy(clipboardSyncEnabled = false)
+    }
+
+    private fun startP2pPullLoop() {
+        p2pPullJob?.cancel()
+        p2pPullJob = serviceScope.launch {
+            while (isActive) {
+                delay(2_000)
+                val bridge = clipboardSyncBridge ?: break
+                if (bridge.pluginId != P2pSyncController.PLUGIN_ID) break
+                bridge.pullOnce()
+            }
+        }
     }
 
     /** 剪贴板同步设置或插件状态变化时调用，按条件动态启停。 */
     private fun updateClipboardSync() {
         if (!::clipboardManager.isInitialized) return
-        if (clipboardSyncBridge == null) {
-            startClipboardSyncIfEnabled()
-            return
-        }
-        if (
-            !SettingsPreferences.isClipboardSyncEnabled(this) ||
-            ExtensionManager.getEnabledClipboardSyncPlugins(this).isEmpty()
-        ) {
+        val enabled = SettingsPreferences.isClipboardSyncEnabled(this)
+        val channels = SettingsPreferences.getClipboardSyncChannels(this)
+        if (!enabled || channels.isEmpty()) {
             stopClipboardSync()
             return
         }
-        // 当前 bridge 使用的插件与偏好选中的插件不一致时，重启切换到偏好插件
-        val enabled = ExtensionManager.getEnabledClipboardSyncPlugins(this)
-        val preferredId = SettingsPreferences.getClipboardSyncPluginId(this)
-        // 与 startClipboardSyncIfEnabled 同一解析规则（含"首个已启用项"回退）
-        val resolvedId = ActivePluginSelection.resolve(preferredId, enabled.map { it.first })
-        val shouldUse = enabled.firstOrNull { it.first == resolvedId } ?: return
-        if (resolvedId != preferredId) SettingsPreferences.setClipboardSyncPluginId(this, resolvedId)
-        // 能力声明也会随插件热更新变化（典型：插件从"仅文本"升级到声明 attachments）：
-        // 能力变了必须重建 bridge，否则会一直沿用旧能力（表现成"图片永远不同步"）
-        val attachments = ExtensionManager.getAllInstalledPlugins()
-            .firstOrNull { it.id == shouldUse.first }
-            ?.capabilities?.clipboardSync?.attachments == true
-        if (shouldUse.first != clipboardSyncBridge?.pluginId ||
-            attachments != clipboardSyncBridge?.supportsAttachments
-        ) {
+        // 通道集合变了（勾选/取消、插件装卸）→ 整体重建，避免留下半套状态
+        val needRestart = channelJob == null ||
+            activeChannel == null ||
+            !channels.contains(activeChannel) ||
+            (activeChannel != ChannelPolicy.CHANNEL_P2P &&
+                ExtensionManager.getEnabledClipboardSyncPlugins(this).none { it.first == activeChannel })
+        if (needRestart) {
             stopClipboardSync()
             startClipboardSyncIfEnabled()
         }

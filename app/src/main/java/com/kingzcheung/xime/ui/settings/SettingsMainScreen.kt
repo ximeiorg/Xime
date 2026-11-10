@@ -30,6 +30,7 @@ import androidx.compose.material.icons.twotone.Ballot
 import androidx.compose.material.icons.twotone.Build
 import androidx.compose.material.icons.twotone.ContentPaste
 import androidx.compose.material.icons.twotone.Description
+import androidx.compose.material.icons.twotone.Devices
 import androidx.compose.material.icons.twotone.Extension
 import androidx.compose.material.icons.twotone.GraphicEq
 import androidx.compose.material.icons.twotone.Info
@@ -91,6 +92,7 @@ fun SettingsMainContent(
     onNavigateToSpeechToText: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToClipboard: () -> Unit = {},
+    onNavigateToDeviceLink: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -377,13 +379,27 @@ fun SettingsMainContent(
             }
 
             item {
-                // 分组含两类"本地数据/数据流向"设置：剪贴板（内容与同步）优先，其后是词典与配置的同步备份
+                // 分组含"本地数据/数据流向"设置：剪贴板（内容与同步）、设备互联（配对）、
+                // 词典与配置的同步备份。设备互联虽然也服务于剪贴板同步，但配对是独立任务，
+                // 需要从主设置页一键直达；埋在 剪贴板 → 剪贴板同步 第三层时几乎找不到入口。
                 SettingsSection(title = tr(R.string.s_shujuyutongbu), content = {
                     SettingsItem(
                         icon = Icons.TwoTone.ContentPaste,
                         title = tr(R.string.s_jiantieban),
                         subtitle = tr(R.string.s_tupianjilu_tijixianzhi_zhanyon_fa4c6),
                         onClick = onNavigateToClipboard,
+                        showArrow = true
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    SettingsItem(
+                        icon = Icons.TwoTone.Devices,
+                        title = tr(R.string.s_shebeihulian),
+                        subtitle = tr(R.string.s_shebeihulian_shuoming),
+                        onClick = onNavigateToDeviceLink,
                         showArrow = true
                     )
                     HorizontalDivider(

@@ -51,6 +51,7 @@ fun SettingsScreen(
                 onNavigateToSpeechToText = { navController.navigate(SettingsRoutes.SpeechToText) },
                 onNavigateToAbout = { navController.navigate(SettingsRoutes.About) },
                 onNavigateToClipboard = { navController.navigate(SettingsRoutes.Clipboard) },
+                onNavigateToDeviceLink = { navController.navigate(SettingsRoutes.DeviceLink) },
                 onNavigateToBackup = { navController.navigate(SettingsRoutes.Backup) }
             )
         }
@@ -246,7 +247,13 @@ fun SettingsScreen(
         composable(SettingsRoutes.ClipboardSync) {
             ClipboardSyncSettingsContent(
                 onBack = { navController.popBackStack() },
-                onNavigateToMarket = { navController.navigate(SettingsRoutes.MarketPlugins) }
+                onNavigateToMarket = { navController.navigate(SettingsRoutes.MarketPlugins) },
+                onNavigateToDeviceLink = { navController.navigate(SettingsRoutes.DeviceLink) }
+            )
+        }
+        composable(SettingsRoutes.DeviceLink) {
+            DeviceLinkSettingsContent(
+                onBack = { navController.popBackStack() }
             )
         }
         composable(SettingsRoutes.Backup) {

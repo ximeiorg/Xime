@@ -1,6 +1,11 @@
 package com.kingzcheung.xime.ui.settings
 
 import com.kingzcheung.xime.R
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.mutableIntStateOf
+import kotlinx.coroutines.withContext
+import com.kingzcheung.xime.p2p.P2pBridge
+import com.kingzcheung.xime.clipboard.sync.ChannelPolicy
 
 import com.kingzcheung.xime.i18n.tr
 
@@ -17,18 +22,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.twotone.Devices
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,7 +69,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ClipboardSyncSettingsContent(
     onBack: () -> Unit,
-    onNavigateToMarket: () -> Unit
+    onNavigateToMarket: () -> Unit,
+    onNavigateToDeviceLink: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -84,6 +95,20 @@ fun ClipboardSyncSettingsContent(
     val clipboardPlugins = remember { installedPlugins.filter { it.category == PluginCategory.CLIPBOARD_SYNC } }
     // 切换服务走单选对话框（插件多时页面长度恒定，不随插件数量变长）
     var showServicePicker by remember { mutableStateOf(false) }
+    var channels by remember {
+        mutableStateOf(SettingsPreferences.getClipboardSyncChannels(context))
+    }
+    var pairedCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        pairedCount = withContext(Dispatchers.IO) {
+            runCatching { P2pBridge.peers(P2pBridge.dir(context)).size }.getOrDefault(0)
+        }
+    }
+
+    fun toggleChannel(id: String, checked: Boolean) {
+        channels = if (checked) channels + id else channels - id
+        SettingsPreferences.setClipboardSyncChannels(context, channels)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -122,53 +147,124 @@ fun ClipboardSyncSettingsContent(
                 )
             }
 
-            SettingsSection(
-                title = tr(R.string.s_tongbufuwu),
-                content = {
-                    if (clipboardPlugins.isEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = tr(R.string.s_weianzhuangjiantiebantongbucha_9bf61),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Button(
-                                onClick = onNavigateToMarket,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(tr(R.string.s_qianwangkuozhanshangdian))
-                            }
-                        }
+            SettingsSection(title = tr(R.string.s_chuanshufangshi)) {
+                ChannelRow(
+                    title = tr(R.string.s_juyuwangzhilian),
+                    subtitle = if (pairedCount > 0) {
+                        tr(R.string.s_yipeidui_tai, pairedCount) + " · " + tr(R.string.s_youxian)
                     } else {
-                        // 入口始终可见：只装 1 个插件时也能点开确认候选/协议与配置，
-                        // 藏起来会让"当前生效的是谁、能不能换"在页面上无处可查
-                        CurrentServiceItem(
-                            pluginInfo = installedPlugins.find { it.id == activePlugin?.first },
-                            pluginId = activePlugin?.first,
-                            plugin = activePlugin?.second,
-                            onClick = { showServicePicker = true }
+                        tr(R.string.s_weipeidui)
+                    },
+                    checked = channels.contains(ChannelPolicy.CHANNEL_P2P),
+                    onCheckedChange = { toggleChannel(ChannelPolicy.CHANNEL_P2P, it) }
+                )
+                syncPlugins.forEach { (id, _) ->
+                    val name = installedPlugins.find { it.id == id }?.name ?: id
+                    HorizontalDivider(
+                        modifier = Modifier.padding(start = 56.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    ChannelRow(
+                        title = name,
+                        subtitle = tr(R.string.s_tongbuchajian_shuoming),
+                        checked = channels.contains(id),
+                        onCheckedChange = { toggleChannel(id, it) }
+                    )
+                }
+                if (channels.isEmpty()) {
+                    Text(
+                        text = tr(R.string.s_qingzhishao_gouxuan_yigetongdao),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            }
+
+            SettingsSection(title = tr(R.string.s_shebeihulian)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onNavigateToDeviceLink)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.TwoTone.Devices,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = tr(R.string.s_shebeihulian),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = tr(R.string.s_shebeihulian_shuoming),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            )
+            }
 
-            activePlugin?.let { selected ->
-                val pluginId = selected.first
-                val pluginName = installedPlugins.find { it.id == pluginId }?.name ?: pluginId
-                PluginConfigFormScreen(
-                    pluginId = pluginId,
-                    plugin = selected.second,
-                    pluginName = pluginName,
-                    onBack = {},
-                    embedded = true,
-                    // 配置卡标题带上插件名：明确"在配谁"
-                    fallbackSectionTitle = tr(R.string.s_peizhi_2, pluginName)
+            if (channels.any { it != ChannelPolicy.CHANNEL_P2P }) {
+                SettingsSection(
+                    title = tr(R.string.s_tongbufuwu),
+                    content = {
+                        if (clipboardPlugins.isEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = tr(R.string.s_weianzhuangjiantiebantongbucha_9bf61),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Button(
+                                    onClick = onNavigateToMarket,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(tr(R.string.s_qianwangkuozhanshangdian))
+                                }
+                            }
+                        } else {
+                            // 入口始终可见：只装 1 个插件时也能点开确认候选/协议与配置，
+                            // 藏起来会让"当前生效的是谁、能不能换"在页面上无处可查
+                            CurrentServiceItem(
+                                pluginInfo = installedPlugins.find { it.id == activePlugin?.first },
+                                pluginId = activePlugin?.first,
+                                plugin = activePlugin?.second,
+                                onClick = { showServicePicker = true }
+                            )
+                        }
+                    }
                 )
+
+                activePlugin?.let { selected ->
+                    val pluginId = selected.first
+                    val pluginName = installedPlugins.find { it.id == pluginId }?.name ?: pluginId
+                    PluginConfigFormScreen(
+                        pluginId = pluginId,
+                        plugin = selected.second,
+                        pluginName = pluginName,
+                        onBack = {},
+                        embedded = true,
+                        // 配置卡标题带上插件名：明确"在配谁"
+                        fallbackSectionTitle = tr(R.string.s_peizhi_2, pluginName)
+                    )
+                }
             }
         }
     }
@@ -218,6 +314,37 @@ fun ClipboardSyncSettingsContent(
             },
             onDismiss = { showServicePicker = false }
         )
+    }
+}
+
+@Composable
+private fun ChannelRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

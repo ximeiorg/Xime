@@ -115,6 +115,11 @@ jobs:
           path: app/build/test-results/testDebugUnitTest/
           retention-days: 7
           
+      - name: Build P2P native libs
+        # .gitignore 忽略 jniLibs，正式包必须由源码现场编译；
+        # 否则 P2pNative.loaded=false，设备互联整页是空的。
+        run: bash scripts/build-p2p-android.sh
+
       - name: Build Debug APKs
         run: ./gradlew assembleDebug --no-daemon
 

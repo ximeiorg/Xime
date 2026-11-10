@@ -1082,4 +1082,65 @@
     <string name="s_fuzzy_conflict_en_eng_ong">en = eng 與 eng = ong 同時開啟時，en/eng/ong 會互通。</string>
     <string name="s_fuzzy_conflict_un_on_ong">un = ong 與 on = ong 同時開啟時，un/on/ong 會互通。</string>
     <string name="s_fuzzy_conflict_uan_huang">uan = uang 與 huang = wang 同時開啟時，wan/wang/huang 會互通。</string>
+
+    <!-- 裝置互聯（區域網路直連） -->
+    <string name="s_shebeihulian">裝置互聯</string>
+    <string name="s_shebeihulian_shuoming">區域網路直連，不經過伺服器；兩台裝置需在同一個 Wi-Fi。</string>
+    <string name="s_benjibiaoshi">本機標識</string>
+    <string name="s_peidui">配對</string>
+    <string name="s_xianshipeiduima">顯示配對碼</string>
+    <string name="s_shurupeiduima">輸入配對碼</string>
+    <string name="s_peiduima">配對碼</string>
+    <string name="s_peiduimatishi">輸入對端顯示的 6 位配對碼</string>
+    <string name="s_dengdaiduifangshuru">等待對端輸入配對碼…</string>
+    <string name="s_peiduichenggong">配對成功：%1$s</string>
+    <string name="s_peiduishibai">配對失敗：%1$s</string>
+    <string name="s_chongxinshengcheng">重新產生</string>
+    <string name="s_yipeiduishebei">已配對裝置</string>
+    <string name="s_zanwuyipeiduishebei">還沒有已配對裝置。先與另一台裝置完成配對。</string>
+    <string name="s_yuanshengkuweijiazai">P2P 原生庫未載入，目前安裝檔不包含裝置互聯能力。</string>
+    <string name="s_qiyongshebeihulian">啟用裝置互聯</string>
+    <string name="s_qiyongshebeihulian_shuoming">在同一個 Wi-Fi 下與其他裝置直連互傳剪貼簿，內容端到端加密；已裝同步外掛時離開區域網路會自動改走外掛</string>
+    <string name="s_benji">本機</string>
+    <string name="s_shebeimingcheng">裝置名稱</string>
+    <string name="s_shebeimingcheng_shuoming">配對時在對方裝置上顯示的名字</string>
+    <string name="s_shebeibiaoqi">裝置標識</string>
+    <string name="s_peiduishoubei">配對裝置</string>
+    <string name="s_peidui_shuoming">關於配對</string>
+    <string name="s_peidui_shuoming_neirong">配對只建立裝置之間的信任關係（認證），不決定同步什麼。哪些功能用這條通道，在「剪貼簿同步」等對應功能頁裡勾選。</string>
+    <string name="s_zaijisuanjianshang_xianshi_peiduima">在另一台裝置上開啟配對介面，選擇「輸入配對碼」，填入上面的數字（60 秒內有效）</string>
+    <string name="s_kaishipeidui">開始配對</string>
+    <string name="s_shurujisuanjianshang_dema">輸入配對碼</string>
+    <string name="s_zhengzaicha_shebei">正在尋找裝置…請在對方裝置上保持配對介面開啟</string>
+    <string name="s_zaijisuanjianshang_daima">產生配對碼</string>
+    <string name="s_shebeihulian_yiguanbi">裝置互聯已關閉：先開啟上方開關，再來配對。</string>
+    <string name="s_jiuzhongzhong">（就緒中）</string>
+    <string name="s_yipeiduishebei_shuliang">已配對裝置（%1$d）</string>
+    <string name="s_jiechu">解除</string>
+    <string name="s_shuoming_1">• 需要在系統設定中啟用本輸入法，裝置互聯依賴輸入法服務常駐執行。</string>
+    <string name="s_shuoming_2">• 同步在鍵盤使用時進行：打開鍵盤後會自動連上已配對的裝置，並取回對方最新的剪貼簿內容。</string>
+    <string name="s_shuoming_3">• 剪貼簿內容只在兩台裝置之間加密傳輸，不經過任何第三方伺服器，也不儲存歷史。</string>
+    <string name="s_shuoming_4">• 只同步純文字；內容在裝置之間端到端加密，預設走區域網路直連，不經過伺服器。</string>
+    <string name="s_shuoming_5">• 若已安裝剪貼簿同步外掛：離開同一網路或對端離線時自動改走外掛，回到區域網路後自動切回直連。</string>
+    <string name="s_jintongbuwenzi">僅同步文字</string>
+    <string name="s_lianjie">連線</string>
+    <string name="s_miaohouzidongshixiao">%1$d 秒後失效</string>
+    <string name="s_shanchuipeidui">刪除該裝置</string>
+
+    <!-- 剪貼簿同步傳輸方式 -->
+    <string name="s_chuanshufangshi">同步通道</string>
+    <string name="s_youxian">優先</string>
+    <string name="s_qingzhishao_gouxuan_yigetongdao">至少勾選一個通道才能同步</string>
+    <string name="s_zidong_tuijian">自動（推薦）</string>
+    <string name="s_zidong_shuoming">優先局域網直連，連不上時自動改走同步外掛</string>
+    <string name="s_tongbuchajian">同步外掛</string>
+    <string name="s_tongbuchajian_shuoming">透過 WebDAV、ximed 等外掛同步</string>
+    <string name="s_juyuwangzhilian">區域網路直連</string>
+    <string name="s_juyuwangzhilian_shuoming">不經過伺服器，直接連線已配對裝置</string>
+
+    <string name="s_weipeidui">未配對裝置</string>
+    <string name="s_yipeidui_tai">已配對 %1$d 台</string>
+
+    <string name="s_weiqidong">未啟動</string>
+    <string name="s_weilianjiedaoshebei">未連線到裝置</string>
 </resources>
