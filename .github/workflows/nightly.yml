@@ -96,8 +96,13 @@ jobs:
 
       - name: Install build tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build
+          # ubuntu-latest 自带 cmake/ninja，仅在缺失时安装，避免 apt 镜像抖动拖垮整个 job
+          if ! command -v cmake >/dev/null || ! command -v ninja >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y cmake ninja-build
+          fi
+          cmake --version | head -1
+          ninja --version
 
       - name: Cache native deps
         uses: actions/cache@v6
