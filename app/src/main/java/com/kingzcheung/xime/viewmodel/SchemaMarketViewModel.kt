@@ -178,7 +178,7 @@ class SchemaMarketViewModel(application: Application) : AndroidViewModel(applica
                     context, item.scheme,
                     version = selectedVersion,
                     onDownloadProgress = { downloaded, total ->
-                        val progress = if (total > 0) (downloaded.toFloat() / total) else 0f
+                        val progress = if (total > 0) (downloaded.toFloat() / total).coerceIn(0f, 1f) else 0f
                         _uiState.update { it.copy(downloadProgress = progress) }
                     },
                 )
@@ -247,7 +247,7 @@ class SchemaMarketViewModel(application: Application) : AndroidViewModel(applica
                     context, item.scheme,
                     version = selectedVersion,
                     onDownloadProgress = { downloaded, total ->
-                        val progress = if (total > 0) (downloaded.toFloat() / total) else 0f
+                        val progress = if (total > 0) (downloaded.toFloat() / total).coerceIn(0f, 1f) else 0f
                         _uiState.update { it.copy(downloadProgress = progress) }
                     },
                 )
