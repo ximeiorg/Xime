@@ -109,6 +109,25 @@ internal class SelfWriteCaretGuard(
 }
 
 /**
+ * 组合区起点：由「刚写完时的光标（组合区末尾）− 编码长度」反推。
+ *
+ * 编码显示在输入框时，它是和上屏文字混在同一段文本里的，输入法侧再维护一份
+ * 编码内容/光标（影子状态）必然在上屏、撤销、宿主改选区后失真，用失真状态算起点
+ * 会让光标乱跳。因此起点一律用宿主刚回报的真实光标反推，且必须在批处理结束后读取
+ * （`beginBatchEdit` 期间读到的是旧选区）。
+ *
+ * @param regionEnd 刚写完编码后宿主回报的光标（组合区末尾）
+ * @param textLength 刚写入的编码长度（含音节分隔符）
+ * @return 组合区起点；读数缺失或不自洽（光标比编码还靠前）时返回 null，
+ *         调用方退化为不动光标
+ */
+internal fun composingStartFromRegionEnd(regionEnd: Int, textLength: Int): Int? {
+    if (regionEnd < 0 || textLength < 0) return null
+    val start = regionEnd - textLength
+    return if (start < 0) null else start
+}
+
+/**
  * 丢弃输入框内的未上屏编码后应恢复的光标位置；null = 不删除编码文本。
  *
  * 编码在输入框里以 composing 区域存在（宿主不会在光标移出时定稿），

@@ -264,3 +264,34 @@ class SelfWriteCaretGuardRecentWriteTest {
         assertTrue(guard.consumedBySelfWrite(3, 5, 1_700))
     }
 }
+
+/**
+ * 组合区起点推算：刚写完的光标（组合区末尾）− 编码长度。
+ *
+ * 编码与上屏文字混在同一段文本里，只能按宿主真实回报反推，不做影子状态。
+ */
+class ComposingStartFromRegionEndTest {
+
+    @Test
+    fun `编码接在上屏文字之后`() {
+        // 上屏 "abc" + 编码 "s s s"，写完光标在 8，编码长 5 → 起点 3
+        assertEquals(3, composingStartFromRegionEnd(8, 5))
+    }
+
+    @Test
+    fun `编码在文本开头`() {
+        assertEquals(0, composingStartFromRegionEnd(5, 5))
+    }
+
+    @Test
+    fun `空编码时起点就是光标`() {
+        assertEquals(7, composingStartFromRegionEnd(7, 0))
+    }
+
+    @Test
+    fun `宿主未回报光标或读数不自洽时返回空`() {
+        assertNull(composingStartFromRegionEnd(-1, 5))
+        // 光标比编码还靠前：说明宿主内容与本次写入已失同步，宁可不动光标
+        assertNull(composingStartFromRegionEnd(2, 5))
+    }
+}
