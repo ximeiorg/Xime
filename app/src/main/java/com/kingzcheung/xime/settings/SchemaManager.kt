@@ -996,6 +996,8 @@ object SchemaManager {
         schemeId: String,
         fileName: String,
         expectedSha256: String? = null,
+        /** 响应未带 Content-Length 时用于进度回调的总量（来自索引或预探测）。 */
+        expectedTotal: Long = 0L,
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ): DownloadResult = withContext(Dispatchers.IO) {
         val wakeLock = (context.getSystemService(Context.POWER_SERVICE) as PowerManager)
@@ -1013,7 +1015,8 @@ object SchemaManager {
                     return@withContext DownloadResult(false)
                 }
                 val body = response.body ?: return@withContext DownloadResult(false)
-                val totalBytes = body.contentLength()
+                // chunked 响应没有 Content-Length，用调用方给的总量兜底，否则全程无进度回调
+                val totalBytes = body.contentLength().takeIf { it > 0 } ?: expectedTotal
                 var downloadedBytes = 0L
                 val md = if (!expectedSha256.isNullOrBlank()) MessageDigest.getInstance("SHA-256") else null
                 body.byteStream().use { input ->

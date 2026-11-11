@@ -8,14 +8,23 @@ import android.content.Context
 import android.util.Log
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 
 /** 下载校验状态：null=未提供sha256, true=校验通过, false=校验不通过。 */
 typealias Sha256Status = Boolean?
@@ -82,10 +91,9 @@ object XimeIndexSource {
         get() = url.substringAfterLast('/').takeIf { it.isNotBlank() }
             ?: "file.${url.substringAfterLast('.').takeIf { it.length in 1..6 } ?: "bin"}"
 
-    /** 下载总量：索引精确字节数（sizeBytes）优先，缺省回退 size 字符串估算（KB/MB 文本）。 */
+    /** 下载总量：索引精确字节数（sizeBytes）优先，缺省回退 size 文本估算（KB/MB/GB）。 */
     private val DownloadItem.resolvedSizeBytes: Long
-        get() = sizeBytes ?: size?.removeSuffix(" MB")?.trim()?.toDoubleOrNull()
-            ?.let { (it * 1024.0 * 1024.0).toLong() } ?: 0L
+        get() = sizeBytes?.takeIf { it > 0 } ?: parseSizeText(size) ?: 0L
 
     private fun buildMirrors(userUrls: List<String>): List<String> = userUrls
 
@@ -543,6 +551,9 @@ object XimeIndexSource {
     /**
      * 下载一个方案到 market 目录（仅下载，不解压）。
      * 遍历所有 downloadUrl（如主包 + 语言模型等），逐一下载到 market/{schemeId}/。
+     *
+     * 进度总量优先用预探测到的真实 Content-Length（索引里的体积可能过期，像万象拼音的
+     * 语法模型索引值与实际差 3 倍，会让进度冲到 298%），探测失败再回退索引声明值。
      */
     suspend fun downloadScheme(
         context: Context,
@@ -560,19 +571,23 @@ object XimeIndexSource {
         }
 
         val items = v.downloadUrls.filter { it.url.isNotBlank() }
-        val totalBytesAll = items.sumOf { it.resolvedSizeBytes }
-        var accumulatedBytes = 0L
+        val declaredSizes = items.map { it.resolvedSizeBytes }
+        val probedSizes = coroutineScope {
+            items.map { dl -> async { probeContentLength(dl.url) } }.awaitAll()
+        }
+        val sizes = declaredSizes.indices.map { i ->
+            probedSizes[i].takeIf { it > 0 } ?: declaredSizes[i]
+        }
+        val progress = MarketDownloadProgress(sizes, onDownloadProgress)
         var anyVerified = false
 
-        for (dl in items) {
+        for ((index, dl) in items.withIndex()) {
+            progress.startFile(index)
             val result = SchemaManager.downloadToMarket(
                 context, dl.url, scheme.id, dl.fileName, dl.sha256?.takeIf { it.isNotBlank() },
-                onProgress = { read, _ ->
-                    val overall = accumulatedBytes + read
-                    if (totalBytesAll > 0) onDownloadProgress(overall, totalBytesAll)
-                },
+                expectedTotal = sizes[index],
+                onProgress = { read, reportedTotal -> progress.onBytes(read, reportedTotal) },
             )
-            accumulatedBytes += dl.resolvedSizeBytes
             if (!result.success) {
                 val schemeDir = SchemaManager.getMarketDir(context, scheme.id)
                 if (schemeDir.exists()) schemeDir.deleteRecursively()
@@ -581,12 +596,39 @@ object XimeIndexSource {
                 return@withContext InstallResult(
                     false, failureReason = reason, sha256Status = result.sha256Verified
                 )
-            } else if (result.sha256Verified == true) {
+            }
+            progress.finishFile()
+            if (result.sha256Verified == true) {
                 anyVerified = true
             }
         }
+        progress.complete()
         InstallResult(success = true, sha256Status = if (anyVerified) true else null)
     }
+
+    /** HEAD 探测真实体积；失败/无长度/超时返回 0（调用方回退索引声明值）。 */
+    private suspend fun probeContentLength(url: String): Long = withTimeoutOrNull(3_000L) {
+        val call = client.newCall(Request.Builder().url(url).head().build())
+        suspendCancellableCoroutine { cont ->
+            cont.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    Log.w(TAG, "probeContentLength failed: $url (${e.message})")
+                    if (cont.isActive) cont.resume(0L)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    val length = response.use {
+                        if (!it.isSuccessful) return@use 0L
+                        // HEAD 响应的 body 为空，长度只可能来自头部；body 仅作代理改写的兜底
+                        it.header("Content-Length")?.toLongOrNull()?.takeIf { v -> v > 0 }
+                            ?: it.body.contentLength().takeIf { v -> v > 0 } ?: 0L
+                    }
+                    if (cont.isActive) cont.resume(length)
+                }
+            })
+        }
+    } ?: 0L
 
     /**
      * 从 market 目录安装已下载的方案到 rime 目录（解压/复制 + 依赖补齐）。
