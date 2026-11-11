@@ -173,18 +173,42 @@ internal class ImeSessionController(private val service: XimeInputMethodService)
         displayText: String,
         caretOffset: Int = -1,
     ) {
-        // 第二参数：末尾/未知时传 1（光标紧跟编码末尾，避免传 displayText.length 时被 AOSP
-        // 钳制到整段文本末尾）；编码编辑态（caret 在中间）传 offset+1，光标落在编码
-        // 第 offset 个字符之后。
         // 标记输入框存在 composing 区域：endComposingInputBox 仅在此标记下执行 setComposingText("") 清空，
         // 否则该调用会在光标处插入空串，光标处有选中文字时等于删除选区。
         service.markInputBoxComposing()
         ic.beginBatchEdit()
         try {
-            val cursorArg = if (caretOffset < 0 || caretOffset >= displayText.length) 1 else caretOffset + 1
-            ic.setComposingText(displayText, cursorArg)
+            // 1 = 光标落到编码末尾；该参数挪不动组合区内的光标（真机实测 1..6 都落在末尾），
+            // 编码内编辑光标只能在写入后 setSelection。
+            ic.setComposingText(displayText, 1)
         } finally {
             ic.endBatchEdit()
+        }
+
+        // 编码在输入框里与上屏文字混在同一段文本中，落点一律按宿主真实回报反推：
+        // 起点 = 刚写完的光标（组合区末尾）− 编码长度。改在批处理结束后读取——
+        // 批处理期间读到的是旧选区，用它算起点会让光标乱跳。
+        if (caretOffset >= 0 && caretOffset < displayText.length) {
+            val regionEnd = selectionStartOf(ic)
+            val start = composingStartFromRegionEnd(regionEnd, displayText.length)
+            if (start != null) {
+                val caret = start + caretOffset
+                // 登记自身写入位移：宿主回传的选区变化不是用户移动光标，不能被
+                // onUpdateSelection 判成移动而丢弃组合态（部分宿主不回报组合区区间，
+                // 光靠「光标仍在组合区内」挡不住）。
+                service.noteSelfWriteCaretDelta(caret - regionEnd)
+                ic.setSelection(caret, caret)
+            }
+        }
+    }
+
+    /** 宿主当前光标位置；未回报（部分输入框返回 -1）时返回 -1。 */
+    private fun selectionStartOf(ic: android.view.inputmethod.InputConnection): Int {
+        return try {
+            ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
+                ?.selectionStart ?: -1
+        } catch (_: Exception) {
+            -1
         }
     }
 
