@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """把 GitHub Release 的正文与附件同步到 GitCode Release。
 
-GitCode 的 tag 可由代码镜像自动同步，本脚本只负责 release 页面与附件。
-目标必须是**普通仓库**：GitCode 的只读镜像仓库（Pull mirror）不支持创建 Release。
+GitCode 的 tag 可由代码镜像自动同步（每日一次），本脚本负责 release 页面与附件：
+Release 不存在时用 v5 POST 创建，已存在时更新正文并补齐附件。
+创建偶尔会被 GitCode 以「镜像仓库限制」拒绝，通常是 tag 还没镜像到位，重跑即可。
 仅使用 Python 3 标准库，可在本地或 GitHub Actions 中直接运行。
 """
 
@@ -51,6 +52,16 @@ class MirrorRepoError(SyncError):
 
 def _is_mirror_repo_error(exc: SyncError) -> bool:
     return "image repository" in str(exc).lower()
+
+
+def _is_auth_rejected(exc: SyncError) -> bool:
+    """v2 Web API 拒绝令牌：401/403 或 425 TOKEN_INVALID_ERROR。
+
+    v2 走的是网页登录态凭据，CI 里的 GITCODE_TOKEN 是 v5 API 令牌，在 v2 侧会被判无效。
+    """
+    message = str(exc)
+    upper = message.upper()
+    return "TOKEN_INVALID" in upper or "HTTP 401" in message or "HTTP 403" in message
 
 
 def _rate_limit_message(headers):
@@ -248,6 +259,16 @@ def gc_write_release_v2(owner, repo, tag, name, body, status, token, target_comm
     except SyncError as exc:
         if _is_mirror_repo_error(exc):
             raise _mirror_repo_error(owner, repo) from exc
+        if _is_auth_rejected(exc):
+            # 两个接口凭据体系不同：v5 认 API 令牌，v2 只认网页登录会话，所以这条兜底在 CI 里
+            # 基本走不通。真正原因通常是 tag 还没镜像到 GitCode，等下一轮巡检即可，无需改令牌。
+            raise MirrorRepoError(
+                f"v5 创建 Release 被拒、v2 Web API 兜底也不可用（{str(exc).strip()}）。"
+                f"常见原因是 {owner}/{repo} 上该 tag 尚未镜像完成；v2 接口只认网页登录会话，"
+                "CI 里的 GITCODE_TOKEN 是 v5 API 令牌，兜底走不通。"
+                "下一次巡检会自动重试；若长期都是这条提示，再考虑把 GITCODE_RELEASE_REPO "
+                "指向普通仓库。"
+            ) from exc
         raise
     print("  Release 已通过 v2 Web API 创建")
     return "created"
@@ -276,7 +297,9 @@ def gc_write_release(owner, repo, tag, name, body, status, token, target_commiti
             return "updated"
         except SyncError as exc:
             if _is_mirror_repo_error(exc):
-                raise _mirror_repo_error(owner, repo) from exc
+                # Release 已在网页建好，只是正文改不了：继续传附件比整版跳过有用
+                print(f"  ! 镜像仓库不允许改 Release 正文，继续同步附件: {exc}")
+                return "update-failed"
             # 正文更新失败不应连累附件
             print(f"  ! 更新 Release 信息失败，继续同步附件: {exc}")
             return "update-failed"
@@ -305,9 +328,9 @@ def gc_write_release(owner, repo, tag, name, body, status, token, target_commiti
 
 def _mirror_repo_error(owner: str, repo: str) -> MirrorRepoError:
     return MirrorRepoError(
-        f"GitCode 仓库 {owner}/{repo} 的 Release 创建被拒绝（镜像仓库限制）。"
-        "脚本已尝试 v2 Web API；如仍失败，请改用普通仓库（--gitcode-repo / "
-        "GITCODE_RELEASE_REPO）。"
+        f"GitCode 拒绝了在 {owner}/{repo} 上创建 Release（返回信息提到镜像仓库限制）。"
+        "如果该仓库的代码镜像还没跑到这个 tag，等下一轮巡检会重试；"
+        "若持续出现，可把 GITCODE_RELEASE_REPO 指向普通仓库（--gitcode-repo）。"
     )
 
 
@@ -431,6 +454,12 @@ def sync_release(args, tag, release=None):
 
     print(f"  Release: {'更新' if existing else '创建'} | 附件 {len(todo)}/{len(assets)} 待上传")
     planned_bytes = sum(int(asset.get("size") or 0) for asset, _ in todo)
+
+    # 定时巡检：Release 已建好且附件齐全就不用再碰它，省得每天刷一遍正文
+    if args.skip_synced and existing and not todo:
+        print("  已同步，跳过")
+        return "skipped", 0, 0
+
     if args.dry_run:
         for asset, current in todo:
             flag = "覆盖" if current else "新增"
@@ -453,6 +482,15 @@ def sync_release(args, tag, release=None):
         print(f"{prefix}{exc}")
         print("  ! 跳过本版本的 GitCode Release 同步")
         return "unsupported", 0, 0
+    except SyncError as exc:
+        # GitCode 的代码镜像每天才拉一次，巡检时 tag 可能还没到，创建 Release 自然失败；
+        # 这属于预期延迟，本轮跳过、等下一次巡检重试，不要把每日任务跑红。
+        if not args.skip_synced:
+            raise
+        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") else "  ! "
+        print(f"{prefix}{tag} 本轮创建 Release 失败（GitCode 可能还没镜像到该 tag）: {exc}")
+        print("  ! 已跳过，下一次巡检会重试")
+        return "skipped", 0, 0
     print(f"  Release {action}")
 
     failed = 0
@@ -510,6 +548,8 @@ def parse_args(argv=None):
     parser.add_argument("--exclude", action="append", default=[], help="排除文件名正则，可重复")
     parser.add_argument("--no-banner", action="store_true", help="正文不插入镜像说明")
     parser.add_argument("--dry-run", action="store_true", help="只打印计划，不写入")
+    parser.add_argument("--skip-synced", action="store_true",
+                        help="GitCode 上该 Release 已存在且附件齐全时直接跳过（定时巡检用）")
     args = parser.parse_args(argv)
 
     # 允许 CI 变量带首尾空白或尾斜杠；URL / SSH 形式直接拒绝，避免后面 API 层报看不懂的错
