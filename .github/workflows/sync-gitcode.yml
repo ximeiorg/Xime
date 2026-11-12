@@ -1,12 +1,19 @@
 name: Sync Release to GitCode
 
-# 手动把 GitHub Release 镜像到 GitCode（镜像仓库的代码与 tag 由 GitCode 侧自动同步，
-# 这里只补 release 页面与附件）。日常发布由 release.yml 自动触发，本流程用于补传历史版本。
+# GitCode 侧的代码是每日拉取的镜像，tag 到达 GitCode 天然有延迟，所以在 release.yml 里
+# 跟着发版同步 Release 不可行（新 tag 那时还没到 GitCode）。
 #
-# 注意：GitCode v5 接口对只读镜像仓库有限制，脚本会自动尝试 v2 Web API 创建 Release；
-# 若 v2 也失败，用 vars.GITCODE_RELEASE_REPO 指向普通仓库。
+# 这里改成定时巡检：每天扫一遍最近的 Release，GitCode 上还没有的补建、附件不齐的补传，
+# 已经齐的直接跳过。手工触发仍可按指定 tag 立即同步（补历史版本用）。
+#
+# 注意：Release 由脚本自己调 v5 POST 创建，不需要人在网页上建。发版时创建失败基本是
+# 因为 tag 还没镜像到 GitCode，等下一轮巡检重试即可；若长期提示镜像仓库限制，再考虑
+# 用 vars.GITCODE_RELEASE_REPO 指向普通仓库。
 
 on:
+  schedule:
+    # 每天 UTC 03:00（北京时间 11:00）巡检一次
+    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       tag:
@@ -49,6 +56,7 @@ jobs:
           EXCLUDE: ${{ inputs.exclude }}
           INCLUDE_PRE: ${{ inputs.include_prerelease }}
           DRY_RUN: ${{ inputs.dry_run }}
+          RECONCILE: ${{ github.event_name == 'schedule' }}
         run: |
           set -u
 
@@ -71,7 +79,14 @@ jobs:
 
           status=0
           if [ -z "${TAGS// /}" ]; then
-            python3 scripts/sync-release-to-gitcode.py "${common[@]}" || status=1
+            if [ "$RECONCILE" = "true" ]; then
+              # 巡检最近 3 个版本（含预发布）：镜像同步滞后时，这轮没赶上的下轮还能补
+              python3 scripts/sync-release-to-gitcode.py \
+                --last 3 --include-prerelease --tag-filter "" --skip-synced \
+                "${common[@]}" || status=1
+            else
+              python3 scripts/sync-release-to-gitcode.py "${common[@]}" || status=1
+            fi
           else
             IFS=',' read -ra items <<< "$TAGS"
             for item in "${items[@]}"; do
