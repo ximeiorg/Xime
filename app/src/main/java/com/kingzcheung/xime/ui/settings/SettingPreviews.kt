@@ -25,7 +25,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -268,12 +267,18 @@ fun KeycapPreview(
 }
 
 /**
- * 横屏分体预览：四行键位（三行字母 + 控制行），开启时从中间裂开并逐行错开。
+ * 横屏分体预览：四行键位（三行字母 + 控制行），开启时从中间裂开。
  *
- * 行结构照实机横屏来：竖屏同源的四行（`landscapeQwertyRows` 直接取 `keyRows`），
- * 末行是控制行（中英切换 / 逗号 / 空格 / 键盘选择 / 回车）。**开关只改变排布、不改变键数**——
- * 之前关闭态 11 键、开启态 5+5，切换时键数变了，看起来像换了个键盘。左右两半各占 42%、
- * 中缝 16%（`LandscapeKeyboardContent` 的 0.42 / 0.16 / 0.42），手机横屏每行再按 staggerStep 递增错开。
+ * 结构照实机 `LandscapeKeyboardContent`：
+ * - 左右两半各 42%、中缝 16%（[SPLIT_HALF_WEIGHT] / [SPLIT_GAP_WEIGHT]）；
+ * - 行拆分同 `splitRowForLandscape`：`take(half)` + `takeLast(half)`，奇数行的中间键
+ *   （9 键行的第 5 个、控制行的空格）在两半各出现一次，所以**两半键数相同、同一行
+ *   左右键宽一致**，空格自然被中缝劈成两块；
+ * - 行错位沿用竖屏 QWERTY：只有第二行（A 行）两端内缩 [SPLIT_ROW_INSET]，
+ *   第一行、第三行、控制行都贴边；分体后这个缩进只加在外侧（左半 start /
+ *   右半 end），中缝固定不动、竖直对齐。
+ *
+ * 关闭态就是普通横屏键盘：整行铺满、无中缝，只有第二行的两端缩进。
  */
 @Composable
 fun SplitKeyboardPreview(
@@ -281,26 +286,54 @@ fun SplitKeyboardPreview(
     modifier: Modifier = Modifier,
 ) {
     SettingsPreviewFrame(modifier) {
-        Column(verticalArrangement = Arrangement.spacedBy(KEY_ROW_GAP)) {
-            SPLIT_PREVIEW_ROWS.forEachIndexed { rowIndex, (keys, inset) ->
-                // 阶梯错位按行递增，与实机 staggerStep 同向
-                val stagger = if (splitEnabled) (rowIndex * 5).dp else 0.dp
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(KEYCAP_HEIGHT)
-                        .padding(start = inset + stagger, end = inset + stagger),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    if (splitEnabled) {
-                        // 与 splitRowForLandscape 同向：奇数键行左多右少（10→5/5、9→5/4、5→3/2）。
-                        // 实机那里用 takeLast(half)，奇数行末尾会重复一个键；预览用 drop 避免重复。
-                        val half = (keys.size + 1) / 2
-                        KeyGroup(weight = 0.42f, keys = keys.take(half))
-                        Spacer(modifier = Modifier.weight(0.16f))
-                        KeyGroup(weight = 0.42f, keys = keys.drop(half))
-                    } else {
-                        KeyGroup(weight = 1f, keys = keys)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(KEY_ROW_GAP),
+        ) {
+            SPLIT_PREVIEW_ROWS.forEachIndexed { rowIndex, keys ->
+                // 行错位沿用竖屏：只有第二行（A 行）两端内缩，其余行贴边。
+                // 分体态这个缩进只加在外侧（左半 start / 右半 end），中缝不动。
+                val rowInset = if (rowIndex == SPLIT_INSET_ROW) SPLIT_ROW_INSET else 0.dp
+                if (splitEnabled) {
+                    // 照实机 LandscapeKeyboardContent：两半各 42%、中缝 16%，中缝两侧固定不动、
+                    // 竖直对齐。与 splitRowForLandscape 一致：take(half) / takeLast(half)，
+                    // 奇数行的中间键（9 键行的第 5 个、控制行的空格）在两半各出现一次，
+                    // 两半键数因此相同，同一行左右两半的键宽也一致。
+                    val half = (keys.size + 1) / 2
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(KEYCAP_HEIGHT),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(SPLIT_HALF_WEIGHT)
+                                .padding(start = rowInset)
+                                .fillMaxHeight(),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            keys.take(half).forEach { PreviewKeycap(it) }
+                        }
+                        Spacer(modifier = Modifier.weight(SPLIT_GAP_WEIGHT))
+                        Row(
+                            modifier = Modifier
+                                .weight(SPLIT_HALF_WEIGHT)
+                                .padding(end = rowInset)
+                                .fillMaxHeight(),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            keys.takeLast(half).forEach { PreviewKeycap(it) }
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(KEYCAP_HEIGHT)
+                            .padding(horizontal = rowInset),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        keys.forEach { PreviewKeycap(it) }
                     }
                 }
             }
@@ -355,7 +388,7 @@ fun FlushBottomPreview(
                             .offset(y = FLUSH_SHIFT - KEYCAP_HEIGHT + KEYCAP_CORNER),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        SPLIT_PREVIEW_ROWS[2].first.forEach { PreviewKeycap(it) }
+                        SPLIT_PREVIEW_ROWS[2].forEach { PreviewKeycap(it) }
                     }
                 }
             }
@@ -394,17 +427,6 @@ fun FlushBottomPreview(
  */
 private data class PreviewKey(val weight: Float = 1f, val isFunction: Boolean = false)
 
-/** 键位分组：按 [weight] 分配宽度的一排键帽。 */
-@Composable
-private fun RowScope.KeyGroup(weight: Float, keys: List<PreviewKey>) {
-    Row(
-        modifier = Modifier.weight(weight),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        keys.forEach { PreviewKeycap(it) }
-    }
-}
-
 /** 整行键帽：贴底预览里按行画键盘，键高统一 [KEYCAP_HEIGHT]。 */
 @Composable
 private fun PreviewKeyRow(keys: List<PreviewKey>) {
@@ -431,115 +453,6 @@ private fun RowScope.PreviewKeycap(key: PreviewKey) {
                 else scheme.onSurfaceVariant.copy(alpha = 0.16f)
             ),
     )
-}
-
-/**
- * 实体键盘检测预览：跟随开关的双态示意图。
- *
- * - 关闭：输入框下方照常弹出软键盘（两行迷你键帽）；
- * - 打开：接上实体键盘后软键盘收起，改为"实体键盘图标 + 跟随光标的候选浮窗"，
- *   对应实机的 compact 模式（`applyCompactMode` → `isCompact`，窗口透明、只挂
- *   `HardwareKeyboardCandidateBar`）。
- *
- * 两态共用同一块固定高度（两行键帽），切换时卡片不跳；配色沿用预览的
- * `onSurfaceVariant` 叠加体系，所以浅底、深底都能看清。
- */
-@Composable
-fun HardwareKeyboardPreview(
-    detectionEnabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    SettingsPreviewFrame(modifier) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // 宿主输入框（与编码位置预览共用同一套度量）
-            PreviewInputBox(textSize = 12)
-            Spacer(modifier = Modifier.height(6.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(KEYCAP_HEIGHT * 2 + KEY_ROW_GAP),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                if (detectionEnabled) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        PhysicalKeyboardGlyph()
-                        CandidateFloatingChip()
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(KEY_ROW_GAP)) {
-                        PreviewKeyRow(keys = List(10) { PreviewKey() })
-                        PreviewKeyRow(keys = List(9) { PreviewKey() })
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** 实体键盘示意：一个带键纹的圆角方块，代表已接入的硬件键盘。 */
-@Composable
-private fun PhysicalKeyboardGlyph(modifier: Modifier = Modifier) {
-    val base = MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = modifier
-            .width(34.dp)
-            .height(20.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .border(1.dp, base.copy(alpha = 0.55f), RoundedCornerShape(4.dp))
-            .padding(horizontal = 5.dp, vertical = 5.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            repeat(2) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    repeat(5) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(2.dp)
-                                .clip(RoundedCornerShape(1.dp))
-                                .background(base.copy(alpha = 0.30f))
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** 跟随光标的候选浮窗示意：首候选用主色，其余常规色。 */
-@Composable
-private fun CandidateFloatingChip(modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(scheme.onSurfaceVariant.copy(alpha = 0.10f))
-            .border(0.5.dp, scheme.outlineVariant, RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = PREVIEW_CANDIDATES[0],
-            fontSize = 11.sp,
-            color = scheme.primary,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-        )
-        Text(
-            text = PREVIEW_CANDIDATES[1],
-            fontSize = 11.sp,
-            color = scheme.onSurface,
-            maxLines = 1,
-        )
-    }
 }
 
 @Composable
@@ -580,9 +493,11 @@ private fun PreviewCandidate(
 }
 
 /**
- * 分体预览的四行：10 / 9 /（shift + 7 字母 + 退格）/ 控制行。第二行两侧缩进 8dp 与竖屏错位一致，
- * 第三行两端 1.4 倍宽是 `functionKeyWidth` 里 shift / delete 的默认档。
- * 开关只改排布（42% / 16% / 42% + 逐行阶梯），不改键数与键宽关系。
+ * 分体预览的四行：10 / 9 /（shift + 7 字母 + 退格）/ 控制行。第三行两端 1.4 倍宽是
+ * `functionKeyWidth` 里 shift / delete 的默认档。
+ * 开关只改排布（中缝 + 逐行阶梯），不改键数与键宽关系。
+ *
+ * 横屏分体是从竖屏同行拆出来的，不保留竖屏第二行的两侧缩进，所以这里也没有 inset。
  */
 private val QWERTY_ROW0 = listOf("Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P")
 
@@ -601,15 +516,24 @@ private val FUNCTION_PREVIEW_ROW: List<PreviewKey> = listOf(
     PreviewKey(1.2f, isFunction = true),
 )
 
-private val SPLIT_PREVIEW_ROWS: List<Pair<List<PreviewKey>, Dp>> = listOf(
-    List(10) { PreviewKey() } to 0.dp,
-    List(9) { PreviewKey() } to 8.dp,
-    (
-        listOf(PreviewKey(1.4f, isFunction = true)) + List(7) { PreviewKey() } +
-            listOf(PreviewKey(1.4f, isFunction = true))
-        ) to 0.dp,
-    FUNCTION_PREVIEW_ROW to 0.dp,
+private val SPLIT_PREVIEW_ROWS: List<List<PreviewKey>> = listOf(
+    List(10) { PreviewKey() },
+    List(9) { PreviewKey() },
+    listOf(PreviewKey(1.4f, isFunction = true)) + List(7) { PreviewKey() } +
+        listOf(PreviewKey(1.4f, isFunction = true)),
+    FUNCTION_PREVIEW_ROW,
 )
+
+/** 分体态左右两半的宽度占比与中缝占比：`LandscapeKeyboardContent` 的 0.42 / 0.16 / 0.42。 */
+private const val SPLIT_HALF_WEIGHT = 0.42f
+private const val SPLIT_GAP_WEIGHT = 0.16f
+
+/**
+ * 行错位：与竖屏 QWERTY 一致，只有第二行（A 行）两端各内缩 [SPLIT_ROW_INSET]，
+ * 第一行（Q 行）、第三行（shift 行）、控制行都贴边。
+ */
+private const val SPLIT_INSET_ROW = 1
+private val SPLIT_ROW_INSET = 8.dp
 
 /** 贴底预览只画控制行本身。 */
 private val FLUSH_PREVIEW_ROW: List<PreviewKey> = FUNCTION_PREVIEW_ROW

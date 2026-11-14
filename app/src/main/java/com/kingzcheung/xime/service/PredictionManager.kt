@@ -22,6 +22,18 @@ class PredictionManager(
         private const val TAG = "PredictionManager"
         private const val MAX_CONTEXT_LENGTH = 25
         const val MAX_ASSOCIATION_COUNT = 20
+
+        /**
+         * 联想上下文是否值得推理：最后一个字符必须是文字或数字。
+         *
+         * 空格、标点、表情本身不承载语义——若照常推理，ONNX 模型对 " "、"，" 这类
+         * 输入同样会吐出一批候选，于是「什么都没输入，按个空格」或「刚打完一个句号」
+         * 候选栏就凭空冒出一排与前文无关的联想词。这类上屏只清空候选栏，不触发推理。
+         */
+        internal fun isValidPredictionContext(text: String): Boolean {
+            val last = text.lastOrNull() ?: return false
+            return Character.isLetterOrDigit(last)
+        }
     }
     
     private var _lastCommittedText = ""
@@ -107,7 +119,10 @@ class PredictionManager(
             return
         }
 
-        if (contextText.isEmpty()) {
+        if (!isValidPredictionContext(contextText)) {
+            // 上下文为空，或以空白/标点/表情结尾（空按空格、刚上屏句号）：不推理，
+            // 作废在途结果并立刻清空候选栏——否则旧的联想词会残留到下一次输入。
+            invalidatePendingPredictions()
             onPredictionResult(emptyList())
             return
         }
@@ -176,6 +191,8 @@ class PredictionManager(
     }
     
     suspend fun getChineseAssociations(text: String, limit: Int = MAX_ASSOCIATION_COUNT): List<String> {
+        // 与自动推理同口径：空白/标点结尾不预测（供插件等外部调用方复用）
+        if (!isValidPredictionContext(text)) return emptyList()
         return try {
             if (!AssociationManager.isInitialized()) {
                 AssociationManager.initialize(context)
