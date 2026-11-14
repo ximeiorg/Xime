@@ -3153,7 +3153,9 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     private fun commitTextAndPredict(text: String, isPaste: Boolean) {
         commitTextSilently(text, isPaste)
-        if (isChineseMode) {
+        // 空串上屏不改变上下文，跳过本轮推理。空格/标点仍要进入：预测入口会判定
+        // 上下文无效并清空候选栏（见 PredictionManager.isValidPredictionContext）。
+        if (isChineseMode && text.isNotEmpty()) {
             mainHandler.post {
                 if (!uiState.value.isAsciiMode) {
                     getPredictionFromPlugin(predictionManager.lastCommittedText)

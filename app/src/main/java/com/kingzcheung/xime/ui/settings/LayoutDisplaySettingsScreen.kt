@@ -132,8 +132,7 @@ fun LayoutDisplaySettingsContent(
                         onCheckedChange = { enabled ->
                             hardwareKeyboardDetection = enabled
                             SettingsPreferences.setHardwareKeyboardDetectionEnabled(context, enabled)
-                        },
-                        footer = { HardwareKeyboardPreview(detectionEnabled = hardwareKeyboardDetection) }
+                        }
                     )
                     SectionDivider()
                     SettingsToggleItem(
