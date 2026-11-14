@@ -566,18 +566,18 @@ fun PrivacyPolicyContent(
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         PrivacySection(
+                            title = tr(R.string.s_yinsicelvzhaiyao),
+                            content = tr(R.string.s_yinsicelvzhaiyaoshuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_shiyongfanwei),
+                            content = tr(R.string.s_shiyongfanweishuoming)
+                        )
+                        
+                        PrivacySection(
                             title = tr(R.string.s_shujushouji),
                             content = tr(R.string.s_ximabushoujirenhegerenshenfenx_7e0f8)
-                        )
-                        
-                        PrivacySection(
-                            title = tr(R.string.s_bendicunchu),
-                            content = tr(R.string.s_ximajiangyonghushezhi_yonghuci_e9dfb)
-                        )
-                        
-                        PrivacySection(
-                            title = tr(R.string.s_wangluoquanxian),
-                            content = tr(R.string.s_ximaxuyaowangluoquanxianyongyu_5544d)
                         )
                         
                         PrivacySection(
@@ -586,8 +586,58 @@ fun PrivacyPolicyContent(
                         )
                         
                         PrivacySection(
-                            title = tr(R.string.s_jiantieban),
+                            title = tr(R.string.s_bendicunchu),
+                            content = tr(R.string.s_ximajiangyonghushezhi_yonghuci_e9dfb)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_yingyongquanxian),
+                            content = tr(R.string.s_yingyongquanxianshuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_wangluoquanxian),
+                            content = tr(R.string.s_ximaxuyaowangluoquanxianyongyu_5544d)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_kexuanchajian),
+                            content = tr(R.string.s_kexuanchajianshuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_yuyinhemaikefeng),
+                            content = tr(R.string.s_yuyinhemaikefengshuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_jiantiebanhetongbu),
                             content = tr(R.string.s_jiantiebangongnengjinzainindes_cfa37)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_shujugongxiang),
+                            content = tr(R.string.s_shujugongxiangshuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_shujuanquan),
+                            content = tr(R.string.s_shujuanquanshuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_nidekongzhi),
+                            content = tr(R.string.s_nidekongzhishuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_weichengnianren),
+                            content = tr(R.string.s_weichengnianrenshuoming)
+                        )
+                        
+                        PrivacySection(
+                            title = tr(R.string.s_celuegengxin),
+                            content = tr(R.string.s_celuegengxinshuoming)
                         )
                         
                         PrivacySection(
