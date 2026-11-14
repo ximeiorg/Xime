@@ -4,16 +4,22 @@ import com.kingzcheung.xime.R
 
 import com.kingzcheung.xime.i18n.tr
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.DataObject
 import androidx.compose.material.icons.twotone.Storage
+import androidx.compose.material.icons.twotone.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -26,7 +32,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -105,6 +113,12 @@ fun DictionaryHubContent(
                 )
             })
 
+            // 扩展方案带进来的快捷短语是全局的，卸载方案不会带走，是「奇怪候选」最常见的来源
+            DictionaryWarningNote(
+                title = tr(R.string.s_zhuyishixiang_5b7c1),
+                text = tr(R.string.s_kuozhanfanganzidingyiduan_9a3d2),
+            )
+
             Text(
                 tr(R.string.s_fanganzidaidejingtaicibiao_dic_cca30),
                 style = MaterialTheme.typography.bodySmall,
@@ -115,6 +129,49 @@ fun DictionaryHubContent(
                     tr(R.string.s_duoshebeianshijianchuohebingqi_0f0c1),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * 「注意事项」条：本页的软提醒。
+ *
+ * 底色取 `secondaryContainer`（跟随主题强调色），不用 `errorContainer`——这里要表达的是
+ * "别踩这个坑"，不是错误状态；深浅两个主题下都能读清，也不会抢走列表项的注意力。
+ */
+@Composable
+private fun DictionaryWarningNote(
+    title: String,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(scheme.secondaryContainer)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.TwoTone.WarningAmber,
+            contentDescription = null,
+            tint = scheme.onSecondaryContainer,
+            modifier = Modifier.size(18.dp),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = scheme.onSecondaryContainer,
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSecondaryContainer,
+                lineHeight = 18.sp,
             )
         }
     }
