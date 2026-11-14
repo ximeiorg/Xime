@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -153,6 +154,12 @@ fun SettingsItem(
     }
 }
 
+/**
+ * 开关设置行。
+ *
+ * [footer] 用于挂一张"效果预览"（如编码注释开关下的候选行）：放在开关下方，
+ * 与内容左缘对齐，因此带预览的行和不带预览的行共用同一条左缘基线。
+ */
 @Composable
 fun SettingsToggleItem(
     icon: ImageVector,
@@ -161,61 +168,166 @@ fun SettingsToggleItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     onClick: (() -> Unit)? = null,
-    showArrow: Boolean = false
+    showArrow: Boolean = false,
+    footer: (@Composable () -> Unit)? = null,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (onClick != null) Modifier.clickable(onClick = onClick)
-                else Modifier.clickable { onCheckedChange(!checked) }
-            )
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .then(
+                    if (onClick != null) Modifier.clickable(onClick = onClick)
+                    else Modifier.clickable { onCheckedChange(!checked) }
+                )
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (showArrow) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
+                )
             )
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        if (footer != null) {
+            Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                footer()
+            }
+        }
+    }
+}
+
+/**
+ * 滑块设置行：图标 + 标题 + 当前值 + 滑块，可选副标题、两端刻度与效果预览。
+ *
+ * [footer] 用来挂本项的预览（候选行 / 键面），与开关行的 footer 同一位置、同一缩进，
+ * 因此同一页里"滑块预览"和"开关预览"上下对齐。
+ */
+@Composable
+fun SettingsSliderItem(
+    icon: ImageVector,
+    title: String,
+    valueText: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    rangeStartLabel: String? = null,
+    rangeEndLabel: String? = null,
+    footer: (@Composable () -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                text = valueText,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.primary
             )
         }
-        if (showArrow) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.primary,
-                checkedTrackColor = MaterialTheme.colorScheme.primaryContainer
-            )
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
+            valueRange = valueRange,
+            steps = steps,
+            modifier = Modifier.padding(top = 4.dp)
         )
+        if (rangeStartLabel != null && rangeEndLabel != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = rangeStartLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = rangeEndLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        }
+        if (footer != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            footer()
+        }
     }
 }
 
@@ -233,7 +345,7 @@ fun SettingsToggleItem(
 @Composable
 fun SettingsRadioItem(
     title: String,
-    subtitle: String,
+    subtitle: String = "",
     selected: Boolean,
     onSelect: () -> Unit,
     icon: ImageVector? = null,
@@ -270,11 +382,13 @@ fun SettingsRadioItem(
                 color = if (selected) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         RadioButton(selected = selected, onClick = null)
     }
@@ -685,333 +799,6 @@ fun ThemeCard(
 }
 
 @Composable
-fun CodeDisplayCard(
-    title: String,
-    isSelected: Boolean,
-    showCodeInInputBox: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val primary = MaterialTheme.colorScheme.primary
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    val selectedBg = primary.copy(alpha = 0.15f)
-
-    Column(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .then(
-                    if (isSelected) {
-                        Modifier.border(
-                            width = 2.dp,
-                            color = primary,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    } else {
-                        Modifier
-                    }
-                )
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 0.dp,
-                onClick = onClick
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(26.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .border(
-                                    0.5.dp,
-                                    MaterialTheme.colorScheme.outlineVariant,
-                                    RoundedCornerShape(4.dp)
-                                )
-                                .padding(horizontal = 8.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            if (showCodeInInputBox) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = tr(R.string.s_xima_shu_ru_fa),
-                                        fontSize = 12.sp,
-                                        color = onSurface,
-                                        maxLines = 1
-                                    )
-                                    Spacer(modifier = Modifier.width(1.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .width(1.dp)
-                                            .height(13.dp)
-                                            .background(primary)
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 4.dp)
-                        ) {
-                            Column(
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(vertical = 0.dp)
-                            ) {
-                                Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                                    Text(
-                                        "shu ru fa",
-                                        fontSize = 10.sp,
-                                        lineHeight = 1.sp,
-                                        color = onSurface.copy(alpha = 0.6f)
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(selectedBg)
-                                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = tr(R.string.s_shurufa),
-                                            fontSize = 13.sp,
-                                            color = primary,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = tr(R.string.s_lixue),
-                                        fontSize = 13.sp,
-                                        color = onSurface,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) primary else onSurface
-            )
-        }
-    }
-}
-
-// ========== Previews ==========
-
-@Preview(name = "CodeDisplayCard - 选中+显示码")
-@Composable
-fun CodeDisplayCardPreview_SelectedWithCode() {
-    XimeTheme {
-        CodeDisplayCard(
-            title = tr(R.string.s_xima),
-            isSelected = true,
-            showCodeInInputBox = true,
-            onClick = {},
-            modifier = Modifier
-                .padding(16.dp)
-                .height(160.dp)
-        )
-    }
-}
-
-@Preview(name = "CodeDisplayCard - 不显示码")
-@Composable
-fun CodeDisplayCardPreview_NotSelectedNoCode() {
-    XimeTheme {
-        CodeDisplayCard(
-            title = tr(R.string.s_xima),
-            isSelected = true,
-            showCodeInInputBox = false,
-            onClick = {},
-            modifier = Modifier
-                .padding(16.dp)
-                .height(160.dp)
-        )
-    }
-}
-
-@Composable
-fun CommentDisplayCard(
-    title: String,
-    isSelected: Boolean,
-    showComment: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val primary = MaterialTheme.colorScheme.primary
-    val onSurface = MaterialTheme.colorScheme.onSurface
-
-    Box(modifier = modifier) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .clickable { onClick() }
-                    .then(
-                        if (isSelected) {
-                            Modifier.border(
-                                width = 2.dp,
-                                color = primary,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                        } else {
-                            Modifier
-                        }
-                    )
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(primary.copy(alpha = 0.15f))
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = tr(R.string.s_shurufa),
-                                        fontSize = 14.sp,
-                                        color = primary,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1
-                                    )
-                                    if (showComment) {
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text(
-                                            text = "ltif",
-                                            fontSize = 9.sp,
-                                            color = onSurface.copy(alpha = 0.5f),
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = tr(R.string.s_lixue),
-                                fontSize = 14.sp,
-                                color = onSurface,
-                                maxLines = 1
-                            )
-                            if (showComment) {
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "lixue",
-                                    fontSize = 9.sp,
-                                    color = onSurface.copy(alpha = 0.5f),
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isSelected) primary else onSurface,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Preview(name = "CommentDisplayCard - 显示注释", heightDp = 120)
-@Composable
-fun CommentDisplayCardPreview_Show() {
-    XimeTheme {
-        CommentDisplayCard(
-            title = tr(R.string.s_xianshi),
-            isSelected = true,
-            showComment = true,
-            onClick = {},
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
-                .padding(10.dp)
-        )
-    }
-}
-
-@Preview(name = "CommentDisplayCard - 隐藏注释", heightDp = 120)
-@Composable
-fun CommentDisplayCardPreview_Hide() {
-    XimeTheme {
-        CommentDisplayCard(
-            title = tr(R.string.s_yincang),
-            isSelected = false,
-            showComment = false,
-            onClick = {},
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
-                .padding(10.dp)
-        )
-    }
-}
-
-
-@Composable
 fun KeyboardThemeCard(
     theme: KeyboardColorScheme,
     isSelected: Boolean,
@@ -1174,80 +961,5 @@ private fun ThemeHalfPreview(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun CandidateTextSizeCard(
-    candidateTextSize: Float,
-    modifier: Modifier = Modifier
-) {
-    val primary = MaterialTheme.colorScheme.primary
-    val onSurface = MaterialTheme.colorScheme.onSurface
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            ) {
-                Row(modifier = Modifier.padding(vertical = 2.dp)) {
-                    Text(
-                        "shu ru fa",
-                        fontSize = 10.sp,
-                        lineHeight = 1.sp,
-                        color = onSurface.copy(alpha = 0.6f)
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(primary.copy(alpha = 0.2f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = tr(R.string.s_shurufa),
-                            fontSize = candidateTextSize.sp,
-                            color = primary,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = tr(R.string.s_lixue),
-                        fontSize = candidateTextSize.sp,
-                        color = onSurface,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Preview(name = "CandidateTextSizeCard - default")
-@Composable
-fun CandidateTextSizeCardPreview() {
-    XimeTheme {
-        CandidateTextSizeCard(
-            candidateTextSize = 19f,
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
-        )
     }
 }
