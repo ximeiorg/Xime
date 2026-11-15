@@ -97,4 +97,40 @@ class DefaultCustomYamlTest {
         assertFalse(stripped.contains("非法项"))
         assertTrue(stripped.contains("page_size: 20"))
     }
+
+    /**
+     * 回归：rime-wbpy-full 的 default.custom.yaml 在 schema_list 中段用注释分组
+     * （# ── 双拼 ──）。旧实现遇到注释行直接中断，只剥一半：剩余的 `- schema:` 条目
+     * 挂在 patch 下使整份 YAML 无效，librime 静默忽略 patch，用户补丁全部丢失。
+     */
+    @Test
+    fun `块内交错注释不中断剥离`() {
+        val text = """
+            patch:
+              schema_list:
+                - schema: wubi86
+                - schema: pinyin_simp
+                # ── 双拼（26 键）──
+                - schema: double_pinyin
+                - schema: double_pinyin_flypy
+                # ── 双拼（合并键）──
+                - schema: double_pinyin_14jian
+
+              # Menu
+              menu:
+                page_size: 5
+              key_binder:
+                bindings: []
+            """.trimIndent()
+        val (stripped, schemas) = SchemaManager.stripSchemaListBlock(text)
+        assertEquals(
+            listOf("wubi86", "pinyin_simp", "double_pinyin", "double_pinyin_flypy", "double_pinyin_14jian"),
+            schemas,
+        )
+        assertFalse("所有条目都被剥掉", stripped.contains("- schema:"))
+        assertFalse("块内分组注释一并剥掉", stripped.contains("── 双拼"))
+        assertTrue("块尾注释保留", stripped.contains("# Menu"))
+        assertTrue("menu 节保留", stripped.contains("page_size: 5"))
+        assertTrue("key_binder 节保留", stripped.contains("key_binder:"))
+    }
 }

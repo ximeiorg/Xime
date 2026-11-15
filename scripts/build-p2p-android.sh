@@ -129,7 +129,21 @@ text = re.sub(r"^default-members\s*=\s*\[.*?^\]",
               text, count=1, flags=re.S | re.M)
 open(dst, "w", encoding="utf-8").write(text)
 PY
-  if [ -f "$SRC/Cargo.lock" ]; then
+  # 优先用仓库里提交的整份 workspace lock：submodule 自带的 Cargo.lock 只覆盖
+  # 三个协议 crate，没有 JNI 绑定的 jni 等依赖；app/src/main/rust/xime-p2p-jni/
+  # Cargo.lock 才是四 crate 完整锁定的版本（F-Droid 也要求该 Cargo.toml 旁有 lockfile）。
+  #
+  # 升级 submodule 后刷新这份 lockfile（只解析依赖、不交叉编译）：
+  #   1. 把 $SRC/crates/{xime-sync-domain,xime-p2p,xime-p2p-c} 与 $JNI_CRATE
+  #      复制到一个临时目录的 crates/ 下，写一个 members 含四个 crate 的
+  #      [workspace] Cargo.toml（与上面生成的 $WORK/Cargo.toml 相同）；
+  #   2. cp $SRC/Cargo.lock 到该临时目录（以协议侧已锁定的版本为起点）；
+  #   3. cargo metadata --format-version 1 --manifest-path <临时目录>/Cargo.toml；
+  #   4. 把更新后的 Cargo.lock 拷回 $JNI_CRATE/Cargo.lock 并提交。
+  # 增量解析只补 JNI 链路的新包，不会把协议侧的版本全部升级。
+  if [ -f "$JNI_CRATE/Cargo.lock" ]; then
+    cp "$JNI_CRATE/Cargo.lock" "$WORK/Cargo.lock"
+  elif [ -f "$SRC/Cargo.lock" ]; then
     cp "$SRC/Cargo.lock" "$WORK/Cargo.lock"
   fi
 }

@@ -763,18 +763,28 @@ object SchemaManager {
         val headerIdx = lines.indexOfFirst { it.trim() == "schema_list:" }
         if (headerIdx < 0) return text to emptyList()
         var end = headerIdx + 1
+        // 最后一个确定属于块内的行（列表项）。注释/空行先挂起：后面还有列表项就归入
+        // 块内一并剥离，遇到块外键则回退到这里结束——块尾的注释/空行因此原样保留。
+        // 曾因遇注释行直接中断，schema_list 里带分组注释（如「# ── 双拼 ──」）时
+        // 只剥一半，剩余 `- schema:` 条目留在 patch 下使整份 YAML 失效、用户补丁被忽略。
+        var lastItemIdx = headerIdx
         val schemas = mutableListOf<String>()
         while (end < lines.size) {
             val trimmed = lines[end].trim()
             if (trimmed.startsWith("- schema:")) {
                 val id = trimmed.removePrefix("- schema:").trim()
                 if (id.isNotEmpty()) schemas.add(id)
-            } else if (!trimmed.startsWith("-")) {
+                lastItemIdx = end
+            } else if (trimmed.startsWith("-")) {
+                lastItemIdx = end
+            } else if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                // 挂起，等下一行裁决归属
+            } else {
                 break
             }
             end++
         }
-        val rebuilt = lines.subList(0, headerIdx) + lines.subList(end, lines.size)
+        val rebuilt = lines.subList(0, headerIdx) + lines.subList(lastItemIdx + 1, lines.size)
         var result = rebuilt.joinToString(sep)
         if (text.endsWith("\n") && !result.endsWith("\n")) result += sep
         return result to schemas
