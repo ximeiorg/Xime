@@ -823,8 +823,10 @@ keyboard:
       row_align: stretch
       rows:
         - [[q, w], [e, r], [t, y], [u, i], [o, p]]
-        - [[a, s], [d, f], [g, h], [j, k], [l]]
-        - [[z, x], [c, v], [b, n], [m]]
+        - [[a, s], [d, f], [g, h], [j, k], l]
+        - [shift, [z, x], [c, v], [b, n], m, delete]
+        # 第四行（控制行）：与 26 键同形，缺了就没有空格 / 回车 / 中英切换
+        - [mode_change, comma, space, earth, enter]
     keys:
       # swipe_up 数字按行序排布：上排 1-5、中排 6-0
       qw: { tap: { label: "qw", value: "q" }, swipe_up: "1", long_press: { display: "bubble", values: [{ action: commit, value: "q" }, { action: commit, value: "w" }, { action: commit, value: "Q" }, { action: commit, value: "W" }] } }
@@ -841,6 +843,13 @@ keyboard:
       cv: { tap: { label: "cv", value: "c" }, swipe_up: "、", long_press: { display: "bubble", values: [{ action: commit, value: "c" }, { action: commit, value: "v" }, { action: commit, value: "C" }, { action: commit, value: "V" }] } }
       bn: { tap: { label: "bn", value: "b" }, swipe_up: "!", long_press: { display: "bubble", values: [{ action: commit, value: "b" }, { action: commit, value: "n" }, { action: commit, value: "B" }, { action: commit, value: "N" }] } }
       m:  { tap: { label: "m", value: "m" }, swipe_up: "#", long_press: { display: "bubble", values: [{ action: commit, value: "m" }, { action: commit, value: "M" }] } }
+      # ── 功能键（合并键段不继承 qwerty 段的手势，必须在此定义，否则 shift / 退格不显示）──
+      # 与字母键同宽：第三行 6~7 个键，比首行多一两个，同宽时视觉最接近全键盘
+      shift: { width: 1, tap: { action: command, value: shift_single }, double_tap: { action: command, value: shift_caps } }
+      delete: { width: 1, tap: { action: delete }, long_press: { values: [ { action: delete, label: "删除" } ] }, swipe_up: { action: clear_all, label: "上滑清空" }, swipe_down: { action: undo_clear, label: "下滑撤回" }, swipe_left: { action: command, value: clear_composition }, swipe_right: { action: command, value: clear_composition } }
+      mode_change: { width: 1.2, tap: { action: command, value: mode_change, bubble: false }, long_press: { display: bubble, values: [ { label: number, action: command, value: mode_change_number }, { label: common_symbol, action: command, value: mode_change_common_symbol } ] } }
+      space: { width: 3, tap: { action: space }, long_press: { label: "语音", action: voice, bubble: false } }
+      enter: { width: 1.2, tap: { action: enter, bubble: false } }
       comma: { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [{ action: commit, value: "," }, { action: commit, value: "." }] }}
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
@@ -854,7 +863,9 @@ keyboard:
       rows:
         - [q, [w, e], [r, t], [y, u], i, [o, p]]
         - [a, [s, d], [f, g], h, [j, k], l]
-        - [z, [x, c], v, [b, n], m]
+        - [shift, z, [x, c], v, [b, n], m, delete]
+        # 第四行（控制行）：与 26 键同形，缺了就没有空格 / 回车 / 中英切换
+        - [mode_change, comma, space, earth, enter]
     keys:
       # swipe_up 数字按行序排布：上排 1-6、中排 7-0
       q:  { tap: { label: "q", value: "q" }, swipe_up: "1", long_press: { display: "bubble", values: [{ action: commit, value: "q" }, { action: commit, value: "Q" }] } }
@@ -874,6 +885,13 @@ keyboard:
       v:  { tap: { label: "v", value: "v" }, swipe_up: "?", long_press: { display: "bubble", values: [{ action: commit, value: "v" }, { action: commit, value: "V" }] } }
       bn: { tap: { label: "bn", value: "b" }, swipe_up: "!", long_press: { display: "bubble", values: [{ action: commit, value: "b" }, { action: commit, value: "n" }, { action: commit, value: "B" }, { action: commit, value: "N" }] } }
       m:  { tap: { label: "m", value: "m" }, swipe_up: "#", long_press: { display: "bubble", values: [{ action: commit, value: "m" }, { action: commit, value: "M" }] } }
+      # ── 功能键（合并键段不继承 qwerty 段的手势，必须在此定义，否则 shift / 退格不显示）──
+      # 与字母键同宽：第三行 6~7 个键，比首行多一两个，同宽时视觉最接近全键盘
+      shift: { width: 1, tap: { action: command, value: shift_single }, double_tap: { action: command, value: shift_caps } }
+      delete: { width: 1, tap: { action: delete }, long_press: { values: [ { action: delete, label: "删除" } ] }, swipe_up: { action: clear_all, label: "上滑清空" }, swipe_down: { action: undo_clear, label: "下滑撤回" }, swipe_left: { action: command, value: clear_composition }, swipe_right: { action: command, value: clear_composition } }
+      mode_change: { width: 1.2, tap: { action: command, value: mode_change, bubble: false }, long_press: { display: bubble, values: [ { label: number, action: command, value: mode_change_number }, { label: common_symbol, action: command, value: mode_change_common_symbol } ] } }
+      space: { width: 3, tap: { action: space }, long_press: { label: "语音", action: voice, bubble: false } }
+      enter: { width: 1.2, tap: { action: enter, bubble: false } }
       comma: { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [{ action: commit, value: "," }, { action: commit, value: "." }] }}
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 
@@ -887,7 +905,9 @@ keyboard:
       rows:
         - [q, [w, e], [r, t], y, u, [i, o], p]
         - [a, [s, d], [f, g], h, [j, k], l]
-        - [z, [x, c], v, [b, n], m]
+        - [shift, z, [x, c], v, [b, n], m, delete]
+        # 第四行（控制行）：与 26 键同形，缺了就没有空格 / 回车 / 中英切换
+        - [mode_change, comma, space, earth, enter]
     keys:
       # swipe_up 数字按行序排布：上排 1-7、中排 8-0
       q:  { tap: { label: "q", value: "q" }, swipe_up: "1", long_press: { display: "bubble", values: [{ action: commit, value: "q" }, { action: commit, value: "Q" }] } }
@@ -908,6 +928,13 @@ keyboard:
       v:  { tap: { label: "v", value: "v" }, swipe_up: "?", long_press: { display: "bubble", values: [{ action: commit, value: "v" }, { action: commit, value: "V" }] } }
       bn: { tap: { label: "bn", value: "b" }, swipe_up: "!", long_press: { display: "bubble", values: [{ action: commit, value: "b" }, { action: commit, value: "n" }, { action: commit, value: "B" }, { action: commit, value: "N" }] } }
       m:  { tap: { label: "m", value: "m" }, swipe_up: "#", long_press: { display: "bubble", values: [{ action: commit, value: "m" }, { action: commit, value: "M" }] } }
+      # ── 功能键（合并键段不继承 qwerty 段的手势，必须在此定义，否则 shift / 退格不显示）──
+      # 与字母键同宽：第三行 6~7 个键，比首行多一两个，同宽时视觉最接近全键盘
+      shift: { width: 1, tap: { action: command, value: shift_single }, double_tap: { action: command, value: shift_caps } }
+      delete: { width: 1, tap: { action: delete }, long_press: { values: [ { action: delete, label: "删除" } ] }, swipe_up: { action: clear_all, label: "上滑清空" }, swipe_down: { action: undo_clear, label: "下滑撤回" }, swipe_left: { action: command, value: clear_composition }, swipe_right: { action: command, value: clear_composition } }
+      mode_change: { width: 1.2, tap: { action: command, value: mode_change, bubble: false }, long_press: { display: bubble, values: [ { label: number, action: command, value: mode_change_number }, { label: common_symbol, action: command, value: mode_change_common_symbol } ] } }
+      space: { width: 3, tap: { action: space }, long_press: { label: "语音", action: voice, bubble: false } }
+      enter: { width: 1.2, tap: { action: enter, bubble: false } }
       comma: { tap: { label: "，", value: "," }, swipe_up: { label: "。", value: "." } , long_press: { display: "bubble", values: [{ action: commit, value: "," }, { action: commit, value: "." }] }}
       earth: { tap: { label: "@language", action: "toggle_ascii" }, long_press: { display: "bubble", values: [ { label: "选择输入法", action: "command", value: "show_ime_picker" } ] } }
 

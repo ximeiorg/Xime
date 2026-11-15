@@ -500,6 +500,8 @@
     <string name="s_buchongfanganmabiaozhiwaidecha_f3531">补充方案码表之外的常用短语，随输入方案生效</string>
     <string name="s_tiao">" · %1$s 条"</string>
     <string name="s_fanganzidaidejingtaicibiao_dic_cca30">方案自带的静态词表（.dict.yaml）属于方案本身，请到「输入方案 → 方案词表」查看。</string>
+    <string name="s_zhuyishixiang_5b7c1">注意事项</string>
+    <string name="s_kuozhanfanganzidingyiduan_9a3d2">从方案市场安装的方案，其自带的快捷短语不会随方案卸载自动删除：它们保存在全局的 custom_phrase 中，对所有方案生效。如果某个键突然出现奇怪的首选词，先到「快捷短语」里看看是不是被它占用了。</string>
     <string name="s_kuashebeibanyun_danbencikuyong_176a2">跨设备搬运：单本词库用「用户词库 → 导出/导入文本码表」，与电脑端 rime 同格式；</string>
     <string name="s_duoshebeianshijianchuohebingqi_0f0c1">多设备按时间戳合并请用「同步与备份 → 词库同步」。</string>
     <string name="s_zanwucaijiyangben">暂无采集样本</string>
