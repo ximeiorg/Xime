@@ -4,7 +4,7 @@ name: PR 关联 Issue 检查
 # - 未关联 → 打 needs-issue 标签 + @作者提醒
 # - 补关联 → 自动移除标签并删除提醒（幂等，不重复刷屏）
 # - 提醒发出满 24 小时仍未关联 → 自动关闭
-# OWNER / MEMBER / COLLABORATOR 与机器人（dependabot 等）豁免。
+# OWNER / MEMBER / COLLABORATOR、机器人（dependabot 等）与维护者账号（EXEMPT_LOGINS）豁免。
 # 用 pull_request_target 是为了拿到写权限（fork PR 的默认 token 只读）；
 # 本工作流只调 API、不 checkout 任何 PR 代码。
 
@@ -35,7 +35,16 @@ jobs:
             const MARKER = '<!-- pr-issue-link -->';
             const GRACE_HOURS = 24;
             const EXEMPT_ASSOC = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+            // 维护者账号：从 fork 发 PR 时 author_association 只是 CONTRIBUTOR，
+            // 不在上面的豁免集合里，按登录名单独放过（GitHub 登录名不区分大小写）
+            const EXEMPT_LOGINS = new Set(['kingzcheung']);
             const { owner, repo } = context.repo;
+
+            // 是否需要走关联检查：机器人、内部贡献者、豁免账号都不检查
+            const isExempt = (user, association) =>
+              user.type === 'Bot' ||
+              EXEMPT_ASSOC.has(association) ||
+              EXEMPT_LOGINS.has((user.login || '').toLowerCase());
 
             // 已关联的 issue 号：只认「会被关闭」的关联（Closes/Fixes/Resolves + 手动关联），
             // 仅在正文里提一句 #123 不算。
@@ -126,8 +135,12 @@ jobs:
             // ── 事件触发：PR 新建 / 编辑 / 重开 / 转正式 ──
             async function checkOne(pr) {
               if (pr.state !== 'open') return;
-              if (pr.user.type === 'Bot' || EXEMPT_ASSOC.has(pr.author_association)) {
-                core.info(`内部贡献者或机器人（${pr.author_association}），跳过`);
+              if (isExempt(pr.user, pr.author_association)) {
+                // 豁免账号：若之前被打过标/留过提醒（如豁免名单后加的），顺手清掉
+                if ((pr.labels || []).some(l => l.name === LABEL)) {
+                  await clearReminder(pr.number);
+                }
+                core.info(`内部贡献者、机器人或豁免账号（${pr.author_association}/${pr.user.login}），跳过`);
                 return;
               }
               const linked = await linkedIssueNumbers(pr.number);
@@ -150,6 +163,12 @@ jobs:
               let closed = 0, cleared = 0;
               for (const item of items) {
                 if (!item.pull_request) continue; // 只看 PR，issue 有独立的工作流
+                // 豁免账号（维护者从 fork 发的 PR）：清掉可能残留的标记，不再计时/关闭
+                if (isExempt(item.user, item.author_association)) {
+                  await clearReminder(item.number);
+                  cleared++;
+                  continue;
+                }
                 const linked = await linkedIssueNumbers(item.number);
                 if (linked.length > 0) {
                   await clearReminder(item.number);

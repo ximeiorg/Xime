@@ -53,6 +53,12 @@ interface ActionExecutor {
 
     /** 轮换切换到下一个已启用输入方案（菜单栏方案列表顺序，末尾回到首个）。 */
     fun cycleSchema()
+
+    /**
+     * 选择第 [index] 个候选（0 起）。该序号没有候选时退化为空格键语义
+     * （组合态提交首候选 / 空闲态上屏空格），避免把序号当普通文本上屏。
+     */
+    fun selectCandidateOrSpace(index: Int)
 }
 
 /**
@@ -134,6 +140,12 @@ enum class GestureAction(val value: String) {
 
     /** 空格键语义（组合态选首候选 / 空闲态上屏空格）。 */
     SPACE("space"),
+
+    /**
+     * 选择第 N 个候选：value 为候选序号（1 起，如 "2" 即二选）。
+     * 该序号没有候选时退化为空格键语义（组合态提交首候选 / 空闲态上屏空格）。
+     */
+    SELECT_CANDIDATE("select_candidate"),
 
     /** 上滑清空：输入态清输入态 / 空闲态清空全部已上屏（记录撤回）。 */
     CLEAR_ALL("clear_all"),

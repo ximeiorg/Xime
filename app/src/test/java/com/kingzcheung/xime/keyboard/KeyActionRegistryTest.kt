@@ -78,6 +78,23 @@ class KeyActionRegistryTest {
     }
 
     @Test
+    fun `select_candidate 的 value 序号从 1 起映射为 0 起索引`() {
+        assertEquals(ActionDomain.SERVICE, KeyActionRegistry.fromId("select_candidate")!!.domain)
+        val executor = RecordingExecutor()
+        KeyActionRegistry.execute(GestureAction.SELECT_CANDIDATE, KeyActionContext(executor), "2")
+        KeyActionRegistry.execute(GestureAction.SELECT_CANDIDATE, KeyActionContext(executor), "3")
+        assertEquals(listOf(1, 2), executor.candidateSelections)
+    }
+
+    @Test
+    fun `select_candidate 缺省或非法序号按 1 选处理`() {
+        val executor = RecordingExecutor()
+        KeyActionRegistry.execute(GestureAction.SELECT_CANDIDATE, KeyActionContext(executor), "")
+        KeyActionRegistry.execute(GestureAction.SELECT_CANDIDATE, KeyActionContext(executor), "abc")
+        assertEquals(listOf(0, 0), executor.candidateSelections)
+    }
+
+    @Test
     fun `GestureAction fromValue 兼容既有取值`() {
         assertEquals(GestureAction.COPY, GestureAction.fromValue("copy"))
         assertEquals(GestureAction.SEND_RIME, GestureAction.fromValue("send_rime"))
@@ -89,6 +106,7 @@ class KeyActionRegistryTest {
         val commands = mutableListOf<String>()
         val dispatched = mutableListOf<String>()
         val cursorMoves = mutableListOf<Int>()
+        val candidateSelections = mutableListOf<Int>()
         var schemaCycles = 0
 
         override fun commitText(text: String) = Unit
@@ -106,6 +124,9 @@ class KeyActionRegistryTest {
         }
         override fun cycleSchema() {
             schemaCycles++
+        }
+        override fun selectCandidateOrSpace(index: Int) {
+            candidateSelections.add(index)
         }
     }
 }

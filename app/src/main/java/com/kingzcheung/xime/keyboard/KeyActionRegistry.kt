@@ -137,6 +137,10 @@ object KeyActionRegistry {
         register("enter", ActionDomain.SERVICE, GestureAction.ENTER) { c, _ -> c.service.dispatchKey("enter") }
         register("newline", ActionDomain.SERVICE, GestureAction.NEWLINE) { c, _ -> c.service.dispatchKey("newline") }
         register("space", ActionDomain.SERVICE, GestureAction.SPACE) { c, _ -> c.service.dispatchKey("space") }
+        register("select_candidate", ActionDomain.SERVICE, GestureAction.SELECT_CANDIDATE) { c, v ->
+            // value 为 1 起的候选序号；缺省/非法值按 1 选处理（等同空格）
+            c.service.selectCandidateOrSpace((v.trim().toIntOrNull() ?: 1) - 1)
+        }
         register("repeat_space", ActionDomain.SERVICE, GestureAction.REPEAT_SPACE) { c, v ->
             val count = v.toIntOrNull()?.coerceIn(1, 100) ?: 5
             repeat(count) { c.service.dispatchKey("space") }
