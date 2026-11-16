@@ -14,11 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
-import com.kingzcheung.xime.clipboard.ClipboardDragSender
 import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.i18n.tr
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
@@ -36,10 +34,9 @@ fun QuickSendTabContent(
     onQuickSendAddClick: (() -> Unit)? = null,
     onQuickSendEditItem: ((Long, String, String) -> Unit)? = null,
     onLongPressItem: (ClipboardItem, Boolean) -> Unit,
-    /** 拖拽发送已成功启动（收起输入法）。与剪贴板 tab 同款手势语义。 */
+    /** 拖拽发送已成功启动（收起输入法）；拖拽入口已迁到长按菜单的预览卡片。 */
     onDragSendStarted: (() -> Unit)? = null,
 ) {
-    val view = LocalView.current
     if (items.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -61,11 +58,7 @@ fun QuickSendTabContent(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             itemsIndexed(items, key = { _, it -> it.id }) { index, item ->
-                val onStartDrag: () -> Boolean = {
-                    val ok = ClipboardDragSender.startDragAndDrop(view, item, null)
-                    if (ok) onDragSendStarted?.invoke()
-                    ok
-                }
+                // 长按直接弹菜单；拖拽发送在菜单浮层的预览卡片上（与剪贴板 tab 一致）
                 GridItemCard(
                     text = item.text,
                     highlighted = false,
@@ -75,8 +68,6 @@ fun QuickSendTabContent(
                     modifier = Modifier.height(62.dp),
                     onClick = { onSelect(item.text) },
                     onLongClick = { onLongPressItem(item, index % 2 == 0) },
-                    dragKey = item.id,
-                    onStartDrag = onStartDrag,
                 )
             }
         }

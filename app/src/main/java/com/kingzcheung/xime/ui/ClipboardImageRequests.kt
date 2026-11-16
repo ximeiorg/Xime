@@ -25,6 +25,9 @@ const val CLIPBOARD_CARD_MAX_PX = 512
 /** 候选栏图片芯片（约 28dp 圆形缩略图）。 */
 const val CLIPBOARD_CHIP_MAX_PX = 128
 
+/** 长按浮层里的图片预览（卡片约 200dp 宽，留足 3x 屏清晰度，仍远小于原图上限）。 */
+const val CLIPBOARD_PREVIEW_MAX_PX = 1024
+
 /**
  * 构造剪贴板图片请求：[maxWidthPx]×[maxHeightPx] 为解码上限方框。
  *

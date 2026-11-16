@@ -54,9 +54,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -66,6 +68,7 @@ import com.kingzcheung.xime.clipboard.ClipboardItem
 import com.kingzcheung.xime.clipboard.clipboardLongPressDrag
 import com.kingzcheung.xime.i18n.tr
 import com.kingzcheung.xime.ui.CLIPBOARD_CARD_MAX_PX
+import com.kingzcheung.xime.ui.CLIPBOARD_PREVIEW_MAX_PX
 import com.kingzcheung.xime.ui.keyboard.WIDE_CONTAINER_WIDTH
 import com.kingzcheung.xime.ui.keyboard.tolerantClick
 import com.kingzcheung.xime.ui.rememberClipboardImageRequest
@@ -115,6 +118,8 @@ fun ClipboardView(
     var isMultiSelect by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var showClearConfirm by remember { mutableStateOf(false) }
+    // 长按菜单浮层里的预览卡片发起拖拽时，需要宿主 View 调 startDragAndDrop
+    val view = LocalView.current
 
     fun exitMultiSelect() {
         isMultiSelect = false
@@ -325,7 +330,6 @@ fun ClipboardView(
                     onExitMultiSelect = { exitMultiSelect() },
                     onSelectImage = onSelectImage,
                     imageFileOf = imageFileOf,
-                    onDragSendStarted = onDragSendStarted,
                 )
             } else {
                 QuickSendTabContent(
@@ -479,12 +483,35 @@ fun ClipboardView(
                     )
                 )
             }
+            val previewFile = if (anchor.item.isImage) imageFileOf?.invoke(anchor.item) else null
             LongPressMenuOverlay(
                 text = if (anchor.item.isImage) clipboardImageLabel(anchor.item) else anchor.item.text,
                 isLeftColumn = anchor.isLeftColumn,
                 backgroundColor = backgroundColor,
                 contentBgColor = itemBgColor,
                 textColor = textColor,
+                subTextColor = subTextColor,
+                // 图片条目给出真实预览；文件已被配额淘汰时为 null，退回文案。
+                imageFile = previewFile,
+                // 用入库时记录的宽高决定预览框尺寸：不读解码后的 intrinsic（加载前后不跳动），
+                // 也让 1:80 这种长截图有稳定的框可用
+                imageAspectRatio = if (anchor.item.width > 0 && anchor.item.height > 0) {
+                    anchor.item.width.toFloat() / anchor.item.height
+                } else 0f,
+                dragKey = anchor.item.id,
+                // 拖拽发送挂在预览卡片上：长按菜单已弹出，再按住预览拖出即发送。
+                // 列表卡片本身只负责点击/长按，不再被拖拽抢占长按。
+                onStartDrag = if (isMultiSelect) null else {
+                    {
+                        val ok = ClipboardDragSender.startDragAndDrop(view, anchor.item, previewFile)
+                        if (ok) {
+                            // 收起浮层，露出目标应用的接收区域（与列表直接拖拽的行为一致）
+                            menuAnchor = null
+                            onDragSendStarted?.invoke()
+                        }
+                        ok
+                    }
+                },
                 onDismiss = { menuAnchor = null },
                 menuItems = menuItems
             )
@@ -590,6 +617,23 @@ internal data class MenuAnchor(
     val tab: Int
 )
 
+/** 预览图容器的高度区间（dp）：下限防超宽图压成一条线，上限防超高图顶爆浮层。 */
+private val MIN_PREVIEW_HEIGHT = 48.dp
+private val MAX_PREVIEW_HEIGHT = 200.dp
+
+/** Fit 之后短边低于此值（dp）就改用裁切填充——否则细到看不出是张图。 */
+private val MIN_LEGIBLE_EDGE = 28.dp
+
+/**
+ * 长按菜单卡片的宽度（dp）：**固定值，不随容器/屏幕变化**——同一套菜单在任何设备、
+ * 任何键盘宽度下宽度一致，剩余空间全部给左侧内容预览。
+ *
+ * 取值依据：菜单项固定消耗「图标 18dp + 间距 10dp + 左右内边距 13×2dp」= 54dp，
+ * 两字标签在默认字号下约 28dp、放大 1.6 倍时约 45dp，故 112dp 可覆盖到 1.6 倍字号仍单行。
+ * 实际使用时还会乘系统字体缩放并限制不超过容器的 62%（见 [LongPressMenuOverlay]）。
+ */
+private val MENU_CARD_WIDTH = 112.dp
+
 data class LongPressMenuEntry(
     val icon: ImageVector,
     val label: String,
@@ -616,9 +660,7 @@ fun ClipboardTabContent(
     onExitMultiSelect: () -> Unit = {},
     onSelectImage: ((ClipboardItem) -> Unit)? = null,
     imageFileOf: ((ClipboardItem) -> File?)? = null,
-    onDragSendStarted: (() -> Unit)? = null,
 ) {
-    val view = LocalView.current
     if (items.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -654,15 +696,8 @@ fun ClipboardTabContent(
                     if (isMultiSelect) onExitMultiSelect()
                     else onLongPressItem(item, index % 2 == 0)
                 }
-                // 拖拽发送：长按后拖出 slop 启动；多选态不启用（选择模式冲突）。
-                // 启动失败（文件缺失/URI 获取失败/系统拒绝）由手势回退长按菜单。
-                val onStartDrag: (() -> Boolean)? = if (isMultiSelect) null else {
-                    {
-                        val ok = ClipboardDragSender.startDragAndDrop(view, item, imageFileOf?.invoke(item))
-                        if (ok) onDragSendStarted?.invoke()
-                        ok
-                    }
-                }
+                // 列表卡片只负责点击/长按：长按即弹菜单，拖拽发送挪到菜单里的预览卡片上
+                // （长按与拖拽共用一个手势时，用户必须先长按再拖，菜单反而要等抬手才出）。
                 if (item.isImage) {
                     ClipboardImageCard(
                         item = item,
@@ -675,8 +710,6 @@ fun ClipboardTabContent(
                         modifier = Modifier.height(62.dp),
                         onClick = onClick,
                         onLongClick = onLongClick,
-                        dragKey = item.id,
-                        onStartDrag = onStartDrag,
                     )
                 } else {
                     GridItemCard(
@@ -688,8 +721,6 @@ fun ClipboardTabContent(
                         modifier = Modifier.height(62.dp),
                         onClick = onClick,
                         onLongClick = onLongClick,
-                        dragKey = item.id,
-                        onStartDrag = onStartDrag,
                     )
                 }
             }
@@ -720,8 +751,6 @@ fun ClipboardImageCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    dragKey: Any? = null,
-    onStartDrag: (() -> Boolean)? = null,
 ) {
     val shape = RoundedCornerShape(8.dp)
     val bg = if (highlighted) accentColor.copy(alpha = 0.18f) else bgColor
@@ -730,19 +759,11 @@ fun ClipboardImageCard(
             .border(1.5.dp, if (highlighted) accentColor else Color.Transparent, shape)
             .clip(shape)
             .background(bg)
-            // 长按/拖拽由 clipboardLongPressDrag 处理（长按未拖 → onLongClick 弹菜单）。
+            // 长按直接弹菜单（拖拽发送在菜单浮层的预览卡片上，见 ContentCard）。
             // 用 tolerantClick 而非 combinedClickable：卡片位于 LazyVerticalGrid + HorizontalPager 内，
             // 轻点的小位移会被父级手势判定吃掉（部分 ROM/高采样屏幕表现为“点了没反应”）。
-            // onLongClick 仍须传空回调：长按触发后抬起不再 dispatch onClick，避免误上屏
-            .tolerantClick(onClick = onClick, onLongClick = {})
-            // 拖拽手势必须放在点击手势之后（更内层）：Main pass 内层先收，
-            // 长按触发后外层点击手势会消费后续事件，外层收到的位移恒为 Zero
-            .clipboardLongPressDrag(
-                key = dragKey,
-                enabled = onStartDrag != null,
-                onLongPress = onLongClick,
-                onStartDrag = onStartDrag ?: { false },
-            )
+            // 长按震动由 tolerantClick 的 longPressHaptic 发（拖拽已不在这里，没人再发触觉）。
+            .tolerantClick(onClick = onClick, onLongClick = onLongClick, longPressHaptic = true)
     ) {
         if (file != null) {
             AsyncImage(
@@ -789,8 +810,6 @@ fun GridItemCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    dragKey: Any? = null,
-    onStartDrag: (() -> Boolean)? = null,
 ) {
     val shape = RoundedCornerShape(8.dp)
     val bg = if (highlighted) accentColor.copy(alpha = 0.18f) else bgColor
@@ -799,19 +818,11 @@ fun GridItemCard(
             .border(1.5.dp, if (highlighted) accentColor else Color.Transparent, shape)
             .clip(shape)
             .background(bg)
-            // 长按/拖拽由 clipboardLongPressDrag 处理（长按未拖 → onLongClick 弹菜单）。
+            // 长按直接弹菜单（拖拽发送在菜单浮层的预览卡片上，见 ContentCard）。
             // 用 tolerantClick 而非 combinedClickable：卡片位于 LazyVerticalGrid + HorizontalPager 内，
             // 轻点的小位移会被父级手势判定吃掉（部分 ROM/高采样屏幕表现为“点了没反应”）。
-            // onLongClick 仍须传空回调：长按触发后抬起不再 dispatch onClick，避免误上屏
-            .tolerantClick(onClick = onClick, onLongClick = {})
-            // 拖拽手势必须放在点击手势之后（更内层）：Main pass 内层先收，
-            // 长按触发后外层点击手势会消费后续事件，外层收到的位移恒为 Zero
-            .clipboardLongPressDrag(
-                key = dragKey,
-                enabled = onStartDrag != null,
-                onLongPress = onLongClick,
-                onStartDrag = onStartDrag ?: { false },
-            )
+            // 长按震动由 tolerantClick 的 longPressHaptic 发（拖拽已不在这里，没人再发触觉）。
+            .tolerantClick(onClick = onClick, onLongClick = onLongClick, longPressHaptic = true)
             .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.Center
     ) {
@@ -833,6 +844,13 @@ fun LongPressMenuOverlay(
     backgroundColor: Color,
     contentBgColor: Color,
     textColor: Color,
+    subTextColor: Color = textColor.copy(alpha = 0.65f),
+    imageFile: File? = null,
+    /** 原图宽高比（w/h）；<= 0 表示未知，预览按 3:2 兜底。 */
+    imageAspectRatio: Float = 0f,
+    /** 预览卡片上的长按拖拽发送；返回 true = 系统接管。null 表示该条目不可拖拽。 */
+    onStartDrag: (() -> Boolean)? = null,
+    dragKey: Any? = null,
     onDismiss: () -> Unit,
     menuItems: List<LongPressMenuEntry>,
 ) {
@@ -844,39 +862,54 @@ fun LongPressMenuOverlay(
                 .clickable(onClick = onDismiss)
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier.weight(if (isLeftColumn) 2f else 1f),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isLeftColumn) {
-                    ContentCard(
-                        text = text,
-                        bgColor = contentBgColor,
-                        textColor = textColor
-                    )
-                } else {
-                    MenuCard(menuItems = menuItems, cardBgColor = contentBgColor, onDismiss = onDismiss)
-                }
+        // 菜单宽度固定：同一套菜单在任何屏幕/键盘宽度下都一样宽（不再按容器比例算，
+        // 否则大屏上菜单会跟着变宽），剩余空间全部给预览卡片。
+        // 仅随系统字体缩放适度变宽，且不超过容器的 62%——防止极窄键盘下顶出屏幕。
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.6f)
+            val menuWidth = (MENU_CARD_WIDTH * fontScale)
+                .coerceAtMost(maxWidth * 0.62f)
+            val preview: @Composable () -> Unit = {
+                ContentCard(
+                    text = text,
+                    bgColor = contentBgColor,
+                    textColor = textColor,
+                    subTextColor = subTextColor,
+                    imageFile = imageFile,
+                    imageAspectRatio = imageAspectRatio,
+                    onStartDrag = onStartDrag,
+                    dragKey = dragKey
+                )
             }
-
-            Box(
-                modifier = Modifier.weight(if (isLeftColumn) 1f else 2f),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                // 预览卡片与菜单卡片都在这条浮层里垂直居中：两者高度通常不等
+                // （预览随图片/文本长度变，菜单固定四项），贴顶会让视觉重心偏上。
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 if (isLeftColumn) {
-                    MenuCard(menuItems = menuItems, cardBgColor = contentBgColor, onDismiss = onDismiss)
-                } else {
-                    ContentCard(
-                        text = text,
-                        bgColor = contentBgColor,
-                        textColor = textColor
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        preview()
+                    }
+                    MenuCard(
+                        modifier = Modifier.width(menuWidth),
+                        menuItems = menuItems,
+                        cardBgColor = contentBgColor,
+                        onDismiss = onDismiss
                     )
+                } else {
+                    MenuCard(
+                        modifier = Modifier.width(menuWidth),
+                        menuItems = menuItems,
+                        cardBgColor = contentBgColor,
+                        onDismiss = onDismiss
+                    )
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        preview()
+                    }
                 }
             }
         }
@@ -888,21 +921,87 @@ private fun ContentCard(
     text: String,
     bgColor: Color,
     textColor: Color,
+    subTextColor: Color,
+    imageFile: File? = null,
+    /** 原图宽高比（w/h）；<= 0 表示未知，按 3:2 兜底。 */
+    imageAspectRatio: Float = 0f,
+    onStartDrag: (() -> Boolean)? = null,
+    dragKey: Any? = null,
 ) {
+    // 长按预览 → 拖出即发送；长按后原地抬起不做事（菜单已经开着，不需要再弹一次）
+    val dragModifier = if (onStartDrag != null) {
+        Modifier.clipboardLongPressDrag(
+            key = dragKey,
+            enabled = true,
+            onLongPress = {},
+            onStartDrag = onStartDrag,
+        )
+    } else {
+        Modifier
+    }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragModifier),
         shape = RoundedCornerShape(8.dp),
         color = bgColor
     ) {
-        Text(
-            text = text,
-            color = textColor,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            maxLines = 8,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
-        )
+        if (imageFile != null) {
+            // 图片条目：给真正的缩略预览，分辨率作为底部说明（无预览时只有一行「图片 · 宽×高」，
+            // 用户根本分不清是哪张图）。解码上限显式给死，避免大图整图进内存。
+            // 尺寸由**入库时记录的宽高**决定，不依赖解码后的 intrinsic size：
+            // 加载前后容器尺寸一致（不跳动），且极端比例的图不会算出离谱的高度。
+            Column(modifier = Modifier.padding(6.dp)) {
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val ratio = if (imageAspectRatio > 0f) imageAspectRatio else 1.5f
+                    // 按原图比例算出的高度，夹在 [48dp, 200dp]：既不会把浮层顶爆，
+                    // 也不会让超宽图压成一条几像素高的横线。
+                    val naturalHeight = maxWidth / ratio
+                    val boxHeight = naturalHeight.coerceIn(MIN_PREVIEW_HEIGHT, MAX_PREVIEW_HEIGHT)
+                    // Fit 之后短边还剩多少：小于 MIN_LEGIBLE_EDGE 就别 Fit 了
+                    // （1:80 的长截图 Fit 出来只有两三像素宽，等于看不见），改裁切填充。
+                    val fittedShortEdge: Dp? = when {
+                        naturalHeight > MAX_PREVIEW_HEIGHT -> MAX_PREVIEW_HEIGHT * ratio
+                        naturalHeight < MIN_PREVIEW_HEIGHT -> maxWidth / ratio
+                        else -> null // 正好铺满，不需要判定
+                    }
+                    val crop = fittedShortEdge != null && fittedShortEdge < MIN_LEGIBLE_EDGE
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(boxHeight)
+                            .clip(RoundedCornerShape(6.dp))
+                    ) {
+                        AsyncImage(
+                            // 解码框取卡片实际像素与上限的较小值：长图不会被按原长边解码
+                            model = rememberClipboardImageRequest(imageFile, CLIPBOARD_PREVIEW_MAX_PX),
+                            contentDescription = text,
+                            contentScale = if (crop) ContentScale.Crop else ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = text,
+                    color = subTextColor,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+        } else {
+            Text(
+                text = text,
+                color = textColor,
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                maxLines = 8,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+            )
+        }
     }
 }
 
@@ -911,9 +1010,10 @@ private fun MenuCard(
     menuItems: List<LongPressMenuEntry>,
     cardBgColor: Color,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         color = cardBgColor
     ) {
@@ -950,7 +1050,7 @@ fun LongPressMenuItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 11.dp),
+            .padding(horizontal = 13.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -959,11 +1059,15 @@ fun LongPressMenuItem(
             tint = tint,
             modifier = Modifier.size(18.dp)
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = label,
             color = tint,
-            fontSize = 14.sp
+            fontSize = 14.sp,
+            // 菜单项一句话就是一句话：宁可省略也不换行，否则窄键盘下「拆词」会竖排成两行
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
