@@ -17,5 +17,5 @@ name = "xime_p2p_jni"
 crate-type = ["cdylib"]
 
 [dependencies]
-jni = { version = "0.22.4", default-features = false }
+jni = { version = "0.21", default-features = false }
 xime-p2p-c = { path = "../xime-p2p-c" }
