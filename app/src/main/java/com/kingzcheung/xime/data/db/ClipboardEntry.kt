@@ -1,4 +1,4 @@
-package com.kingzcheung.xime.clipboard.db
+package com.kingzcheung.xime.data.db
 
 import androidx.room3.ColumnInfo
 import androidx.room3.Entity

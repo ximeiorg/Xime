@@ -16,8 +16,8 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import com.kingzcheung.xime.clipboard.db.ClipboardDatabase
-import com.kingzcheung.xime.clipboard.db.ClipboardEntry
+import com.kingzcheung.xime.data.db.XimeDatabase
+import com.kingzcheung.xime.data.db.ClipboardEntry
 import com.kingzcheung.xime.plugin.core.api.ClipboardProfile
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -475,9 +475,9 @@ class ClipboardManager private constructor(private val context: Context) {
         selfClipboardImagePath = null
     }
 
-    private val database = ClipboardDatabase.getInstance(context)
+    private val database = XimeDatabase.getInstance(context)
     private val dao = database.clipboardDao()
-    private val scope = ClipboardDatabase.scope()
+    private val scope = XimeDatabase.scope()
 
     private val _clipboardItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val clipboardItems: StateFlow<List<ClipboardItem>> = _clipboardItems.asStateFlow()
