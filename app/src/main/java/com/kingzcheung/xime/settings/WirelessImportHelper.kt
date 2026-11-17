@@ -276,6 +276,7 @@ class WirelessImportHelper(private val context: Context) {
                     name.endsWith(".tar.gz", ignoreCase = true) ||
                     name.endsWith(".tgz", ignoreCase = true) ||
                     name.endsWith(".yaml") || name.endsWith(".schema.yaml") || name.endsWith(".dict.yaml") ||
+                    name.endsWith(".scel", ignoreCase = true) ||
                     name.endsWith(".jpg", ignoreCase = true) || name.endsWith(".jpeg", ignoreCase = true) ||
                     name.endsWith(".png", ignoreCase = true) ||
                     name.endsWith(".ttf", ignoreCase = true) || name.endsWith(".otf", ignoreCase = true) ||

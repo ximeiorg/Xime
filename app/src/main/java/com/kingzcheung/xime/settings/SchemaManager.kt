@@ -8,6 +8,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.PowerManager
 import android.util.Log
+import com.kingzcheung.xime.dictionary.ImportedDictManager
 import com.kingzcheung.xime.scheme.SchemeArchive
 import com.kingzcheung.xime.scheme.SchemeFiles
 import com.kingzcheung.xime.scheme.SchemeInstaller
@@ -15,6 +16,9 @@ import com.kingzcheung.xime.scheme.SchemePackages
 import com.kingzcheung.xime.scheme.SchemeStore
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.rime.RimeConfigHelper
+import com.kingzcheung.xime.lexicon.LexiconFormatException
+import com.kingzcheung.xime.lexicon.LexiconFormats
+import com.kingzcheung.xime.lexicon.LexiconParser
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.charleskorn.kaml.YamlList
@@ -30,6 +34,7 @@ import okhttp3.Request
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -840,6 +845,8 @@ object SchemaManager {
     data class ImportResult(
         val success: Boolean,
         val installedDirect: Boolean = false,
+        /** 非空时优先于调用方默认文案（如词库导入的条数/挂载方案）。 */
+        val message: String? = null,
     )
 
     /** 判断文件名是否为压缩包。 */
@@ -879,6 +886,10 @@ object SchemaManager {
                 name.removeSuffix(".txt")
             name.endsWith(".dict.yaml.txt", ignoreCase = true) ->
                 name.removeSuffix(".txt")
+            name.endsWith(".txt", ignoreCase = true) -> {
+                val withoutTxt = name.removeSuffix(".txt")
+                if (LexiconFormats.findByFileName(withoutTxt) != null) withoutTxt else name
+            }
             else -> name
         }
     }
@@ -895,8 +906,15 @@ object SchemaManager {
         displayName: String,
         inputStream: java.io.InputStream,
         autoEnable: Boolean = true,
+        lexiconSchemeIds: List<String> = emptyList(),
     ): ImportResult = withContext(Dispatchers.IO) {
         val name = sanitizeDisplayName(displayName)
+        val lexiconParser = LexiconFormats.findByFileName(name)
+        if (lexiconParser != null) {
+            return@withContext importLexiconFile(
+                context, name, inputStream, lexiconParser, lexiconSchemeIds
+            )
+        }
         when {
             isFont(name) -> ImportResult(saveInto(getFontsDir(context), name, inputStream))
             isImage(name) -> ImportResult(saveInto(getThemesDir(context), name, inputStream))
@@ -915,6 +933,70 @@ object SchemaManager {
                 ImportResult(true, installedDirect = true)
             }
         }
+    }
+
+    /** 已注册的词库格式：读文件 -> 解析器 -> 派生词典管线。 */
+    private suspend fun importLexiconFile(
+        context: Context,
+        name: String,
+        inputStream: InputStream,
+        parser: LexiconParser,
+        schemeIds: List<String>,
+    ): ImportResult {
+        val limit = parser.maxBytes
+        val bytes = try {
+            inputStream.use { readAllBytesLimited(it, limit + 1) }
+        } catch (e: Exception) {
+            return ImportResult(
+                false,
+                message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+            )
+        }
+        if (bytes.size > limit) {
+            return ImportResult(
+                false,
+                message = tr(R.string.s_daorushibai_2, tr(R.string.s_ciku_wenjianguoda)),
+            )
+        }
+        val parsed = try {
+            parser.parse(name, bytes)
+        } catch (e: LexiconFormatException) {
+            return ImportResult(
+                false,
+                message = tr(
+                    R.string.s_daorushibai_2,
+                    tr(R.string.s_ciku_geshibuzhengque, e.message ?: ""),
+                ),
+            )
+        } catch (e: Exception) {
+            return ImportResult(
+                false,
+                message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+            )
+        }
+
+        return ImportedDictManager.importLexicon(context, parsed, name, schemeIds).fold(
+            onSuccess = { record ->
+                val schemeId = record.attachedSchemas.firstOrNull().orEmpty()
+                val schemeName = getSchemaDisplayName(context, schemeId) ?: schemeId
+                ImportResult(
+                    success = true,
+                    installedDirect = true,
+                    message = tr(
+                        R.string.s_ciku_daoruchenggong,
+                        record.displayName,
+                        record.entryCount,
+                        schemeName,
+                    ),
+                )
+            },
+            onFailure = { e ->
+                ImportResult(
+                    false,
+                    message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+                )
+            },
+        )
     }
 
     /** 写到目录下的同名文件；父目录按需创建。 */
@@ -1142,6 +1224,19 @@ object SchemaManager {
             Log.e(TAG, "Failed to import from URL: $url", e)
             ImportResult(false)
         }
+    }
+
+    /** 读取至多 [limit] 字节；超出时只多读 1 字节返回，由调用方判超。 */
+    private fun readAllBytesLimited(input: InputStream, limit: Int): ByteArray {
+        val buffer = ByteArrayOutputStream()
+        val chunk = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(chunk)
+            if (read < 0) break
+            buffer.write(chunk, 0, minOf(read, limit + 1 - buffer.size()))
+            if (buffer.size() > limit) break
+        }
+        return buffer.toByteArray()
     }
 
     private fun getFileName(context: Context, uri: Uri): String? {

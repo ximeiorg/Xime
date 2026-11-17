@@ -240,7 +240,7 @@ class MainActivity : ComponentActivity() {
             when (val result = ImportManager.import(this@MainActivity, uri)) {
                 is ImportManager.ImportResult.Content -> {
                     launch(Dispatchers.Main) {
-                        val msg = when {
+                        val msg = result.message ?: when {
                             !result.success -> tr(R.string.s_daorushibai)
                             result.installedDirect -> tr(R.string.s_daoruchenggong_yifangru_rime_mulu)
                             else -> tr(R.string.s_fangandaoruchenggong_qingdao_s_3a7ee)

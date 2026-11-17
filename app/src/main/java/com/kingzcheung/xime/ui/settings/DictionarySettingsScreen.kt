@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.twotone.DataObject
+import androidx.compose.material.icons.twotone.DriveFolderUpload
 import androidx.compose.material.icons.twotone.Storage
 import androidx.compose.material.icons.twotone.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,6 +60,7 @@ fun DictionaryHubContent(
     onBack: () -> Unit,
     onNavigateToUserDict: () -> Unit,
     onNavigateToCustomPhrase: () -> Unit,
+    onNavigateToImportedDict: () -> Unit,
 ) {
     val viewModel: DictionaryHubViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -109,6 +111,19 @@ fun DictionaryHubContent(
                     subtitle = tr(R.string.s_buchongfanganmabiaozhiwaidecha_f3531) +
                         (uiState.customPhraseCount?.let { tr(R.string.s_tiao, it) } ?: ""),
                     onClick = onNavigateToCustomPhrase,
+                    showArrow = true
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 72.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+                SettingsItem(
+                    icon = Icons.TwoTone.DriveFolderUpload,
+                    title = tr(R.string.s_daoruciku),
+                    subtitle = tr(R.string.s_daoruciku_jianjie) +
+                        (uiState.importedDictCount?.let { tr(R.string.s_ben, it) } ?: ""),
+                    onClick = onNavigateToImportedDict,
                     showArrow = true
                 )
             })

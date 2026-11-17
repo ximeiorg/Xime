@@ -199,7 +199,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                     refresh()
                     _importCompleted.tryEmit(Unit)
                     showToast(
-                        when {
+                        result.message ?: when {
                             !result.success -> tr(R.string.s_daorushibai)
                             result.installedDirect -> tr(R.string.s_daoruchenggong_yifangru_rime_mulu)
                             else -> tr(R.string.s_daoruchenggong_kezailiebiaozho_f4ac5)

@@ -218,6 +218,7 @@ fun SettingsScreen(
             DictionaryHubContent(
                 onNavigateToUserDict = { navController.navigate(SettingsRoutes.DictionaryUserDict) },
                 onNavigateToCustomPhrase = { navController.navigate(SettingsRoutes.DictionaryCustomPhrase) },
+                onNavigateToImportedDict = { navController.navigate(SettingsRoutes.DictionaryImported) },
                 onBack = { navController.popBackStack() }
             )
         }
@@ -226,6 +227,9 @@ fun SettingsScreen(
         }
         composable(SettingsRoutes.DictionaryCustomPhrase) {
             CustomPhraseSettingsContent(onBack = { navController.popBackStack() })
+        }
+        composable(SettingsRoutes.DictionaryImported) {
+            ImportedDictContent(onBack = { navController.popBackStack() })
         }
         composable(SettingsRoutes.SchemaDictBrowser) {
             SchemaDictBrowserContent(

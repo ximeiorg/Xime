@@ -32,6 +32,8 @@ object ImportManager {
         data class Content(
             val success: Boolean,
             val installedDirect: Boolean,
+            /** 非空时优先作为提示文案（词库导入会带条数与挂载方案）。 */
+            val message: String? = null,
         ) : ImportResult()
 
         /** 插件（.xipk）安装结果。 */
@@ -46,7 +48,11 @@ object ImportManager {
         name.endsWith(".xipk", ignoreCase = true)
 
     /** 从 URI 导入（文件选择器、分享等）。按文件名自动路由。 */
-    suspend fun import(context: Context, uri: Uri): ImportResult = withContext(Dispatchers.IO) {
+    suspend fun import(
+        context: Context,
+        uri: Uri,
+        lexiconSchemeIds: List<String> = emptyList(),
+    ): ImportResult = withContext(Dispatchers.IO) {
         val displayName = queryDisplayName(context, uri)
             ?: return@withContext ImportResult.Failed(tr(R.string.s_wufashibiewenjianming))
         val name = SchemaManager.sanitizeDisplayName(displayName)
@@ -64,8 +70,10 @@ object ImportManager {
             if (stream == null) {
                 ImportResult.Failed(tr(R.string.s_wufaduquwenjian))
             } else {
-                val r = SchemaManager.saveImportedFile(context, name, stream)
-                ImportResult.Content(r.success, r.installedDirect)
+                val r = SchemaManager.saveImportedFile(
+                    context, name, stream, lexiconSchemeIds = lexiconSchemeIds
+                )
+                ImportResult.Content(r.success, r.installedDirect, r.message)
             }
         }
     }
@@ -81,6 +89,7 @@ object ImportManager {
         name: String,
         file: File,
         autoEnable: Boolean = true,
+        lexiconSchemeIds: List<String> = emptyList(),
     ): ImportResult = withContext(Dispatchers.IO) {
         val safe = SchemaManager.sanitizeDisplayName(name)
 
@@ -90,8 +99,11 @@ object ImportManager {
                 is InstallerManager.InstallResult.Failure -> ImportResult.Failed(r.reason)
             }
         } else {
-            val r = SchemaManager.saveImportedFile(context, safe, file.inputStream(), autoEnable = autoEnable)
-            ImportResult.Content(r.success, r.installedDirect)
+            val r = SchemaManager.saveImportedFile(
+                context, safe, file.inputStream(),
+                autoEnable = autoEnable, lexiconSchemeIds = lexiconSchemeIds,
+            )
+            ImportResult.Content(r.success, r.installedDirect, r.message)
         }
     }
 
