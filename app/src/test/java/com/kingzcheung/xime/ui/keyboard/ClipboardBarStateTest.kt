@@ -1,7 +1,7 @@
 package com.kingzcheung.xime.ui.keyboard
 
 import com.kingzcheung.xime.clipboard.ClipboardItem
-import com.kingzcheung.xime.clipboard.db.ClipboardEntry
+import com.kingzcheung.xime.data.db.ClipboardEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

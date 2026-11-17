@@ -23,7 +23,7 @@ import java.util.Locale
  * - logs         filesDir/logs（保留 FileLogger 当日活跃文件，其句柄仍被持有）
  * - schema_cache rime/build 编译产物 + rime/logs；清除后复位部署标记，
  *                下次启动 ensureDeployment 自动全量重建，词库/自定义配置不受影响
- * - clipboard    Room 数据库文件（clipboard.db*）+ filesDir/clipboard_images 图片文件；
+ * - clipboard    Room 数据库文件（xime.db*，与导入词库元数据共用）+ filesDir/clipboard_images 图片文件；
  *                清除走 ClipboardManager 的剪贴板历史清空（保留快捷发送），
  *                并回收图片文件与数据库无引用的残留
  * - models       filesDir/models 已下载模型；清除后需重新下载
@@ -68,9 +68,9 @@ object StorageStats {
 
     /** 方案市场下载包目录（与 rime/ 同级；builtin 子目录为内置方案包，不可清除）。 */
     fun marketDir(context: Context): File = File(context.filesDir, "market")
-    fun clipboardDbFiles(context: Context): List<File> {
+    fun databaseFiles(context: Context): List<File> {
         val dbDir = File(context.filesDir, "databases")
-        return listOf("clipboard.db", "clipboard.db-wal", "clipboard.db-shm")
+        return listOf("xime.db", "xime.db-wal", "xime.db-shm")
             .map { File(dbDir, it) }
             .filter { it.exists() }
     }
@@ -97,7 +97,7 @@ object StorageStats {
         val marketSize = directorySize(marketDir(context))
         // 剪贴板类目 = Room 库文件 + 图片文件（files/clipboard_images）；
         // 不并入的话图片目录会落进 otherSize（不可清理的"其他数据"）
-        val clipboardSize = clipboardDbFiles(context).sumOf { it.length() } +
+        val clipboardSize = databaseFiles(context).sumOf { it.length() } +
             directorySize(clipboardImagesDir(context))
         val logsSize = directorySize(logsDir(context))
         val cacheSize = directorySize(context.cacheDir)
