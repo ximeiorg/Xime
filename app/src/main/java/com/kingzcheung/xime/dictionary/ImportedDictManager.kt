@@ -253,11 +253,34 @@ object ImportedDictManager {
                     }
                     .map { it.id }
 
-                if (original == null && packs.isEmpty()) continue
+                // 方案原文件里声明的 packs 可能指向不存在的词典（如 pinyin_simp 的
+                // user_simp）。这种悬空项排在最前会让 librime 的 pack 循环丢掉
+                // syllabary，导致后面导入词库编出 0 条目表；不碰原 schema，
+                // 在 custom.yaml 里改成显式覆盖 packs，只保留有源文件的那几项。
+                val schemaFile = File(rimeDir, "$schemeId.schema.yaml")
+                val declared = if (schemaFile.isFile) {
+                    parsePacks(schemaFile.readText(Charsets.UTF_8), namespace)
+                } else {
+                    emptyList()
+                }
+                val validDeclared = declared.filter { File(rimeDir, "$it.dict.yaml").isFile }
+                val hasDangling = validDeclared.size != declared.size
+                val finalPacks = if (hasDangling) {
+                    (validDeclared + packs).distinct()
+                } else {
+                    packs
+                }
+
+                if (original == null && finalPacks.isEmpty()) continue
                 backups += CustomBackup(custom, original)
                 custom.parentFile?.mkdirs()
                 custom.writeText(
-                    upsertManagedPackBlock(original ?: "", namespace, packs),
+                    upsertManagedPackBlock(
+                        original ?: "",
+                        namespace,
+                        finalPacks,
+                        replacePacks = hasDangling,
+                    ),
                     Charsets.UTF_8,
                 )
             }
@@ -365,6 +388,8 @@ object ImportedDictManager {
         original: String,
         namespace: String,
         packNames: List<String>,
+        /** true = 直接覆盖 `packs`；false = 追加到现有 `packs`。 */
+        replacePacks: Boolean = false,
     ): String {
         val without = removeManagedBlock(original)
         val cleaned = without.trimEnd()
@@ -375,8 +400,8 @@ object ImportedDictManager {
             require(it.matches(Regex("[A-Za-z0-9_-]+"))) { "非法 packs 项：$it" }
         }
 
-        val key = if (namespace == "translator") {
-            "\"translator/packs/+\""
+        val key = if (replacePacks) {
+            "\"$namespace/packs\""
         } else {
             "\"$namespace/packs/+\""
         }
@@ -408,6 +433,38 @@ object ImportedDictManager {
         return pattern.replace(text, "")
             .replace(Regex("\\n{3,}"), "\n\n")
             .trimEnd()
+    }
+
+    /**
+     * 读取 schema 顶层的 `<namespace>/packs` 列表（纯文本解析，不引入完整 YAML 解析，
+     * 也避免兼容 `__include`/锚点等 Rime 扩展写法）。
+     */
+    internal fun parsePacks(schemaText: String, namespace: String): List<String> {
+        val result = ArrayList<String>()
+        var inSection = false
+        var inPacks = false
+        for (raw in schemaText.lineSequence()) {
+            val line = raw.substringBefore('#').trimEnd()
+            if (line.isBlank()) continue
+            val indent = line.length - line.trimStart().length
+            val trimmed = line.trim()
+            if (!inSection) {
+                if (indent == 0 && trimmed == "$namespace:") inSection = true
+                continue
+            }
+            if (indent == 0) break
+            if (!inPacks) {
+                if (indent == 2 && trimmed == "packs:") inPacks = true
+                continue
+            }
+            if (trimmed.startsWith("- ")) {
+                val name = trimmed.removePrefix("- ").trim().trim('"', '\'')
+                if (name.isNotEmpty()) result += name
+            } else if (indent <= 2) {
+                inPacks = false
+            }
+        }
+        return result
     }
 
     internal data class TranslatorInfo(val component: String, val namespace: String)
@@ -518,6 +575,11 @@ object ImportedDictManager {
                         else tr(R.string.s_ciku_bushu_shibai)
                     )
                 }
+                // 防御：librime 的 packs 编译曾出现「文件存在但 0 条目」的产物
+                // （同一 schema 有多个 packs 且前一个源文件缺失时 syllabary 被搬空）。
+                if (tableEntryCount(table) == 0) {
+                    throw IOException(tr(R.string.s_ciku_bianyi_weikong, id))
+                }
             }
 
             dao(context).upsert(record.toEntity())
@@ -563,6 +625,28 @@ object ImportedDictManager {
             throw e
         }
     }
+
+    /**
+     * 读 `Rime::Table/4.0` 表头里的 num_entries（偏移 0x28，小端）。
+     * 只认这个格式；其它版本返回 null（不做判断）。
+     */
+    private fun tableEntryCount(file: File): Int? = runCatching {
+        file.inputStream().use { input ->
+            val header = ByteArray(0x2C)
+            var read = 0
+            while (read < header.size) {
+                val n = input.read(header, read, header.size - read)
+                if (n <= 0) return null
+                read += n
+            }
+            val format = String(header, 0, 32, Charsets.US_ASCII).trimEnd('\u0000')
+            if (!format.startsWith("Rime::Table/")) return null
+            (header[0x28].toInt() and 0xff) or
+                ((header[0x29].toInt() and 0xff) shl 8) or
+                ((header[0x2a].toInt() and 0xff) shl 16) or
+                ((header[0x2b].toInt() and 0xff) shl 24)
+        }
+    }.getOrNull()
 
     private fun newId(rimeDir: File, sourceName: String): String {
         repeat(20) {

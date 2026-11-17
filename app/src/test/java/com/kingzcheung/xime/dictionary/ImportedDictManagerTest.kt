@@ -123,6 +123,63 @@ class ImportedDictManagerTest {
     }
 
     @Test
+    fun `parsePacks reads list under translator section`() {
+        val schema = """
+            speller:
+              alphabet: abc
+            translator:
+              dictionary: pinyin_simp
+              packs:
+                - user_simp
+                - custom_pack
+              preedit_format:
+                - xform/a/b/
+            other:
+              packs:
+                - ignored
+        """.trimIndent()
+
+        assertEquals(listOf("user_simp", "custom_pack"), ImportedDictManager.parsePacks(schema, "translator"))
+        assertEquals(emptyList<String>(), ImportedDictManager.parsePacks(schema, "unknown"))
+    }
+
+    @Test
+    fun `parsePacks stops at next top level section`() {
+        val schema = """
+            translator:
+              packs:
+                - a
+            punctuator:
+              packs:
+                - b
+        """.trimIndent()
+
+        assertEquals(listOf("a"), ImportedDictManager.parsePacks(schema, "translator"))
+    }
+
+    @Test
+    fun `replace mode overrides packs instead of appending`() {
+        val original = """
+            patch:
+              # >>> xime-imported-dicts
+              "translator/packs/+":
+                - old
+              # <<< xime-imported-dicts
+        """.trimIndent() + "\n"
+        val text = ImportedDictManager.upsertManagedPackBlock(
+            original,
+            "translator",
+            listOf("xime_import_1"),
+            replacePacks = true,
+        )
+
+        assertTrue(text.contains("\"translator/packs\":"))
+        assertFalse(text.contains("\"translator/packs/+\":"))
+        assertTrue(text.contains("- xime_import_1"))
+        assertFalse(text.contains("- old"))
+    }
+
+    @Test
     fun `parseMainTranslator handles standard and namespaced translators`() {
         val standard = """
             engine:

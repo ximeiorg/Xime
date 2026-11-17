@@ -157,7 +157,11 @@ fun WirelessImportSheet(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = tr(R.string.s_tuozhuaishurufanganhuochajianw_5164d),
+                    text = if (lexiconSchemeIds.isNotEmpty()) {
+                    tr(R.string.s_tuozhuaishurucikuwenjian)
+                } else {
+                    tr(R.string.s_tuozhuaishurufanganhuochajianw_5164d)
+                },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center

@@ -506,6 +506,7 @@
     <string name="s_ciku_geshibuzhichi">不支持这种词库格式（支持：%1$s）</string>
     <string name="s_ciku_bushu_shibai">词库部署失败</string>
     <string name="s_ciku_meiyouchanwu">词库没有编译出 %1$s.table.bin</string>
+    <string name="s_ciku_bianyi_weikong">词库编译结果为空（%1$s.table.bin 0 条），请重新部署后再试</string>
     <string name="s_ciku">词库</string>
     <string name="s_bianma_wubi">五笔</string>
     <string name="s_bianma_qita">其他</string>
@@ -514,7 +515,12 @@
     <string name="s_daoruciku_shuoming">支持搜狗 .scel/.bin、百度 .bdict/.txt、Fcitx5 .dict/.txt 等拼音词库；.txt 按内容识别。导入时选择要挂载的方案；导入后生成派生词库，不改动原方案的词典文件。</string>
     <string name="s_daoruciku_kong">还没有导入的词库</string>
     <string name="s_daoruciku_tianjia">导入词库</string>
+    <string name="s_daoruciku_congwenjian">从文件导入</string>
     <string name="s_daoruciku_congurl">从 URL 导入</string>
+    <string name="s_daoruciku_zhi_ziku">当前页面只支持导入词库文件</string>
+    <string name="s_daoru_fanganbao_tishi">方案包已下载，请到「方案管理」安装</string>
+    <string name="s_daoru_peizhi_tishi">已保存到 rime 目录，部署后生效</string>
+    <string name="s_daoru_ziyuan_tishi">已导入到本地资源</string>
     <string name="s_daoruciku_tiaoshu">%1$s 条</string>
     <string name="s_daoruciku_guazai">挂到：%1$s</string>
     <string name="s_daoruciku_yibianyi">已编译</string>
@@ -1017,6 +1023,7 @@
     <string name="s_erweima">二维码</string>
     <string name="s_diannaoliulanqidakaishangfangw_0b91b">电脑浏览器打开上方网址，或在手机浏览器输入</string>
     <string name="s_tuozhuaishurufanganhuochajianw_5164d">拖拽输入方案或插件文件到页面上传</string>
+    <string name="s_tuozhuaishurucikuwenjian">拖拽词库文件（.scel/.bdict/.bin/.dict/.txt）到页面上传</string>
     <string name="s_yidaoru_2">已导入 (%1$s)</string>
     <string name="s_dongtaipeise">动态配色</string>
     <string name="s_xunyicaozi">薰衣草紫</string>

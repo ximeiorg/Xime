@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.AlertDialog
@@ -111,12 +110,6 @@ fun ImportedDictContent(onBack: () -> Unit) {
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { importLauncher.launch(arrayOf("*/*")) },
-                        enabled = !uiState.isWorking,
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = tr(R.string.s_daoruciku_tianjia))
-                    }
                     Box {
                         IconButton(
                             onClick = { showMenu = true },
@@ -131,6 +124,13 @@ fun ImportedDictContent(onBack: () -> Unit) {
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(tr(R.string.s_daoruciku_congwenjian)) },
+                                onClick = {
+                                    showMenu = false
+                                    importLauncher.launch(arrayOf("*/*"))
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text(tr(R.string.s_liulanqidaoru)) },
                                 onClick = {
