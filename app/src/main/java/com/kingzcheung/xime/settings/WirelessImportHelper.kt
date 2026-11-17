@@ -1,6 +1,7 @@
 package com.kingzcheung.xime.settings
 
 import com.kingzcheung.xime.R
+import com.kingzcheung.xime.lexicon.LexiconFormats
 
 import com.kingzcheung.xime.i18n.tr
 
@@ -38,6 +39,8 @@ data class UploadResult(
     val error: String? = null,
     /** 导入管线给出的提示（例如「未挂载，需选择方案」）。 */
     val message: String? = null,
+    /** 落点类型：lexicon / scheme_package / config / font / image / file / plugin。 */
+    val kind: String? = null,
 )
 
 @Serializable
@@ -59,6 +62,8 @@ class WirelessImportHelper(
     private val context: Context,
     /** 从词库页进入时预先选好的方案；网页上传的词库文件直接挂到这些方案。 */
     private val lexiconSchemeIds: List<String> = emptyList(),
+    /** 词库页专用模式：页面只接受词库文件，其它类型直接拒绝。 */
+    private val lexiconOnly: Boolean = lexiconSchemeIds.isNotEmpty(),
 ) {
     private var server: EmbeddedServer<*, *>? = null
 
@@ -118,6 +123,14 @@ class WirelessImportHelper(
                         return@get
                     }
                     serveAsset(call, "www/assets/$file")
+                }
+                // 页面模式（手动输入地址也能拿到，不依赖 URL 查询串）
+                get("/config") {
+                    val mode = if (lexiconOnly) "lexicon" else "any"
+                    call.respondText(
+                        """{"mode":"$mode"}""",
+                        ContentType.Application.Json,
+                    )
                 }
                 // 返回 app 数据目录树（filesDir 下递归），供前端右侧展示
                 get("/tree") {
@@ -225,6 +238,9 @@ class WirelessImportHelper(
                     rimeDir.mkdirs()
                     val tmpFile = File.createTempFile("upload_", ".tmp", rimeDir)
                     var lastName = ""
+                            var lastKind = ""
+                            var lastMessage = ""
+                            var lastError = ""
 
                     try {
                         // 1. 流式写入临时文件（不占堆内存）
@@ -277,6 +293,16 @@ class WirelessImportHelper(
                                 val contentLen = partEnd - contentStart
 
                 when {
+                    lexiconOnly && LexiconFormats.candidates(name).isEmpty() -> {
+                        lastError = tr(R.string.s_daoruciku_zhi_ziku)
+                        _uploadResults.trySend(
+                            UploadResult(
+                                fileName = name,
+                                success = false,
+                                error = lastError,
+                            )
+                        )
+                    }
                     ImportManager.isPluginFile(name) ||
                     name.endsWith(".zip", ignoreCase = true) ||
                     name.endsWith(".tar.gz", ignoreCase = true) ||
@@ -305,29 +331,46 @@ class WirelessImportHelper(
                                 is ImportManager.ImportResult.Plugin -> {
                                     PluginManager.loadEnabledPlugins()
                                     saved = true
-                                    _uploadResults.trySend(UploadResult(fileName = name, success = true))
+                                    lastKind = "plugin"
+                                    lastMessage = tr(R.string.s_chajian_anzhuangchenggong, result.pluginInfo?.name ?: name)
+                                    _uploadResults.trySend(
+                                        UploadResult(
+                                            fileName = name,
+                                            success = true,
+                                            kind = lastKind,
+                                            message = lastMessage,
+                                        )
+                                    )
                                 }
                                 is ImportManager.ImportResult.Content -> {
                                     saved = result.success
+                                    val kind = result.kind?.name?.lowercase()
+                                    val message = result.message ?: kindHint(result.kind) ?: ""
+                                    lastKind = kind ?: ""
+                                    lastMessage = message
                                     _uploadResults.trySend(
                                         if (result.success) {
                                             UploadResult(
                                                 fileName = name,
                                                 success = true,
-                                                message = result.message,
+                                                message = message,
+                                                kind = kind,
                                             )
                                         } else {
+                                            lastError = message ?: tr(R.string.s_baocunshibai)
                                             UploadResult(
                                                 fileName = name,
                                                 success = false,
-                                                error = result.message ?: tr(R.string.s_baocunshibai),
+                                                error = lastError,
+                                                kind = kind,
                                             )
                                         }
                                     )
                                 }
                                 else -> {
+                                    lastError = tr(R.string.s_buzhichidewenjianleixing)
                                     _uploadResults.trySend(
-                                        UploadResult(fileName = name, success = false, error = tr(R.string.s_buzhichidewenjianleixing))
+                                        UploadResult(fileName = name, success = false, error = lastError)
                                     )
                                 }
                             }
@@ -336,7 +379,10 @@ class WirelessImportHelper(
                         }
                     }
                     else -> {
-                        _uploadResults.trySend(UploadResult(fileName = name, success = false, error = tr(R.string.s_buzhichidewenjianleixing)))
+                        lastError = tr(R.string.s_buzhichidewenjianleixing)
+                        _uploadResults.trySend(
+                            UploadResult(fileName = name, success = false, error = lastError)
+                        )
                     }
                 }
                                 pos = nextB + 2
@@ -344,10 +390,15 @@ class WirelessImportHelper(
                         }
 
                         if (saved) {
-                            call.respondText("""{"success":true,"file":"$lastName"}""", ContentType.Application.Json)
+                            call.respondText(
+                                """{"success":true,"file":"${escapeJson(lastName)}","kind":"${escapeJson(lastKind)}","message":"${escapeJson(lastMessage)}"}""",
+                                ContentType.Application.Json,
+                            )
                         } else {
-                            call.respondText("""{"success":false,"error":"No valid file (supported: .yaml, .zip, .tar.gz, .scel, .bdict, .bin, .dict, .txt, .jpg/.png, .ttf/.otf/.woff/.woff2)"}""",
-                                ContentType.Application.Json, HttpStatusCode.BadRequest)
+                            call.respondText(
+                                """{"success":false,"error":"${escapeJson(lastError.ifBlank { "上传失败" })}"}""",
+                                ContentType.Application.Json, HttpStatusCode.BadRequest,
+                            )
                         }
                     } finally {
                         tmpFile.delete()
@@ -358,6 +409,27 @@ class WirelessImportHelper(
 
         Log.i(TAG, "Server started at $url")
         return url
+    }
+
+    /** 按落点类型给出上传后的下一步提示；词库自己有更具体的文案。 */
+    private fun kindHint(kind: ImportKind?): String? = when (kind) {
+        ImportKind.SCHEME_PACKAGE -> tr(R.string.s_daoru_fanganbao_tishi)
+        ImportKind.CONFIG -> tr(R.string.s_daoru_peizhi_tishi)
+        ImportKind.FONT, ImportKind.IMAGE -> tr(R.string.s_daoru_ziyuan_tishi)
+        else -> null
+    }
+
+    private fun escapeJson(value: String): String = buildString(value.length + 8) {
+        for (c in value) {
+            when (c) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (c < ' ') append("\\u%04x".format(c.code)) else append(c)
+            }
+        }
     }
 
     fun stop() {
@@ -379,6 +451,8 @@ class WirelessImportHelper(
             call.respond(HttpStatusCode.NotFound)
             return
         }
+        // 页面/资源随 APK 更新，浏览器缓存会导致“说明还是旧的”，统一 no-store。
+        call.response.header("Cache-Control", "no-store")
         call.respondBytes(bytes, mime)
     }
 

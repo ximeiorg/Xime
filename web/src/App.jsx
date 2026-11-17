@@ -5,8 +5,11 @@ import { keymap } from '@codemirror/view'
 import { Prec } from '@codemirror/state'
 import logo from './assets/logo.png'
 
-const ACCEPT = '.yaml,.zip,.tar.gz,.tgz,.gram,.jpg,.jpeg,.png,.xipk,.ttf,.otf,.woff,.woff2'
-const SUPPORTED = /\.(yaml|zip|tar\.gz|tgz|gram|jpe?g|png|xipk|ttf|otf|woff2?)$/i
+// 模式由服务端 /config 下发（词库页 = lexicon），手动输入地址也能正确切换。
+const ACCEPT_ALL = '.yaml,.zip,.tar.gz,.tgz,.gram,.jpg,.jpeg,.png,.xipk,.ttf,.otf,.woff,.woff2,.scel,.bdict,.bin,.dict,.txt'
+const ACCEPT_LEXICON = '.scel,.bdict,.bin,.dict,.txt'
+const SUPPORTED_ALL = /\.(yaml|zip|tar\.gz|tgz|gram|jpe?g|png|xipk|ttf|otf|woff2?|scel|bdict|bin|dict|txt)$/i
+const SUPPORTED_LEXICON = /\.(scel|bdict|bin|dict|txt)$/i
 
 /** 可在浏览器里编辑的文本类型；与 Android 端 WirelessTextFilePolicy 保持一致。 */
 const EDITABLE = /\.(yaml|yml|txt|md|json|conf|lua)$/i
@@ -16,8 +19,8 @@ const EDIT_MAX_BYTES = 2 * 1024 * 1024
 /** 只读预览上限：更大的词典/binary 请下载查看，避免整文件塞进页面。 */
 const VIEW_MAX_BYTES = 1024 * 1024
 
-function supported(name) {
-  return SUPPORTED.test(name)
+function supported(name, lexiconOnly) {
+  return (lexiconOnly ? SUPPORTED_LEXICON : SUPPORTED_ALL).test(name)
 }
 
 function editable(node) {
@@ -114,6 +117,8 @@ function countStats(node) {
 export default function App() {
   const inputRef = useRef(null)
   const previewRef = useRef(null)
+  const [mode, setMode] = useState('any')
+  const lexiconOnly = mode === 'lexicon'
   const [files, setFiles] = useState([])
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -127,11 +132,18 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState({ dirs: 0, files: 0, totalBytes: 0 })
 
+  useEffect(() => {
+    fetch('/config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.mode) setMode(d.mode) })
+      .catch(() => { /* 旧服务端没有 /config 时按通用模式 */ })
+  }, [])
+
   const addFiles = useCallback((list) => {
     const invalid = []
     const newFiles = []
     for (const f of list) {
-      if (!supported(f.name)) {
+      if (!supported(f.name, lexiconOnly)) {
         invalid.push(f.name)
         continue
       }
@@ -141,7 +153,7 @@ export default function App() {
     }
     if (invalid.length) alert('不支持的类型: ' + invalid.join(', '))
     if (newFiles.length) setFiles((prev) => [...prev, ...newFiles])
-  }, [files])
+  }, [files, lexiconOnly])
 
   const onDrop = useCallback((e) => {
     e.preventDefault()
@@ -162,13 +174,19 @@ export default function App() {
       if (e.lengthComputable) update(id, { progress: Math.round((e.loaded / e.total) * 100) })
     }
     xhr.onload = () => {
-      let ok = false
+      let data = null
       try {
-        ok = JSON.parse(xhr.responseText)?.success === true
+        data = JSON.parse(xhr.responseText)
       } catch (_) { /* ignore */ }
-      update(id, { progress: 100, status: ok ? 'ok' : 'fail' })
+      const ok = data?.success === true
+      update(id, {
+        progress: 100,
+        status: ok ? 'ok' : 'fail',
+        message: ok ? (data?.message || '') : (data?.error || ''),
+        kind: data?.kind || '',
+      })
     }
-    xhr.onerror = () => update(id, { progress: 100, status: 'fail' })
+    xhr.onerror = () => update(id, { progress: 100, status: 'fail', message: '网络错误' })
     update(id, { status: 'uploading', progress: 0 })
     xhr.send(fd)
   }, [update])
@@ -323,9 +341,9 @@ export default function App() {
           </div>
         </div>
 
-        <h1 className="mb-2 text-center text-lg font-semibold text-gray-900 md:text-xl">导入输入方案</h1>
+        <h1 className="mb-2 text-center text-lg font-semibold text-gray-900 md:text-xl">{lexiconOnly ? '导入词库' : '导入输入方案'}</h1>
         <p className="mb-4 text-center text-xs text-gray-500 md:mb-6 md:text-sm">
-          将方案压缩包或者 xime.custom.yaml 拖拽到下方，或点击选择
+          {lexiconOnly ? '将词库文件（.scel/.bdict/.bin/.dict/.txt）拖拽到下方，或点击选择' : '将方案包、词库或 xime.custom.yaml 拖拽到下方，或点击选择'}
         </p>
 
         <div
@@ -344,13 +362,13 @@ export default function App() {
         >
           <div className="mb-2 text-3xl text-gray-400 md:mb-3 md:text-4xl">📄</div>
           <div className="text-sm text-gray-400">拖拽文件到此处</div>
-          <div className="mt-2 text-xs text-gray-300">          支持 .yaml / .zip / .tar.gz / 插件(.xipk) / 图片(.jpg/.png) / 字体(.ttf/.otf)</div>
+          <div className="mt-2 text-xs text-gray-300">          {lexiconOnly ? '支持词库：.scel / .bdict / .bin / .dict / .txt' : '支持方案(.yaml/.zip/.tar.gz) / 词库(.scel/.bdict/.bin/.dict/.txt) / 插件(.xipk) / 图片(.jpg/.png) / 字体(.ttf/.otf)'}</div>
         </div>
 
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPT}
+          accept={lexiconOnly ? ACCEPT_LEXICON : ACCEPT_ALL}
           multiple
           className="hidden"
           onChange={(e) => { if (e.target.files) addFiles(Array.from(e.target.files)); e.target.value = '' }}
@@ -361,7 +379,10 @@ export default function App() {
             {files.map((f) => (
               <div key={f.id} className="relative flex items-center justify-between overflow-hidden rounded-lg bg-gray-100 px-3 py-2 text-xs">
                 <div className="absolute inset-y-0 left-0 bg-blue-200 transition-all" style={{ width: `${f.progress}%` }} />
-                <span className="relative z-10 text-gray-900">{f.name}</span>
+                <span className="relative z-10 flex flex-col text-gray-900">
+                  <span>{f.name}</span>
+                  {f.message ? <span className="text-[11px] font-normal text-gray-500">{f.message}</span> : null}
+                </span>
                 <span className={'relative z-10 ml-2 whitespace-nowrap ' + badgeClass[f.status]}>
                   {statusText(f.status, f.progress)}
                 </span>
@@ -378,13 +399,23 @@ export default function App() {
           {uploading ? '上传中...' : '上传'}
         </button>
 
-        <div className="mt-4 hidden rounded-lg bg-gray-100 p-2.5 text-left text-xs leading-relaxed text-gray-400 md:block">
-          <div>💡 上传文件会自动分类放置：</div>
-          <div>· 方案压缩包(.zip/.tar.gz) → market 目录</div>
-          <div>· 配置文件(.yaml) → rime 目录</div>
-          <div>· 图片(.jpg/.png) → themes 目录</div>
-          <div>· 字体(.ttf/.otf) → fonts 目录</div>
-        </div>
+        {lexiconOnly ? (
+          <div className="mt-4 hidden rounded-lg bg-gray-100 p-2.5 text-left text-xs leading-relaxed text-gray-400 md:block">
+            <div>💡 词库上传后自动解析并挂载：</div>
+            <div>· .scel / .bdict / .bin / .dict / .txt → 导入词库，挂到所选方案</div>
+            <div>· 其它类型文件不会上传</div>
+          </div>
+        ) : (
+          <div className="mt-4 hidden rounded-lg bg-gray-100 p-2.5 text-left text-xs leading-relaxed text-gray-400 md:block">
+            <div>💡 上传文件会自动分类放置：</div>
+            <div>· 方案压缩包(.zip/.tar.gz) → market 目录（到「方案管理」安装）</div>
+            <div>· 词库(.scel/.bdict/.bin/.dict/.txt) → 导入词库（未选方案时先在手机上挂载）</div>
+            <div>· 配置文件(.yaml) → rime 目录（部署后生效）</div>
+            <div>· 插件(.xipk) → 安装插件</div>
+            <div>· 图片(.jpg/.png) → themes 目录</div>
+            <div>· 字体(.ttf/.otf) → fonts 目录</div>
+          </div>
+        )}
 
         {summary && (
           <div
@@ -394,7 +425,7 @@ export default function App() {
             }
           >
             {summary.ok}/{summary.ok + summary.fail} 个成功
-            {summary.fail ? `，${summary.fail} 个失败` : '，请在手机上部署'}
+            {summary.fail ? `，${summary.fail} 个失败` : (lexiconOnly ? '，请在手机上确认' : '，请在手机上部署')}
           </div>
         )}
       </div>

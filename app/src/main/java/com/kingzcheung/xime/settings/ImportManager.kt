@@ -34,6 +34,8 @@ object ImportManager {
             val installedDirect: Boolean,
             /** 非空时优先作为提示文案（词库导入会带条数与挂载方案）。 */
             val message: String? = null,
+            /** 落点类型（词库/方案包/配置/字体/图片/普通文件），供浏览器导入区分。 */
+            val kind: ImportKind? = null,
         ) : ImportResult()
 
         /** 插件（.xipk）安装结果。 */
@@ -73,7 +75,7 @@ object ImportManager {
                 val r = SchemaManager.saveImportedFile(
                     context, name, stream, lexiconSchemeIds = lexiconSchemeIds
                 )
-                ImportResult.Content(r.success, r.installedDirect, r.message)
+                ImportResult.Content(r.success, r.installedDirect, r.message, r.kind)
             }
         }
     }
@@ -103,7 +105,7 @@ object ImportManager {
                 context, safe, file.inputStream(),
                 autoEnable = autoEnable, lexiconSchemeIds = lexiconSchemeIds,
             )
-            ImportResult.Content(r.success, r.installedDirect, r.message)
+            ImportResult.Content(r.success, r.installedDirect, r.message, r.kind)
         }
     }
 

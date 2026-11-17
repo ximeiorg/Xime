@@ -850,6 +850,8 @@ object SchemaManager {
         val installedDirect: Boolean = false,
         /** 非空时优先于调用方默认文案（如词库导入的条数/挂载方案）。 */
         val message: String? = null,
+        /** 落点类型；浏览器导入/UI 据此区分成功后的后续动作。 */
+        val kind: ImportKind? = null,
     )
 
     /** 判断文件名是否为压缩包。 */
@@ -919,11 +921,20 @@ object SchemaManager {
             )
         }
         when {
-            isFont(name) -> ImportResult(saveInto(getFontsDir(context), name, inputStream))
-            isImage(name) -> ImportResult(saveInto(getThemesDir(context), name, inputStream))
+            isFont(name) -> ImportResult(
+                saveInto(getFontsDir(context), name, inputStream),
+                kind = ImportKind.FONT,
+            )
+            isImage(name) -> ImportResult(
+                saveInto(getThemesDir(context), name, inputStream),
+                kind = ImportKind.IMAGE,
+            )
             isArchive(name) -> {
                 val pkgDir = getMarketDir(context, generateImportId())
-                ImportResult(saveInto(pkgDir, name, inputStream))
+                ImportResult(
+                    saveInto(pkgDir, name, inputStream),
+                    kind = ImportKind.SCHEME_PACKAGE,
+                )
             }
             else -> {
                 val ok = saveInto(getRimeDir(context), name, inputStream)
@@ -933,7 +944,7 @@ object SchemaManager {
                     val schemaId = name.removeSuffix(".schema.yaml")
                     setEnabledSchemas(context, getEnabledSchemas(context) + schemaId)
                 }
-                ImportResult(true, installedDirect = true)
+                ImportResult(true, installedDirect = true, kind = configKind(name))
             }
         }
     }
@@ -967,6 +978,7 @@ object SchemaManager {
                 return ImportResult(
                     false,
                     message = tr(R.string.s_daoruciku_buzhichi, LexiconFormats.supportedDescription()),
+                    kind = ImportKind.LEXICON,
                 )
             }
             return savePlainImport(context, name, head, inputStream, autoEnable)
@@ -977,13 +989,23 @@ object SchemaManager {
             return ImportResult(
                 false,
                 message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+                kind = ImportKind.LEXICON,
             )
         } ?: return ImportResult(
             false,
             message = tr(R.string.s_daorushibai_2, tr(R.string.s_ciku_wenjianguoda)),
+            kind = ImportKind.LEXICON,
         )
         return importLexiconFile(context, name, bytes, parser, schemeIds)
     }
+
+    /** yaml / txt 视为 Rime 配置，其余算普通文件。 */
+    private fun configKind(name: String): ImportKind =
+        if (name.endsWith(".yaml", true) || name.endsWith(".yml", true) || name.endsWith(".txt", true)) {
+            ImportKind.CONFIG
+        } else {
+            ImportKind.FILE
+        }
 
     /** 内容识别不出词库格式时，按原来的普通文件流程落地。 */
     private fun savePlainImport(
@@ -994,13 +1016,13 @@ object SchemaManager {
         autoEnable: Boolean,
     ): ImportResult {
         val ok = saveInto(getRimeDir(context), name, head, inputStream)
-        if (!ok) return ImportResult(false)
+        if (!ok) return ImportResult(false, kind = configKind(name))
         copyToOverlay(context, name)
         if (autoEnable && name.endsWith(".schema.yaml")) {
             val schemaId = name.removeSuffix(".schema.yaml")
             setEnabledSchemas(context, getEnabledSchemas(context) + schemaId)
         }
-        return ImportResult(true, installedDirect = true)
+        return ImportResult(true, installedDirect = true, kind = configKind(name))
     }
 
     /** 已注册的词库格式：解析字节 -> 派生词典管线。 */
@@ -1049,12 +1071,18 @@ object SchemaManager {
                         schemeName,
                     )
                 }
-                ImportResult(success = true, installedDirect = true, message = message)
+                ImportResult(
+                    success = true,
+                    installedDirect = true,
+                    message = message,
+                    kind = ImportKind.LEXICON,
+                )
             },
             onFailure = { e ->
                 ImportResult(
                     false,
                     message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+                    kind = ImportKind.LEXICON,
                 )
             },
         )
