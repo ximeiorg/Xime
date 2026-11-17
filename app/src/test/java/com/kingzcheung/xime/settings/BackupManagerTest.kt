@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.settings
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -293,6 +294,36 @@ class BackupManagerTest {
         assertFalse("词条快照包不是完整方案包", BackupManager.isBackupPackage(snapshotZip))
         assertFalse("非 zip 文件不是完整方案包", BackupManager.isBackupPackage(notZip))
         assertFalse("不存在的文件不是完整方案包", BackupManager.isBackupPackage(File(filesDir, "missing.zip")))
+    }
+
+    // ---- 数据库：先落 staging，由宿主关库后替换 ----
+
+    @Test
+    fun `restore stages database entries and ignores unknown names`() {
+        val filesDir = tempDir.newFolder("files")
+        val bytes = zipOf(
+            mapOf(
+                "_xime_backup/database/xime.db" to byteArrayOf(1, 2, 3),
+                "_xime_backup/database/xime.db-wal" to byteArrayOf(4, 5),
+                "_xime_backup/database/evil.txt" to byteArrayOf(9),
+            )
+        )
+
+        val outcome = restore(filesDir, bytes)
+
+        assertTrue(outcome.isSuccess)
+        assertArrayEquals(
+            byteArrayOf(1, 2, 3),
+            File(filesDir, ".restore-db/xime.db").readBytes(),
+        )
+        assertArrayEquals(
+            byteArrayOf(4, 5),
+            File(filesDir, ".restore-db/xime.db-wal").readBytes(),
+        )
+        assertFalse(
+            "只接受 xime.db 的三个文件名",
+            File(filesDir, ".restore-db/evil.txt").exists(),
+        )
     }
 
     // ---- 自造词快照：计数（恢复后据此触发引擎合并） ----

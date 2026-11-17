@@ -16,13 +16,17 @@ import java.io.File
     entities = [
         ClipboardEntry::class,
         ImportedLexiconEntity::class,
+        UserNgramEntity::class,
+        InstalledItemEntity::class,
     ],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 abstract class XimeDatabase : RoomDatabase() {
     abstract fun clipboardDao(): ClipboardDao
     abstract fun importedLexiconDao(): ImportedLexiconDao
+    abstract fun userNgramDao(): UserNgramDao
+    abstract fun installedItemDao(): InstalledItemDao
 
     companion object {
         private const val DATABASE_NAME = "xime.db"
@@ -93,6 +97,41 @@ abstract class XimeDatabase : RoomDatabase() {
             }
         }
 
+        /** v5 → v6：用户 n 元组计数（原来整份写 files/user_ngram_cache.json）。 */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.prepare(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_ngrams (
+                        kind INTEGER NOT NULL,
+                        t1 TEXT NOT NULL,
+                        t2 TEXT NOT NULL,
+                        t3 TEXT NOT NULL DEFAULT '',
+                        count INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(kind, t1, t2, t3)
+                    )
+                    """.trimIndent()
+                ).step()
+            }
+        }
+
+        /** v6 → v7：方案包/方案/模型安装元数据（原 prefs JSON）。 */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.prepare(
+                    """
+                    CREATE TABLE IF NOT EXISTS installed_items (
+                        kind TEXT NOT NULL,
+                        id TEXT NOT NULL,
+                        name TEXT NOT NULL DEFAULT '',
+                        version TEXT NOT NULL DEFAULT '',
+                        PRIMARY KEY(kind, id)
+                    )
+                    """.trimIndent()
+                ).step()
+            }
+        }
+
         @Volatile
         private var instance: XimeDatabase? = null
 
@@ -106,7 +145,10 @@ abstract class XimeDatabase : RoomDatabase() {
                     )
                         .setDriver(AndroidSQLiteDriver())
                         .setQueryCoroutineContext(Dispatchers.IO)
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                        .addMigrations(
+                            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                            MIGRATION_6_7,
+                        )
                         .build()
                         .also { instance = it }
                 }
@@ -133,6 +175,35 @@ abstract class XimeDatabase : RoomDatabase() {
                 }
             }
             File(oldDb.path + ".lck").delete()
+        }
+
+        /** 关闭并丢弃单例；下次 [getInstance] 按当前文件重建（备份恢复用）。 */
+        fun closeInstance() {
+            synchronized(this) {
+                runCatching { instance?.close() }
+                instance = null
+            }
+        }
+
+        /**
+         * 用备份包里的 `database/xime.db*` 替换本机库。
+         *
+         * 先关连接再换文件，避免旧连接继续写已删除的 inode；调用后首次访问会重新打开。
+         */
+        fun replaceFromStaged(context: Context, stagedDir: File) {
+            if (!stagedDir.isDirectory) return
+            closeInstance()
+            val target = context.getDatabasePath(DATABASE_NAME)
+            target.parentFile?.mkdirs()
+            listOf("", "-wal", "-shm", "-journal").forEach { File(target.path + it).delete() }
+            stagedDir.listFiles()?.forEach { source ->
+                val dest = File(target.path + source.name.removePrefix(DATABASE_NAME))
+                if (!source.renameTo(dest)) {
+                    runCatching { source.copyTo(dest, overwrite = true) }
+                }
+                source.delete()
+            }
+            stagedDir.deleteRecursively()
         }
 
         fun scope(): CoroutineScope {
