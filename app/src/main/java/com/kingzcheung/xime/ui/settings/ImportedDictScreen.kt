@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -29,11 +30,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -75,6 +79,12 @@ fun ImportedDictContent(onBack: () -> Unit) {
     var pendingDelete by remember { mutableStateOf<ImportedDictUiItem?>(null) }
     var pendingImport by remember { mutableStateOf<android.net.Uri?>(null) }
     var pendingRebind by remember { mutableStateOf<ImportedDictUiItem?>(null) }
+    var showMenu by remember { mutableStateOf(false) }
+    var pendingWeb by remember { mutableStateOf(false) }
+    var showUrlDialog by remember { mutableStateOf(false) }
+    var urlInput by remember { mutableStateOf("") }
+    var pendingUrl by remember { mutableStateOf<String?>(null) }
+    var wirelessSchemes by remember { mutableStateOf<List<String>?>(null) }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -107,6 +117,37 @@ fun ImportedDictContent(onBack: () -> Unit) {
                     ) {
                         Icon(Icons.Default.Add, contentDescription = tr(R.string.s_daoruciku_tianjia))
                     }
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            enabled = !uiState.isWorking,
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = tr(R.string.s_gengduo),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(tr(R.string.s_liulanqidaoru)) },
+                                onClick = {
+                                    showMenu = false
+                                    pendingWeb = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(tr(R.string.s_daoruciku_congurl)) },
+                                onClick = {
+                                    showMenu = false
+                                    urlInput = ""
+                                    showUrlDialog = true
+                                },
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -134,6 +175,11 @@ fun ImportedDictContent(onBack: () -> Unit) {
                 uiState.items.isEmpty() -> {
                     EmptyImportedDict(
                         onImport = { importLauncher.launch(arrayOf("*/*")) },
+                        onWebImport = { pendingWeb = true },
+                        onUrlImport = {
+                            urlInput = ""
+                            showUrlDialog = true
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -189,6 +235,70 @@ fun ImportedDictContent(onBack: () -> Unit) {
         )
     }
 
+    if (pendingWeb) {
+        SchemePickerDialog(
+            options = uiState.schemeOptions,
+            initialSelected = emptySet(),
+            onDismiss = { pendingWeb = false },
+            onConfirm = { schemeIds ->
+                pendingWeb = false
+                wirelessSchemes = schemeIds
+            },
+        )
+    }
+
+    if (showUrlDialog) {
+        AlertDialog(
+            onDismissRequest = { showUrlDialog = false },
+            title = { Text(tr(R.string.s_daoruciku_congurl)) },
+            text = {
+                OutlinedTextField(
+                    value = urlInput,
+                    onValueChange = { urlInput = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("URL") },
+                    placeholder = { Text("https://example.com/dict.scel") },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUrlDialog = false
+                        pendingUrl = urlInput.trim()
+                    },
+                    enabled = urlInput.isNotBlank(),
+                ) { Text(tr(R.string.s_queding)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUrlDialog = false }) { Text(tr(R.string.s_quxiao)) }
+            },
+        )
+    }
+
+    pendingUrl?.let { url ->
+        SchemePickerDialog(
+            options = uiState.schemeOptions,
+            initialSelected = emptySet(),
+            onDismiss = { pendingUrl = null },
+            onConfirm = { schemeIds ->
+                pendingUrl = null
+                viewModel.importFromUrl(url, schemeIds)
+            },
+        )
+    }
+
+    wirelessSchemes?.let { schemeIds ->
+        WirelessImportSheet(
+            onDismiss = {
+                wirelessSchemes = null
+                viewModel.load()
+            },
+            onRefresh = { viewModel.load() },
+            lexiconSchemeIds = schemeIds,
+        )
+    }
+
     pendingDelete?.let { item ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -214,7 +324,12 @@ fun ImportedDictContent(onBack: () -> Unit) {
 }
 
 @Composable
-private fun EmptyImportedDict(onImport: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyImportedDict(
+    onImport: () -> Unit,
+    onWebImport: () -> Unit,
+    onUrlImport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -233,6 +348,15 @@ private fun EmptyImportedDict(onImport: () -> Unit, modifier: Modifier = Modifie
         Spacer(Modifier.height(20.dp))
         Button(onClick = onImport) {
             Text(tr(R.string.s_daoruciku_tianjia))
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onWebImport) {
+                Text(tr(R.string.s_liulanqidaoru))
+            }
+            TextButton(onClick = onUrlImport) {
+                Text(tr(R.string.s_daoruciku_congurl))
+            }
         }
     }
 }
@@ -273,7 +397,8 @@ private fun ImportedDictCard(
                 Switch(
                     checked = item.enabled,
                     onCheckedChange = onEnabledChange,
-                    enabled = !busy,
+                    // 未挂载词库先让用户选方案，避免出现“已启用但不生效”。
+                    enabled = !busy && item.schemeIds.isNotEmpty(),
                 )
                 IconButton(onClick = onDelete, enabled = !busy) {
                     Icon(
@@ -287,7 +412,8 @@ private fun ImportedDictCard(
                 Text(
                     text = tr(
                         R.string.s_daoruciku_guazai,
-                        item.schemeNames.joinToString("、").ifEmpty { "-" },
+                        item.schemeNames.joinToString("、")
+                            .ifEmpty { tr(R.string.s_ciku_weiguazai) },
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -299,7 +425,13 @@ private fun ImportedDictCard(
             }
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!item.enabled) {
+                if (item.schemeIds.isEmpty()) {
+                    StatusBadge(
+                        text = tr(R.string.s_ciku_weiguazai),
+                        container = MaterialTheme.colorScheme.errorContainer,
+                        content = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                } else if (!item.enabled) {
                     StatusBadge(
                         text = tr(R.string.s_daoruciku_tingyong),
                         container = MaterialTheme.colorScheme.surfaceVariant,

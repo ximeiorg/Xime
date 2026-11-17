@@ -190,6 +190,7 @@ androidComponents {
 dependencies {
     implementation(project(":plugin-core"))
     implementation(project(":lexicon-core"))
+    implementation("com.github.luben:zstd-jni:${libs.versions.zstdJni.get()}@aar")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)

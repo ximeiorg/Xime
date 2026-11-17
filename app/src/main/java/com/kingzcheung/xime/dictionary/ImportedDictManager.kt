@@ -5,6 +5,7 @@ import android.util.Log
 import com.kingzcheung.xime.R
 import com.kingzcheung.xime.i18n.tr
 import com.kingzcheung.xime.scheme.SchemeDeployer
+import com.kingzcheung.xime.scheme.SchemeFiles
 import com.kingzcheung.xime.lexicon.LexiconCodeSystem
 import com.kingzcheung.xime.lexicon.LexiconFormats
 import com.kingzcheung.xime.data.db.ImportedLexiconDao
@@ -13,6 +14,7 @@ import com.kingzcheung.xime.data.db.XimeDatabase
 import com.kingzcheung.xime.lexicon.ParsedLexicon
 import com.kingzcheung.xime.settings.DictEntry
 import com.kingzcheung.xime.settings.SchemaManager
+import com.kingzcheung.xime.util.FileLogger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -83,13 +85,16 @@ object ImportedDictManager {
     /**
      * 导入一本已解析的词库，挂到用户明确选择的方案上。
      *
-     * [schemeIds] 为空时直接失败：多方案场景下 app 不能替用户决定。
+     * 交互式导入要求 [schemeIds] 非空：多方案场景下 app 不能替用户决定。
+     * 网页 / URL 等非交互入口传 [allowUnbound] = true，先入库不挂载，等用户到
+     * 「词库管理」里选方案。
      */
     suspend fun importLexicon(
         context: Context,
         parsed: ParsedLexicon,
         sourceName: String,
         schemeIds: List<String>,
+        allowUnbound: Boolean = false,
     ): Result<ImportedDict> = runCatching {
         if (parsed.entries.isEmpty()) {
             throw IOException(tr(R.string.s_ciku_wuneirong))
@@ -100,10 +105,10 @@ object ImportedDictManager {
             )
         }
         val selected = schemeIds.distinct()
-        if (selected.isEmpty()) {
+        if (selected.isEmpty() && !allowUnbound) {
             throw IOException(tr(R.string.s_ciku_xuanzefangan))
         }
-        val namespaces = resolveNamespaces(context, selected)
+        val namespaces = if (selected.isEmpty()) emptyMap() else resolveNamespaces(context, selected)
 
         Log.i(TAG, "import ${parsed.formatId}: entries=${parsed.entries.size}, " +
             "schemes=$selected")
@@ -118,6 +123,44 @@ object ImportedDictManager {
             parsedFormatName = parsed.formatName,
             parsedCodeSystem = parsed.codeSystem.name,
         )
+    }
+
+    /**
+     * 方案包安装/切换后对齐绑定。
+     *
+     * 派生词典作为用户数据跨包保留；记录里已不存在的方案从绑定中摘掉，
+     * 失去全部方案的记录保留为「未挂载」，等用户重新选方案（不删用户导入的词库）。
+     * 同时重写各方案 `.custom.yaml` 的 packs 托管块——包内容重建会丢掉旧 custom.yaml。
+     */
+    suspend fun reconcileAfterPackageChange(context: Context): Result<Unit> = runCatching {
+        val rimeDir = SchemaManager.getRimeDir(context)
+        val existing = SchemeFiles.installedSchemaIds(rimeDir).toSet()
+        val all = list(context)
+        val updated = ArrayList<ImportedDict>(all.size)
+        var changed = false
+        for (record in all) {
+            val keep = record.attachedSchemas.filter { it in existing }
+            val next = if (keep.size == record.attachedSchemas.size) {
+                record
+            } else {
+                changed = true
+                record.copy(
+                    attachedSchemas = keep,
+                    namespaces = record.namespaces.filterKeys { it in keep },
+                    enabled = record.enabled && keep.isNotEmpty(),
+                )
+            }
+            updated += next
+        }
+        if (changed) {
+            val dao = dao(context)
+            updated.forEach { dao.upsert(it.toEntity()) }
+            FileLogger.i(TAG, "reconciled imported lexicons after package change")
+        }
+        val schemes = updated.flatMap { it.attachedSchemas }.distinct()
+        if (schemes.isNotEmpty()) {
+            applyPacksForSchemes(context, schemes, updated)
+        }
     }
 
     /** 删除一本导入词库：摘掉 packs、删派生词典、部署、更新清单。 */
@@ -158,6 +201,9 @@ object ImportedDictManager {
         val all = list(context)
         val index = all.indexOfFirst { it.id == id }
         if (index < 0) throw IOException("词库记录不存在")
+        if (all[index].attachedSchemas.isEmpty()) {
+            throw IOException(tr(R.string.s_ciku_xuanzefangan))
+        }
         val updated = all.toMutableList()
         updated[index] = all[index].copy(enabled = enabled)
         val record = updated[index]
@@ -446,7 +492,8 @@ object ImportedDictManager {
             formatName = parsedFormatName,
             sourceName = sourceName,
             codeSystem = parsedCodeSystem,
-            enabled = true,
+            // 未挂载的导入先停用，避免出现在「已启用」状态却没有方案可生效。
+            enabled = schemeIds.isNotEmpty(),
         )
         val backups = mutableListOf<CustomBackup>()
         try {
@@ -459,15 +506,18 @@ object ImportedDictManager {
                 namespaceHints = namespaces,
             )
 
-            val deploy = SchemeDeployer.deploy(context)
-            val table = File(rimeDir, "build/$id.table.bin")
-            Log.i(TAG, "deploy ok=${deploy.ok} missing=${deploy.missingSchemas} table=${table.isFile}")
-            if (!table.isFile) {
-                // 部署返回 false 也可能只是别的方案缺产物；这里只认本词库的编译产物。
-                throw IOException(
-                    if (deploy.ok) tr(R.string.s_ciku_meiyouchanwu, id)
-                    else tr(R.string.s_ciku_bushu_shibai)
-                )
+            // 未挂载时不写 packs，也不会有 table 产物；等用户绑定后再编译。
+            if (schemeIds.isNotEmpty()) {
+                val deploy = SchemeDeployer.deploy(context)
+                val table = File(rimeDir, "build/$id.table.bin")
+                Log.i(TAG, "deploy ok=${deploy.ok} missing=${deploy.missingSchemas} table=${table.isFile}")
+                if (!table.isFile) {
+                    // 部署返回 false 也可能只是别的方案缺产物；这里只认本词库的编译产物。
+                    throw IOException(
+                        if (deploy.ok) tr(R.string.s_ciku_meiyouchanwu, id)
+                        else tr(R.string.s_ciku_bushu_shibai)
+                    )
+                }
             }
 
             dao(context).upsert(record.toEntity())
@@ -492,7 +542,12 @@ object ImportedDictManager {
         val old = all[index]
         val namespaces = resolveNamespaces(context, selected)
         val updated = all.toMutableList()
-        updated[index] = old.copy(attachedSchemas = selected, namespaces = namespaces)
+        // 首次给未挂载词库绑定方案时自动启用。
+        updated[index] = old.copy(
+            attachedSchemas = selected,
+            namespaces = namespaces,
+            enabled = if (old.attachedSchemas.isEmpty()) true else old.enabled,
+        )
 
         val affected = (old.attachedSchemas + selected).distinct()
         val hints = old.namespaces + namespaces

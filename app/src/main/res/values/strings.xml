@@ -496,6 +496,8 @@
     <string name="s_cikuguanli">词库管理</string>
     <string name="s_cikuneirong">词库内容</string>
     <string name="s_ciku_daoruchenggong">已导入词库「%1$s」：%2$s 条，挂到「%3$s」</string>
+    <string name="s_ciku_daoru_daiguali">已导入词库「%1$s」：%2$s 条，请到「词库管理」选择要挂载的方案</string>
+    <string name="s_ciku_weiguazai">未挂载</string>
     <string name="s_ciku_wenjianguoda">词库文件过大</string>
     <string name="s_ciku_wuneirong">词库里没有可导入的词条</string>
     <string name="s_ciku_wufangan">没有可用的拼音方案，请先启用一个拼音方案</string>
@@ -509,9 +511,10 @@
     <string name="s_bianma_qita">其他</string>
     <string name="s_daoruciku">导入词库</string>
     <string name="s_daoruciku_jianjie">导入的外部词库，挂到方案后参与候选</string>
-    <string name="s_daoruciku_shuoming">支持已注册的词库格式（当前：搜狗细胞词库 .scel）。导入时选择要挂载的方案；导入后生成派生词库，不改动原方案的词典文件。</string>
+    <string name="s_daoruciku_shuoming">支持搜狗 .scel/.bin、百度 .bdict/.txt、Fcitx5 .dict/.txt 等拼音词库；.txt 按内容识别。导入时选择要挂载的方案；导入后生成派生词库，不改动原方案的词典文件。</string>
     <string name="s_daoruciku_kong">还没有导入的词库</string>
     <string name="s_daoruciku_tianjia">导入词库</string>
+    <string name="s_daoruciku_congurl">从 URL 导入</string>
     <string name="s_daoruciku_tiaoshu">%1$s 条</string>
     <string name="s_daoruciku_guazai">挂到：%1$s</string>
     <string name="s_daoruciku_yibianyi">已编译</string>

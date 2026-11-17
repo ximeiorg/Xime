@@ -57,6 +57,12 @@ interface LexiconParser {
     fun matches(fileName: String): Boolean =
         extensions.any { fileName.endsWith(it, ignoreCase = true) }
 
+    /**
+     * 内容特征判断，用于多种格式共用同一扩展名（如 `.txt`）时区分。
+     * 扩展名已能唯一确定的格式保持默认 `true`。
+     */
+    fun looksLike(bytes: ByteArray): Boolean = true
+
     @Throws(LexiconFormatException::class)
     fun parse(fileName: String, bytes: ByteArray): ParsedLexicon
 }

@@ -84,7 +84,7 @@ class ImportedDictViewModel(application: Application) : AndroidViewModel(applica
         viewModelScope.launch {
             val rawName = withContext(Dispatchers.IO) { queryDisplayName(uri) }
             val name = rawName?.let { SchemaManager.sanitizeDisplayName(it) }
-            if (name == null || LexiconFormats.findByFileName(name) == null) {
+            if (name == null || !LexiconFormats.hasCandidate(name)) {
                 _uiState.update {
                     it.copy(
                         message = tr(
@@ -124,7 +124,40 @@ class ImportedDictViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    /** 从 URL 导入；调用方已让用户选好挂载方案。 */
+    fun importFromUrl(url: String, schemeIds: List<String>) {
+        if (schemeIds.isEmpty()) {
+            _uiState.update { it.copy(message = tr(R.string.s_daoruciku_qingxuanze)) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isWorking = true) }
+            val result = withContext(Dispatchers.IO) {
+                SchemaManager.importFromUrl(
+                    context = context,
+                    url = url,
+                    lexiconSchemeIds = schemeIds,
+                )
+            }
+            _uiState.update {
+                it.copy(
+                    isWorking = false,
+                    message = result.message ?: if (result.success) {
+                        tr(R.string.s_daoruchenggong)
+                    } else {
+                        tr(R.string.s_daorushibai)
+                    },
+                )
+            }
+            load()
+        }
+    }
+
     fun setEnabled(item: ImportedDictUiItem, enabled: Boolean) {
+        if (item.schemeIds.isEmpty()) {
+            _uiState.update { it.copy(message = tr(R.string.s_ciku_xuanzefangan)) }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isWorking = true) }
             val result = withContext(Dispatchers.IO) {
