@@ -55,11 +55,14 @@ import kotlinx.coroutines.withContext
 @Composable
 fun WirelessImportSheet(
     onDismiss: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    lexiconSchemeIds: List<String> = emptyList(),
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val helper = remember { WirelessImportHelper(context) }
+    val helper = remember(lexiconSchemeIds) {
+        WirelessImportHelper(context, lexiconSchemeIds)
+    }
 
     var serverUrl by remember { mutableStateOf<String?>(null) }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -187,10 +190,21 @@ fun WirelessImportSheet(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = result.fileName,
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                            Column {
+                                Text(
+                                    text = result.fileName,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                val hint = result.message ?: result.error
+                                if (!hint.isNullOrBlank()) {
+                                    Text(
+                                        text = hint,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                    )
+                                }
+                            }
                         }
                     }
                 }

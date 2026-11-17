@@ -21,6 +21,8 @@ class SchemeFilesTest {
         assertTrue(SchemeFiles.isUserData("fonts/custom.ttf"))
         assertTrue(SchemeFiles.isUserData("custom_phrase.txt"))
         assertTrue(SchemeFiles.isUserData("custom_phrase_double.txt"))
+        // 导入词库的派生词典跟着 SQLite 记录走，换包必须保留
+        assertTrue(SchemeFiles.isUserData("xime_import_1a2b3c4d.dict.yaml"))
         // 目录本身的判定（搬运整天目录时按相对路径传入）
         assertTrue(SchemeFiles.isUserData("themes"))
         assertTrue(SchemeFiles.isUserData("fonts"))
@@ -35,6 +37,8 @@ class SchemeFilesTest {
         assertFalse(SchemeFiles.isUserData("installation.yaml"))
         // 子目录里的同名文件不是"根级短语表"，不享受保留
         assertFalse(SchemeFiles.isUserData("sub/custom_phrase.txt"))
+        assertFalse(SchemeFiles.isUserData("sub/xime_import_1a2b3c4d.dict.yaml"))
+        assertFalse(SchemeFiles.isUserData("xime_import_1a2b3c4d.dict.yaml.bak"))
     }
 
     @Test
@@ -45,6 +49,7 @@ class SchemeFilesTest {
         assertTrue(SchemeFiles.isPackageContent("default.yaml"))
         assertTrue(SchemeFiles.isPackageContent("cn_dicts/base.dict.yaml"))
         assertFalse(SchemeFiles.isPackageContent("xime.custom.yaml"))
+        assertFalse(SchemeFiles.isPackageContent("xime_import_1a2b3c4d.dict.yaml"))
         assertFalse(SchemeFiles.isPackageContent("build/wubi86.table.bin"))
     }
 

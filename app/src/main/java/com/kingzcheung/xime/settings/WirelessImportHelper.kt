@@ -35,7 +35,9 @@ import kotlinx.serialization.json.jsonPrimitive
 data class UploadResult(
     val fileName: String,
     val success: Boolean,
-    val error: String? = null
+    val error: String? = null,
+    /** 导入管线给出的提示（例如「未挂载，需选择方案」）。 */
+    val message: String? = null,
 )
 
 @Serializable
@@ -53,7 +55,11 @@ private val FileTreeSerializer = kotlinx.serialization.serializer<FileNode>()
 /** 共享 Json 实例，用于解析 delete 请求体。 */
 private val configJson: Json = Json { ignoreUnknownKeys = true }
 
-class WirelessImportHelper(private val context: Context) {
+class WirelessImportHelper(
+    private val context: Context,
+    /** 从词库页进入时预先选好的方案；网页上传的词库文件直接挂到这些方案。 */
+    private val lexiconSchemeIds: List<String> = emptyList(),
+) {
     private var server: EmbeddedServer<*, *>? = null
 
     private val _uploadResults = Channel<UploadResult>(Channel.BUFFERED)
@@ -276,6 +282,11 @@ class WirelessImportHelper(private val context: Context) {
                     name.endsWith(".tar.gz", ignoreCase = true) ||
                     name.endsWith(".tgz", ignoreCase = true) ||
                     name.endsWith(".yaml") || name.endsWith(".schema.yaml") || name.endsWith(".dict.yaml") ||
+                    name.endsWith(".scel", ignoreCase = true) ||
+                    name.endsWith(".bdict", ignoreCase = true) ||
+                    name.endsWith(".bin", ignoreCase = true) ||
+                    name.endsWith(".dict", ignoreCase = true) ||
+                    name.endsWith(".txt", ignoreCase = true) ||
                     name.endsWith(".jpg", ignoreCase = true) || name.endsWith(".jpeg", ignoreCase = true) ||
                     name.endsWith(".png", ignoreCase = true) ||
                     name.endsWith(".ttf", ignoreCase = true) || name.endsWith(".otf", ignoreCase = true) ||
@@ -287,7 +298,9 @@ class WirelessImportHelper(private val context: Context) {
                                 raf.channel.transferTo(contentStart, contentLen, out.channel)
                             }
                             when (val result = ImportManager.importFile(
-                                context, name, partFile, autoEnable = false
+                                context, name, partFile,
+                                autoEnable = false,
+                                lexiconSchemeIds = lexiconSchemeIds,
                             )) {
                                 is ImportManager.ImportResult.Plugin -> {
                                     PluginManager.loadEnabledPlugins()
@@ -297,11 +310,19 @@ class WirelessImportHelper(private val context: Context) {
                                 is ImportManager.ImportResult.Content -> {
                                     saved = result.success
                                     _uploadResults.trySend(
-                                        if (result.success) UploadResult(fileName = name, success = true)
-                                        else UploadResult(
-                                            fileName = name, success = false,
-                                            error = tr(R.string.s_baocunshibai)
-                                        )
+                                        if (result.success) {
+                                            UploadResult(
+                                                fileName = name,
+                                                success = true,
+                                                message = result.message,
+                                            )
+                                        } else {
+                                            UploadResult(
+                                                fileName = name,
+                                                success = false,
+                                                error = result.message ?: tr(R.string.s_baocunshibai),
+                                            )
+                                        }
                                     )
                                 }
                                 else -> {
@@ -325,7 +346,7 @@ class WirelessImportHelper(private val context: Context) {
                         if (saved) {
                             call.respondText("""{"success":true,"file":"$lastName"}""", ContentType.Application.Json)
                         } else {
-                            call.respondText("""{"success":false,"error":"No valid file (supported: .yaml, .zip, .tar.gz, .jpg/.png, .ttf/.otf/.woff/.woff2)"}""",
+                            call.respondText("""{"success":false,"error":"No valid file (supported: .yaml, .zip, .tar.gz, .scel, .bdict, .bin, .dict, .txt, .jpg/.png, .ttf/.otf/.woff/.woff2)"}""",
                                 ContentType.Application.Json, HttpStatusCode.BadRequest)
                         }
                     } finally {

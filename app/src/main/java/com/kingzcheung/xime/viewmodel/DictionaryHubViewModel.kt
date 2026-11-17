@@ -3,6 +3,7 @@ package com.kingzcheung.xime.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.kingzcheung.xime.dictionary.ImportedDictManager
 import com.kingzcheung.xime.settings.PersonalDictManager
 import com.kingzcheung.xime.settings.SchemaManager
 import com.kingzcheung.xime.settings.UserDictIoManager
@@ -24,7 +25,9 @@ data class DictionaryHubUiState(
     /** 本机用户词库（`<词典名>.userdb`）本数；null 表示还没数出来。 */
     val userDictCount: Int? = null,
     /** 当前方案使用的快捷短语条数；null 表示还没数出来。 */
-    val customPhraseCount: Int? = null
+    val customPhraseCount: Int? = null,
+    /** 已导入的外部词库本数；null 表示还没数出来。 */
+    val importedDictCount: Int? = null
 )
 
 class DictionaryHubViewModel(application: Application) : AndroidViewModel(application) {
@@ -42,13 +45,18 @@ class DictionaryHubViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             val counts = withContext(Dispatchers.IO) {
                 val currentSchema = SchemaManager.getEnabledSchemas(context).firstOrNull()
-                Pair(
+                Triple(
                     UserDictIoManager.list(context).size,
-                    PersonalDictManager.loadCustomPhrases(context, currentSchema).size
+                    PersonalDictManager.loadCustomPhrases(context, currentSchema).size,
+                    ImportedDictManager.list(context).size
                 )
             }
             _uiState.update {
-                it.copy(userDictCount = counts.first, customPhraseCount = counts.second)
+                it.copy(
+                    userDictCount = counts.first,
+                    customPhraseCount = counts.second,
+                    importedDictCount = counts.third,
+                )
             }
         }
     }

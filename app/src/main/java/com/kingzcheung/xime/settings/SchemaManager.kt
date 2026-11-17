@@ -8,6 +8,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.PowerManager
 import android.util.Log
+import com.kingzcheung.xime.dictionary.ImportedDictManager
 import com.kingzcheung.xime.scheme.SchemeArchive
 import com.kingzcheung.xime.scheme.SchemeFiles
 import com.kingzcheung.xime.scheme.SchemeInstaller
@@ -15,6 +16,9 @@ import com.kingzcheung.xime.scheme.SchemePackages
 import com.kingzcheung.xime.scheme.SchemeStore
 import com.kingzcheung.xime.util.FileLogger
 import com.kingzcheung.xime.rime.RimeConfigHelper
+import com.kingzcheung.xime.lexicon.LexiconFormatException
+import com.kingzcheung.xime.lexicon.LexiconFormats
+import com.kingzcheung.xime.lexicon.LexiconParser
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.charleskorn.kaml.YamlList
@@ -30,6 +34,7 @@ import okhttp3.Request
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -80,6 +85,9 @@ internal data class SchemaEntry(
 
 object SchemaManager {
     private const val TAG = "SchemaManager"
+
+    /** 词库内容探测只读头部，避免为了识别格式把整个大文件读进内存。 */
+    private const val LEXICON_SNIFF_BYTES = 64 * 1024
     private const val CUSTOM_YAML = "default.custom.yaml"
     private const val DEFAULT_YAML = "default.yaml"
     /** 内置预设所在 assets 目录（与 [RimeSharedFiles] 保持一致）。 */
@@ -840,6 +848,8 @@ object SchemaManager {
     data class ImportResult(
         val success: Boolean,
         val installedDirect: Boolean = false,
+        /** 非空时优先于调用方默认文案（如词库导入的条数/挂载方案）。 */
+        val message: String? = null,
     )
 
     /** 判断文件名是否为压缩包。 */
@@ -879,6 +889,10 @@ object SchemaManager {
                 name.removeSuffix(".txt")
             name.endsWith(".dict.yaml.txt", ignoreCase = true) ->
                 name.removeSuffix(".txt")
+            name.endsWith(".txt", ignoreCase = true) -> {
+                val withoutTxt = name.removeSuffix(".txt")
+                if (LexiconFormats.findByFileName(withoutTxt) != null) withoutTxt else name
+            }
             else -> name
         }
     }
@@ -895,8 +909,15 @@ object SchemaManager {
         displayName: String,
         inputStream: java.io.InputStream,
         autoEnable: Boolean = true,
+        lexiconSchemeIds: List<String> = emptyList(),
     ): ImportResult = withContext(Dispatchers.IO) {
         val name = sanitizeDisplayName(displayName)
+        val candidates = LexiconFormats.candidates(name)
+        if (candidates.isNotEmpty()) {
+            return@withContext importLexiconCandidate(
+                context, name, inputStream, autoEnable, lexiconSchemeIds
+            )
+        }
         when {
             isFont(name) -> ImportResult(saveInto(getFontsDir(context), name, inputStream))
             isImage(name) -> ImportResult(saveInto(getThemesDir(context), name, inputStream))
@@ -915,6 +936,151 @@ object SchemaManager {
                 ImportResult(true, installedDirect = true)
             }
         }
+    }
+
+    /**
+     * 扩展名像词库的文件：先按内容在候选格式里选解析器。
+     *
+     * `.txt` 被多种格式共用，识别不出来时：词库导入页（带 [schemeIds]）提示不支持，
+     * 其它入口仍按普通文件保存，不影响原有 `.txt` 导入。
+     */
+    private suspend fun importLexiconCandidate(
+        context: Context,
+        name: String,
+        inputStream: InputStream,
+        autoEnable: Boolean,
+        schemeIds: List<String>,
+    ): ImportResult {
+        val head = try {
+            inputStream.readAtMost(LEXICON_SNIFF_BYTES)
+        } catch (e: Exception) {
+            inputStream.closeQuietly()
+            return ImportResult(
+                false,
+                message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+            )
+        }
+        val parser = LexiconFormats.detect(name, head)
+        if (parser == null) {
+            if (schemeIds.isNotEmpty()) {
+                inputStream.closeQuietly()
+                return ImportResult(
+                    false,
+                    message = tr(R.string.s_daoruciku_buzhichi, LexiconFormats.supportedDescription()),
+                )
+            }
+            return savePlainImport(context, name, head, inputStream, autoEnable)
+        }
+        val bytes = try {
+            readAllWithHead(head, inputStream, parser.maxBytes)
+        } catch (e: Exception) {
+            return ImportResult(
+                false,
+                message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+            )
+        } ?: return ImportResult(
+            false,
+            message = tr(R.string.s_daorushibai_2, tr(R.string.s_ciku_wenjianguoda)),
+        )
+        return importLexiconFile(context, name, bytes, parser, schemeIds)
+    }
+
+    /** 内容识别不出词库格式时，按原来的普通文件流程落地。 */
+    private fun savePlainImport(
+        context: Context,
+        name: String,
+        head: ByteArray,
+        inputStream: InputStream,
+        autoEnable: Boolean,
+    ): ImportResult {
+        val ok = saveInto(getRimeDir(context), name, head, inputStream)
+        if (!ok) return ImportResult(false)
+        copyToOverlay(context, name)
+        if (autoEnable && name.endsWith(".schema.yaml")) {
+            val schemaId = name.removeSuffix(".schema.yaml")
+            setEnabledSchemas(context, getEnabledSchemas(context) + schemaId)
+        }
+        return ImportResult(true, installedDirect = true)
+    }
+
+    /** 已注册的词库格式：解析字节 -> 派生词典管线。 */
+    private suspend fun importLexiconFile(
+        context: Context,
+        name: String,
+        bytes: ByteArray,
+        parser: LexiconParser,
+        schemeIds: List<String>,
+    ): ImportResult {
+        val parsed = try {
+            parser.parse(name, bytes)
+        } catch (e: LexiconFormatException) {
+            return ImportResult(
+                false,
+                message = tr(
+                    R.string.s_daorushibai_2,
+                    tr(R.string.s_ciku_geshibuzhengque, e.message ?: ""),
+                ),
+            )
+        } catch (e: Exception) {
+            return ImportResult(
+                false,
+                message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+            )
+        }
+
+        return ImportedDictManager.importLexicon(
+            context = context,
+            parsed = parsed,
+            sourceName = name,
+            schemeIds = schemeIds,
+            // 网页 / URL 等入口没有方案选择器：先入库，等用户到「词库管理」里挂载。
+            allowUnbound = schemeIds.isEmpty(),
+        ).fold(
+            onSuccess = { record ->
+                val schemeId = record.attachedSchemas.firstOrNull()
+                val message = if (schemeId == null) {
+                    tr(R.string.s_ciku_daoru_daiguali, record.displayName, record.entryCount)
+                } else {
+                    val schemeName = getSchemaDisplayName(context, schemeId) ?: schemeId
+                    tr(
+                        R.string.s_ciku_daoruchenggong,
+                        record.displayName,
+                        record.entryCount,
+                        schemeName,
+                    )
+                }
+                ImportResult(success = true, installedDirect = true, message = message)
+            },
+            onFailure = { e ->
+                ImportResult(
+                    false,
+                    message = tr(R.string.s_daorushibai_2, e.message ?: tr(R.string.s_daorushibai)),
+                )
+            },
+        )
+    }
+
+    /** 先写已经读出的探测字节，再续写剩余内容。 */
+    private fun saveInto(
+        dir: File,
+        name: String,
+        head: ByteArray,
+        inputStream: java.io.InputStream,
+    ): Boolean = try {
+        dir.mkdirs()
+        val target = File(dir, name)
+        target.parentFile?.mkdirs()
+        inputStream.use { input ->
+            target.outputStream().use { output ->
+                output.write(head)
+                input.copyTo(output)
+            }
+        }
+        FileLogger.i(TAG, "Imported $name -> ${dir.name}/")
+        true
+    } catch (e: Exception) {
+        FileLogger.e(TAG, "Failed to import $name", e)
+        false
     }
 
     /** 写到目录下的同名文件；父目录按需创建。 */
@@ -1086,9 +1252,12 @@ object SchemaManager {
         expectedSha256: String? = null,
         archiveName: String? = null,
         onProgress: (Long, Long) -> Unit = { _, _ -> },
+        lexiconSchemeIds: List<String> = emptyList(),
     ): ImportResult = withContext(Dispatchers.IO) {
         try {
-            val fileName = archiveName ?: url.substringAfterLast("/").takeIf { it.isNotBlank() }
+            val fileName = archiveName
+                ?: url.substringBefore('?').substringBefore('#')
+                    .substringAfterLast("/").takeIf { it.isNotBlank() }
                 ?: "download"
             val tmpFile = File.createTempFile("import_", ".tmp", context.cacheDir)
 
@@ -1132,7 +1301,10 @@ object SchemaManager {
                 if (!sha256Ok) return@withContext ImportResult(false)
 
                 // 通过统一函数保存
-                val result = saveImportedFile(context, fileName, tmpFile.inputStream())
+                val result = saveImportedFile(
+                    context, fileName, tmpFile.inputStream(),
+                    lexiconSchemeIds = lexiconSchemeIds,
+                )
                 Log.i(TAG, "Imported from url $url -> ${if (result.installedDirect) "rime/" else "market/"} ($fileName)")
                 result
             } finally {
@@ -1142,6 +1314,55 @@ object SchemaManager {
             Log.e(TAG, "Failed to import from URL: $url", e)
             ImportResult(false)
         }
+    }
+
+    /** 只读出用于内容识别的头部，剩余部分仍从流里续读。 */
+    private fun InputStream.readAtMost(limit: Int): ByteArray {
+        val buffer = ByteArrayOutputStream(minOf(limit, 8 * 1024))
+        val chunk = ByteArray(8 * 1024)
+        while (buffer.size() < limit) {
+            val read = read(chunk, 0, minOf(chunk.size, limit - buffer.size()))
+            if (read < 0) break
+            buffer.write(chunk, 0, read)
+        }
+        return buffer.toByteArray()
+    }
+
+    /** 头部 + 剩余内容；超过 [limit] 返回 null。 */
+    private fun readAllWithHead(head: ByteArray, input: InputStream, limit: Int): ByteArray? {
+        if (head.size > limit) {
+            input.closeQuietly()
+            return null
+        }
+        val buffer = ByteArrayOutputStream(head.size + 64 * 1024)
+        buffer.write(head)
+        input.use { stream ->
+            val chunk = ByteArray(64 * 1024)
+            while (true) {
+                val read = stream.read(chunk)
+                if (read < 0) break
+                if (buffer.size() + read > limit) return null
+                buffer.write(chunk, 0, read)
+            }
+        }
+        return buffer.toByteArray()
+    }
+
+    private fun InputStream.closeQuietly() {
+        runCatching { close() }
+    }
+
+    /** 读取至多 [limit] 字节；超出时只多读 1 字节返回，由调用方判超。 */
+    private fun readAllBytesLimited(input: InputStream, limit: Int): ByteArray {
+        val buffer = ByteArrayOutputStream()
+        val chunk = ByteArray(64 * 1024)
+        while (true) {
+            val read = input.read(chunk)
+            if (read < 0) break
+            buffer.write(chunk, 0, minOf(read, limit + 1 - buffer.size()))
+            if (buffer.size() > limit) break
+        }
+        return buffer.toByteArray()
     }
 
     private fun getFileName(context: Context, uri: Uri): String? {

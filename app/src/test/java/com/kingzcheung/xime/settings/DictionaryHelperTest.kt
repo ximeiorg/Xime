@@ -22,6 +22,15 @@ class DictionaryHelperTest {
     }
 
     @Test
+    fun `parseDictEntries keeps spaces inside tab separated pinyin code`() {
+        val text = "...\n中国\tzhong guo\t100\n你好\tni hao\n"
+        assertEquals(
+            listOf(DictEntry("中国", "zhong guo", 100), DictEntry("你好", "ni hao")),
+            DictionaryHelper.parseDictEntries(text),
+        )
+    }
+
+    @Test
     fun `parseDictEntries ignores header before the marker`() {
         val text = "name: x\nimport_tables:\n  - foo\n...\n词\tcode\n"
         assertEquals(listOf(DictEntry("词", "code")), DictionaryHelper.parseDictEntries(text))

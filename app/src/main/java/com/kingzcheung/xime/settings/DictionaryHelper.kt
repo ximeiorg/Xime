@@ -28,8 +28,17 @@ object DictionaryHelper {
                 continue
             }
             if (line.isEmpty() || line.startsWith("#")) continue
-            val parts = line.split("\t", "  ", " ").filter { it.isNotEmpty() }
-            if (parts.size >= 2) out.add(DictEntry(parts[0], parts[1]))
+            // 优先按 Tab 切：拼音码本身含空格（如 "ni hao"），不能再按空格拆。
+            val tabParts = line.split('\t')
+            val parts = if (tabParts.size >= 2) {
+                tabParts
+            } else {
+                line.split(Regex("\\s+")).filter { it.isNotEmpty() }
+            }
+            if (parts.size >= 2) {
+                val weight = if (tabParts.size >= 3) tabParts[2].toIntOrNull() else null
+                out.add(DictEntry(parts[0], parts[1], weight))
+            }
         }
         return out
     }
