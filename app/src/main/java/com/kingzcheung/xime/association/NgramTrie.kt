@@ -10,8 +10,8 @@ data class TrieNode(
 class NgramTrie {
     private val root = TrieNode()
     
-    fun insert(ngram: List<String>) {
-        if (ngram.isEmpty()) return
+    fun insert(ngram: List<String>, count: Int = 1) {
+        if (ngram.isEmpty() || count <= 0) return
         
         var node = root
         var isNewPath = false
@@ -32,7 +32,8 @@ class NgramTrie {
             node = nextNode
         }
         
-        node.count++
+        // 从 DB 重建时按已有计数一次落位，不必 repeat(count) 逐次插。
+        node.count += count
         updateFrequency(node)
     }
     

@@ -7,6 +7,8 @@ import com.kingzcheung.xime.i18n.tr
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.kingzcheung.xime.data.InstalledItemStore
+import com.kingzcheung.xime.data.db.XimeDatabase
 import com.kingzcheung.xime.plugin.core.api.BackupPlugin
 import com.kingzcheung.xime.scheme.SchemeStore
 import com.kingzcheung.xime.plugin.core.api.RemoteBackupEntry
@@ -40,6 +42,11 @@ object BackupManager {
 
     /** 备份包内元数据条目前缀（保留字，rime 目录不应有同名顶层文件）。 */
     const val META_PREFIX = "_xime_backup/"
+
+    /** 元数据里的数据库条目前缀；恢复时先落 staging，再关库换文件。 */
+    private const val DB_ENTRY_PREFIX = "database/"
+    private const val DB_STAGING_DIR = ".restore-db"
+    private val DB_ENTRY_NAMES = setOf("xime.db", "xime.db-wal", "xime.db-shm")
 
     /** 设置项 SharedPreferences 文件名（SettingsPreferences.PREFS_NAME，此处避免依赖私有常量）。 */
     private const val PREFS_NAME_SETTINGS = "kime_settings"
@@ -165,7 +172,9 @@ object BackupManager {
         }.onFailure { e ->
             Log.e(TAG, "restoreArchive failed", e)
         }
-        return outcome.map { afterRestore(context, it) }
+        return outcome
+            .onSuccess { applyStagedDatabase(context) }
+            .map { afterRestore(context, it) }
     }
 
     /**
@@ -202,6 +211,8 @@ object BackupManager {
         // 再从 prefs 镜像进 default.yaml。default.yaml 本身不进包（派生基座），
         // 避免恢复时把旧版本基座一起盖回来。
         try {
+            // 数据库已整体换过：安装元数据缓存作废，按恢复后的表重建。
+            InstalledItemStore.invalidate()
             SchemaManager.migrateDefaultCustomSchemaList(context, force = true)
             // 备份可能来自旧版本（没有 active_package_id）或另一台设备（活动包 id
             // 对应的包不存在）：丢弃缓存，按恢复后的实际文件重新推断一次。
@@ -221,6 +232,7 @@ object BackupManager {
         return restoreArchive(filesDir, { prefsName, json ->
             restorePrefsJson(context.getSharedPreferences(prefsName, Context.MODE_PRIVATE), json)
         }, archive).onSuccess {
+            applyStagedDatabase(context)
             Log.i(TAG, "Restore done -> ${filesDir.path}")
         }.onFailure { e ->
             Log.e(TAG, "restoreArchive failed", e)
@@ -232,7 +244,7 @@ object BackupManager {
         val filesDir = context.filesDir
         return restoreArchive(filesDir, { prefsName, json ->
             restorePrefsJson(context.getSharedPreferences(prefsName, Context.MODE_PRIVATE), json)
-        }, bytes)
+        }, bytes).onSuccess { applyStagedDatabase(context) }
     }
 
     /**
@@ -305,6 +317,13 @@ object BackupManager {
                             rel == "plugins.xml" -> writeChecked(File(filesDir, "plugins.xml"), filesDir, data)
                             // v3 插件注册表（安装记录 + 启用状态）：与插件包同档（完整方案）
                             rel == "plugins.json" -> writeChecked(File(filesDir, "plugins.json"), filesDir, data)
+                            rel.startsWith(DB_ENTRY_PREFIX) -> {
+                                val dbName = rel.removePrefix(DB_ENTRY_PREFIX)
+                                if (dbName in DB_ENTRY_NAMES) {
+                                    val staged = File(filesDir, DB_STAGING_DIR)
+                                    writeChecked(File(staged, dbName), staged, data)
+                                }
+                            }
                             // 旧版方案清单/注册表（文件所有权追踪）：模型已废弃，恢复时忽略
                             rel == SCHEME_REGISTRY_ENTRY ||
                                 rel.startsWith(SCHEME_MANIFESTS_ENTRY) -> Unit
@@ -431,6 +450,31 @@ object BackupManager {
         editor.apply()
     }
 
+    /** 恢复后把 staging 的数据库文件换到正式位置（先关连接）。 */
+    private fun applyStagedDatabase(context: Context) {
+        val staged = File(context.filesDir, DB_STAGING_DIR)
+        if (!staged.isDirectory) return
+        runCatching {
+            XimeDatabase.replaceFromStaged(context, staged)
+        }.onFailure {
+            Log.e(TAG, "restore database failed", it)
+        }
+    }
+
+    /** WAL 里的数据要并回主库，否则只拷 .db 会漏掉最近的写入。 */
+    private fun checkpointDatabase(dbFile: File) {
+        runCatching {
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                dbFile.path, null,
+                android.database.sqlite.SQLiteDatabase.OPEN_READWRITE,
+            ).use { db ->
+                db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { it.moveToFirst() }
+            }
+        }.onFailure {
+            Log.w(TAG, "checkpoint database failed: ${it.message}")
+        }
+    }
+
     /**
      * 收集备份包元数据条目（设置项、插件配置、插件注册表、方案清单）。
      *
@@ -454,6 +498,18 @@ object BackupManager {
                         prefsToJson(prefs).toByteArray(Charsets.UTF_8)
                 }
             }
+
+        // 数据库（剪贴板、导入词库、n 元组等元数据）：先 checkpoint 再整文件收进备份。
+        val dbFile = context.getDatabasePath("xime.db")
+        if (dbFile.isFile) {
+            checkpointDatabase(dbFile)
+            listOf("", "-wal", "-shm").forEach { suffix ->
+                val file = File(dbFile.path + suffix)
+                if (file.isFile) {
+                    entries += (META_PREFIX + DB_ENTRY_PREFIX + "xime.db" + suffix) to file.readBytes()
+                }
+            }
+        }
 
         // 插件注册表（安装记录 + 启用状态）：与 META plugins/ 下的插件包同档才有意义
         val pluginsRegistry = File(context.filesDir, PLUGINS_REGISTRY_ENTRY)
