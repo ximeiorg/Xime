@@ -15,6 +15,7 @@ import http.client
 import json
 import os
 import re
+import socket
 import sys
 import tempfile
 import time
@@ -28,6 +29,14 @@ GH_API = "https://api.github.com"
 UA = "xime-release-sync"
 
 BANNER = "> 本页为 GitHub Release 的自动镜像，附件与正文由 CI 同步。"
+
+# 附件上传容错：单条 1MB 写入卡住 UPLOAD_STALL_TIMEOUT 秒即判定链路已死，
+# 换新预签名地址重传（GitCode 的大附件偶发写超时，一轮失败不该拖垮整次同步）。
+UPLOAD_CHUNK = 1 << 20
+UPLOAD_ATTEMPTS = 4
+UPLOAD_STALL_TIMEOUT = 120
+UPLOAD_RESPONSE_TIMEOUT = 900
+UPLOAD_BACKOFF = (5, 20, 60)
 
 
 def _retry_after(headers):
@@ -339,7 +348,66 @@ def gc_delete_asset(owner, repo, tag, asset_id, token):
     _http(url, method="DELETE", token=token)
 
 
+class UploadError(SyncError):
+    """上传失败；[retryable] 表示换新地址重传有意义（链路中断/服务端 5xx）。"""
+
+    def __init__(self, message, retryable=False):
+        super().__init__(message)
+        self.retryable = retryable
+
+
+def _gc_find_asset(owner, repo, tag, name, token):
+    rel = gc_release(owner, repo, tag, token) or {}
+    for asset in rel.get("assets") or []:
+        if asset.get("type") == "attach" and asset.get("name") == name:
+            return asset
+    return None
+
+
+def _enable_keepalive(conn):
+    """长上传靠 TCP 心跳尽早发现对端已死，而不是干等到写超时。"""
+    sock = conn.sock
+    if sock is None:
+        return
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        for opt, value in (("TCP_KEEPIDLE", 60), ("TCP_KEEPINTVL", 15), ("TCP_KEEPCNT", 4)):
+            flag = getattr(socket, opt, None)
+            if flag is not None:
+                sock.setsockopt(socket.IPPROTO_TCP, flag, value)
+    except OSError:
+        pass
+
+
 def gc_upload(owner, repo, tag, path, name, token):
+    """PUT 到预签名地址。GitCode 大文件经常在写阶段卡死，这里换新地址重传若干次。"""
+    size = os.path.getsize(path)
+    for attempt in range(1, UPLOAD_ATTEMPTS + 1):
+        try:
+            _gc_upload_once(owner, repo, tag, path, name, token, size)
+            return
+        except UploadError as exc:
+            if not exc.retryable:
+                raise
+            if attempt == UPLOAD_ATTEMPTS:
+                raise UploadError(f"{exc}（已重试 {attempt} 次）", retryable=False) from exc
+            wait = UPLOAD_BACKOFF[min(attempt - 1, len(UPLOAD_BACKOFF) - 1)]
+            print(f"  ! {name} 第 {attempt} 次上传中断（{exc}），{wait} 秒后重传")
+            # 等一会儿再查，给服务端留出登记时间：上一轮可能其实已传完（只是没等到响应）
+            time.sleep(wait)
+            current = _gc_find_asset(owner, repo, tag, name, token)
+            if current and int(current.get("size") or 0) == size:
+                print(f"  ! {name} 上一轮已传完，仅响应超时")
+                return
+            if current:
+                # 半截的同名附件会挡住重传
+                try:
+                    gc_delete_asset(owner, repo, tag, current["id"], token)
+                except SyncError as del_exc:
+                    print(f"  ! 清理残留附件失败（继续重传）: {del_exc}")
+
+
+def _gc_upload_once(owner, repo, tag, path, name, token, size):
     query = urllib.parse.urlencode({"file_name": name})
     info = _http(f"{GC_API}/repos/{owner}/{repo}/releases/{urllib.parse.quote(tag)}/upload_url?{query}", token=token)
     put_url = info.get("url")
@@ -347,11 +415,10 @@ def gc_upload(owner, repo, tag, path, name, token):
         raise SyncError(f"未取得 {name} 的上传地址: {info}")
 
     headers = {k: v for k, v in (info.get("headers") or {}).items() if v}
-    size = os.path.getsize(path)
     parts = urllib.parse.urlsplit(put_url)
     target = parts.path + (f"?{parts.query}" if parts.query else "")
 
-    conn = http.client.HTTPSConnection(parts.netloc, timeout=900)
+    conn = http.client.HTTPSConnection(parts.netloc, timeout=UPLOAD_STALL_TIMEOUT)
     try:
         conn.putrequest("PUT", target, skip_accept_encoding=True)
         for key, value in headers.items():
@@ -360,33 +427,53 @@ def gc_upload(owner, repo, tag, path, name, token):
             conn.putheader(key, value)
         conn.putheader("Content-Length", str(size))
         conn.endheaders()
+        _enable_keepalive(conn)
         sent = 0
+        step = max(size // 10, 1)
+        next_report = step
         with open(path, "rb") as fh:
             while True:
-                chunk = fh.read(1 << 20)
+                chunk = fh.read(UPLOAD_CHUNK)
                 if not chunk:
                     break
                 conn.send(chunk)
                 sent += len(chunk)
                 _progress("上传", sent, size)
+                # CI 里没有 tty：按 10% 打点，卡住时能从日志看出传到哪了
+                if not sys.stdout.isatty() and sent >= next_report:
+                    print(f"  {name}: {sent * 100 // size}% ({sent / 1048576:.1f}/{size / 1048576:.1f} MB)")
+                    next_report += step
         if sys.stdout.isatty():
             sys.stdout.write("\n")
             sys.stdout.flush()
+        if conn.sock is not None:
+            conn.sock.settimeout(UPLOAD_RESPONSE_TIMEOUT)
         resp = conn.getresponse()
         detail = resp.read(2000).decode("utf-8", "replace")
         if resp.status not in (200, 201, 204):
-            raise SyncError(f"上传 {name} 失败 HTTP {resp.status}: {detail}")
+            raise UploadError(
+                f"上传 {name} 失败 HTTP {resp.status}: {detail}",
+                retryable=resp.status in (408, 425, 429) or resp.status >= 500,
+            )
+    except SyncError:
+        raise
+    except OSError as exc:
+        raise UploadError(f"上传 {name} 中断: {type(exc).__name__}: {exc}", retryable=True) from exc
+    except http.client.HTTPException as exc:
+        raise UploadError(f"上传 {name} 中断: {type(exc).__name__}: {exc}", retryable=True) from exc
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except OSError:
+            pass
 
 
 def gc_wait_asset(owner, repo, tag, name, size, token, timeout=180):
     deadline = time.time() + timeout
     while time.time() < deadline:
-        rel = gc_release(owner, repo, tag, token) or {}
-        for asset in rel.get("assets") or []:
-            if asset.get("type") == "attach" and asset.get("name") == name and int(asset.get("size") or 0) == size:
-                return asset
+        asset = _gc_find_asset(owner, repo, tag, name, token)
+        if asset and int(asset.get("size") or 0) == size:
+            return asset
         time.sleep(5)
     return None
 
@@ -514,7 +601,7 @@ def sync_release(args, tag, release=None):
                 else:
                     print(f"  ! {label} 上传后未在 Release 中出现，请人工确认")
                     failed += 1
-            except SyncError as exc:
+            except (SyncError, OSError, http.client.HTTPException) as exc:
                 failed += 1
                 print(f"  ✗ {label}: {exc}")
             finally:
