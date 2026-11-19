@@ -104,4 +104,39 @@ class ModelIndexLoaderTest {
         assertEquals(1, models.size)
         assertEquals("valid", models.first().id)
     }
+
+    /** 索引新增字段（platforms 等）不能让旧客户端解析失败。 */
+    @Test
+    fun `ignores unknown fields such as platforms`() {
+        val yaml = """
+            models:
+              - id: qwen3-asr-0.6b
+                name: Qwen3-ASR 0.6B
+                description: 桌面端专用
+                category: asr
+                size: 1.75 GB
+                tags:
+                  - 语音
+                platforms:
+                  - macos
+                  - windows
+                  - linux
+                warning: 仅桌面端
+                currentVersion: v1.0
+                versions:
+                  - version: "v1.0"
+                    date: "2026-11-18"
+                    files:
+                      - name: config.json
+                        url: "https://example.com/config.json"
+        """.trimIndent()
+
+        val models = ModelIndexLoader.parseModelsIndex(yaml)
+
+        assertEquals(1, models.size)
+        val model = models.first()
+        assertEquals("qwen3-asr-0.6b", model.id)
+        assertEquals(ModelCategory.ASR, model.category)
+        assertEquals("1.75 GB", model.size)
+    }
 }
