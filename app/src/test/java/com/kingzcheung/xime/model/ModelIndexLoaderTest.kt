@@ -106,23 +106,25 @@ class ModelIndexLoaderTest {
         assertEquals("valid", models.first().id)
     }
 
-    /** 索引新增字段（platforms 等）不能让旧客户端解析失败。 */
+    /**
+     * 索引新增字段（tags / warning / currentVersion 等）不能让旧客户端解析失败。
+     *
+     * 注意 `platforms` 不在此列：它已是正式字段，声明了且不含 android 的条目会被
+     * [com.kingzcheung.xime.model.ModelIndexLoader.parseModelsIndex] 过滤掉，
+     * 相关行为由 `hides models not supporting android` 覆盖。
+     */
     @Test
-    fun `ignores unknown fields such as platforms`() {
+    fun `ignores unknown fields such as tags and warning`() {
         val yaml = """
             models:
               - id: qwen3-asr-0.6b
                 name: Qwen3-ASR 0.6B
-                description: 桌面端专用
+                description: 本地语音模型
                 category: asr
                 size: 1.75 GB
                 tags:
                   - 语音
-                platforms:
-                  - macos
-                  - windows
-                  - linux
-                warning: 仅桌面端
+                warning: 首次使用需下载大文件
                 currentVersion: v1.0
                 versions:
                   - version: "v1.0"
