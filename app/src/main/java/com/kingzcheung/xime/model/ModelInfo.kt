@@ -29,8 +29,14 @@ data class ModelInfo(
     val description: String,
     val category: ModelCategory,
     val versions: List<ModelVersion> = emptyList(),
-    val size: String = ""
+    val size: String = "",
+    /** 支持的平台；空 = 索引未声明，视为不限。 */
+    val platforms: List<String> = emptyList()
 ) {
+    /** 是否可在当前（Android）端使用：未声明视为支持，声明了则须含 android。 */
+    val availableOnAndroid: Boolean
+        get() = platforms.isEmpty() || "android" in platforms
+
     /** 默认取第一个版本（索引中第一个为最新）。 */
     fun resolvedVersion(): ModelVersion? = versions.firstOrNull()
 
