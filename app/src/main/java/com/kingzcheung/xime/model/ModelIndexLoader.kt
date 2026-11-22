@@ -40,6 +40,7 @@ object ModelIndexLoader {
                 val text = fetchText(url)
                 if (text != null) {
                     val result = parseModelsIndex(text)
+                    // 空列表视为镜像不可用，继续试下一个镜像（如索引条目全为非 android 平台）
                     if (result.isNotEmpty()) {
                         FileLogger.i(TAG, "Loaded ${result.size} models from $host")
                         return@withContext result
@@ -59,9 +60,10 @@ object ModelIndexLoader {
             val root = yaml.parseToYamlNode(modelsText) as? YamlMap ?: return emptyList()
             val modelsNode = root["models"] as? YamlList ?: return emptyList()
 
-            modelsNode.items.mapNotNull { node ->
-                parseModelEntry(node as? YamlMap ?: return@mapNotNull null)
-            }
+            modelsNode.items
+                .mapNotNull { node -> parseModelEntry(node as? YamlMap ?: return@mapNotNull null) }
+                // 商店只展示本端可用的模型：索引声明了 platforms 且不含 android 的条目不可见
+                .filter { it.availableOnAndroid }
         } catch (e: Exception) {
             FileLogger.e(TAG, "Failed to parse models index: ${e.message}")
             emptyList()
@@ -74,6 +76,10 @@ object ModelIndexLoader {
         val description = (entry["description"] as? YamlScalar)?.content ?: ""
         val categoryStr = (entry["category"] as? YamlScalar)?.content ?: "other"
         val size = (entry["size"] as? YamlScalar)?.content ?: ""
+        val platforms = (entry["platforms"] as? YamlList)
+            ?.items?.mapNotNull { (it as? YamlScalar)?.content?.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?: emptyList()
 
         val category = parseCategory(categoryStr)
 
@@ -89,7 +95,8 @@ object ModelIndexLoader {
             description = description,
             category = category,
             size = size,
-            versions = versions
+            versions = versions,
+            platforms = platforms
         )
     }
 
