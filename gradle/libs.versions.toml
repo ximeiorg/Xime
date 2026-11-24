@@ -2,7 +2,7 @@
 agp = "9.4.1"
 kotlin = "2.4.21"
 kotlinSerialization = "2.4.21"
-ksp = "2.3.13"
+ksp = "2.3.14"
 room = "3.0.0"
 coreKtx = "1.19.1"
 junit = "4.13.2"
@@ -14,7 +14,7 @@ material = "1.14.0"
 composeBom = "2026.11.01"
 lifecycleRuntime = "2.8.7"
 activityCompose = "1.13.0"
-onnxruntimeAndroid = "1.31.1"
+onnxruntimeAndroid = "1.32.0"
 savedstate = "1.5.0"
 navigationCompose = "2.10.2"
 coil = "2.7.0"
@@ -63,7 +63,7 @@ androidx-savedstate = { group = "androidx.savedstate", name = "savedstate", vers
 # Coil (Image Loading)
 coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 kaml = { group = "com.charleskorn.kaml", name = "kaml", version.ref = "kaml" }
-kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.12.0" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "1.13.0" }
 exp4j = { group = "net.objecthunter", name = "exp4j", version.ref = "exp4j" }
 onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntimeAndroid" }
 androidx-autofill = { module = "androidx.autofill:autofill", version = "1.3.0" }
