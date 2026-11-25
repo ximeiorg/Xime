@@ -600,7 +600,7 @@
     <string name="s_jianpanbuju">键盘布局</string>
     <string name="s_qwerty_letter_size">字母键字号</string>
     <string name="s_shitijianpanjiance">实体键盘检测</string>
-    <string name="s_guanbihoubujianceshitijianpan_6aaf1">关闭后不检测实体键盘，始终使用屏幕键盘</string>
+    <string name="s_guanbihoubujianceshitijianpan_6aaf1">关闭后只用屏幕键盘</string>
     <string name="s_hengpingshiyongfentijianpan">横屏使用分体键盘</string>
     <string name="s_guanbihou_hengpingjiangxianshi_e98c9">关闭后，横屏将显示连续的完整键盘布局</string>
     <string name="s_jianpantiedixianshi">键盘贴底显示</string>
@@ -608,10 +608,12 @@
     <string name="s_houxuanci">候选词</string>
     <string name="s_houxuanzidaxiao">候选字大小</string>
     <string name="s_bianmazhushi">编码注释</string>
-    <string name="s_zaihouxuancipangxianshiduiying_de529">在候选词旁显示对应的编码（如五笔字根）</string>
+    <string name="s_zaihouxuancipangxianshiduiying_de529">在候选词旁显示编码</string>
     <string name="s_xianshi">显示</string>
     <string name="s_yincang">隐藏</string>
     <string name="s_bianmaxianshi">编码显示</string>
+    <string name="s_bianmaxianshi_zai_shurukuang">编码显示在输入框</string>
+    <string name="s_guanbishi_xianshi_zai_houxuanlan">关闭时显示在候选栏</string>
     <string name="s_xuanzeshurubianmadexianshiweizhi">选择输入编码的显示位置</string>
     <string name="s_xianshizaishurukuang">显示在输入框</string>
     <string name="s_xianshizaihouxuanlan">显示在候选栏</string>
@@ -620,7 +622,7 @@
     <string name="s_xiugaihouxudaofanganshezhizhon_603c8">修改后需到方案设置中点击部署才能生效</string>
     <string name="s_shurukuangshipei">输入框适配</string>
     <string name="s_shuzikuangzidongshuzijianpan">数字框自动数字键盘</string>
-    <string name="s_jinruhaoma_yanzhengmadengshuzi_1aed9">进入号码、验证码等数字输入框时自动弹出数字键盘</string>
+    <string name="s_jinruhaoma_yanzhengmadengshuzi_1aed9">数字输入框自动弹出数字键盘</string>
     <string name="s_fenxiangrizhi">分享日志</string>
     <string name="s_baocun">保存</string>
     <string name="s_shuaxin">刷新</string>
@@ -866,7 +868,7 @@
     <string name="s_qushangdiangengduomoxing">从扩展商店下载智能联想 / 纠错模型</string>
     <string name="s_chajianshichang">插件市场</string>
     <string name="s_bujushichang">布局市场</string>
-    <string name="s_qushangdiangengduobuju">从扩展商店下载更多键盘布局</string>
+    <string name="s_qushangdiangengduobuju">从扩展商店下载更多布局</string>
     <string name="s_zanweiqiyongrenhefangan">暂未启用任何方案</string>
     <string name="s_tianjiashurufanganhou_xuyaodia_7ee14">添加输入方案后，需要点击一次「部署方案」进行部署</string>
     <string name="s_meiyouqitakeyongfangan">没有其他可用方案</string>

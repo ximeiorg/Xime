@@ -598,7 +598,7 @@
     <string name="s_jianpanbuju">鍵盤佈局</string>
     <string name="s_qwerty_letter_size">字母鍵字級</string>
     <string name="s_shitijianpanjiance">實體鍵盤檢測</string>
-    <string name="s_guanbihoubujianceshitijianpan_6aaf1">關閉後不檢測實體鍵盤，始終使用螢幕鍵盤</string>
+    <string name="s_guanbihoubujianceshitijianpan_6aaf1">關閉後只用螢幕鍵盤</string>
     <string name="s_hengpingshiyongfentijianpan">橫向使用分體鍵盤</string>
     <string name="s_guanbihou_hengpingjiangxianshi_e98c9">關閉後，橫向將顯示連續的完整鍵盤佈局</string>
     <string name="s_jianpantiedixianshi">鍵盤貼底顯示</string>
@@ -606,10 +606,12 @@
     <string name="s_houxuanci">候選詞</string>
     <string name="s_houxuanzidaxiao">候選字大小</string>
     <string name="s_bianmazhushi">編碼註釋</string>
-    <string name="s_zaihouxuancipangxianshiduiying_de529">在候選詞旁顯示對應的編碼（如五筆字根）</string>
+    <string name="s_zaihouxuancipangxianshiduiying_de529">在候選詞旁顯示編碼</string>
     <string name="s_xianshi">顯示</string>
     <string name="s_yincang">隱藏</string>
     <string name="s_bianmaxianshi">編碼顯示</string>
+    <string name="s_bianmaxianshi_zai_shurukuang">編碼顯示在輸入框</string>
+    <string name="s_guanbishi_xianshi_zai_houxuanlan">關閉時顯示在候選欄</string>
     <string name="s_xuanzeshurubianmadexianshiweizhi">選擇輸入編碼的顯示位置</string>
     <string name="s_xianshizaishurukuang">顯示在輸入框</string>
     <string name="s_xianshizaihouxuanlan">顯示在候選欄</string>
@@ -618,7 +620,7 @@
     <string name="s_xiugaihouxudaofanganshezhizhon_603c8">修改後需到方案設定中點擊部署才能生效</string>
     <string name="s_shurukuangshipei">輸入框適配</string>
     <string name="s_shuzikuangzidongshuzijianpan">數字框自動數字鍵盤</string>
-    <string name="s_jinruhaoma_yanzhengmadengshuzi_1aed9">進入號碼、驗證碼等數字輸入框時自動彈出數字鍵盤</string>
+    <string name="s_jinruhaoma_yanzhengmadengshuzi_1aed9">數字輸入框自動彈出數字鍵盤</string>
     <string name="s_fenxiangrizhi">分享日誌</string>
     <string name="s_baocun">儲存</string>
     <string name="s_shuaxin">重新整理</string>
@@ -864,7 +866,7 @@
     <string name="s_qushangdiangengduomoxing">從擴展商店下載智能聯想 / 糾錯模型</string>
     <string name="s_chajianshichang">插件市場</string>
     <string name="s_bujushichang">佈局市場</string>
-    <string name="s_qushangdiangengduobuju">從擴展商店下載更多鍵盤佈局</string>
+    <string name="s_qushangdiangengduobuju">從擴展商店下載更多佈局</string>
     <string name="s_zanweiqiyongrenhefangan">暫未啟用任何方案</string>
     <string name="s_tianjiashurufanganhou_xuyaodia_7ee14">新增輸入方案後，需要點擊一次「部署方案」進行部署</string>
     <string name="s_meiyouqitakeyongfangan">沒有其他可用方案</string>
