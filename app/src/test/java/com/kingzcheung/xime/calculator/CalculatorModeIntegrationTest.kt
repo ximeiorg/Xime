@@ -17,6 +17,25 @@ import org.junit.Test
 class CalculatorModeIntegrationTest {
 
     @Test
+    fun `上滑字面数字继续已有计算器表达式`() {
+        val engine = CalculatorEngine()
+        engine.handleDigit("7")
+        engine.handleOperator("-")
+        engine.handleDigit("2")
+
+        val result = routeCalculatorKey(
+            key = "1",
+            isNumberKeyboard = false,
+            isCommonSymbolKeyboard = false,
+            calculatorEngine = engine,
+            isLiteralSwipeDigit = true,
+        )
+
+        assertEquals(CalculatorRouteResult.Handled("1"), result)
+        assertEquals("7-21 = -14", engine.getCandidate())
+    }
+
+    @Test
     fun `Number键盘_数字触发计算器并提交`() {
         val engine = CalculatorEngine()
 

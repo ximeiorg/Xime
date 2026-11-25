@@ -104,6 +104,7 @@ fun StrokeKeyboardLayout(
     isSttEnabled: Boolean = false,
     voiceSticky: Boolean = false,
     onVoiceModeChange: ((Boolean) -> Unit)? = null,
+    onSwipeKeyPress: ((String) -> Unit)? = null,
 ) {
     StrokeKeyboardSwipeOverlay(
         modifier = modifier,
@@ -112,6 +113,7 @@ fun StrokeKeyboardLayout(
         keyTextColor = keyTextColor,
         isFloatingMode = isFloatingMode,
         onKeyPress = onKeyPress,
+        onSwipeKeyPress = onSwipeKeyPress,
         keyBackgroundColor = keyBackgroundColor,
         specialKeyBackgroundColor = specialKeyBackgroundColor,
         bubbleBackgroundColor = bubbleBackgroundColor,
@@ -140,6 +142,7 @@ private fun StrokeKeyboardSwipeOverlay(
     keyTextColor: Color,
     isFloatingMode: Boolean,
     onKeyPress: (String) -> Unit,
+    onSwipeKeyPress: ((String) -> Unit)? = null,
     keyBackgroundColor: Color,
     specialKeyBackgroundColor: Color,
     bubbleBackgroundColor: Color = keyBackgroundColor,
@@ -231,6 +234,7 @@ onKeyPressDown: ((String) -> Unit)?,
                 ) {
                     StrokeKeyboardContent(
                         onKeyPress = onKeyPress,
+                        onSwipeKeyPress = onSwipeKeyPress,
                         keyBackgroundColor = keyBackgroundColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBackgroundColor,
@@ -264,6 +268,7 @@ onKeyPressDown: ((String) -> Unit)?,
                 ) {
                     StrokeKeyboardContent(
                         onKeyPress = onKeyPress,
+                        onSwipeKeyPress = onSwipeKeyPress,
                         keyBackgroundColor = keyBackgroundColor,
                         keyTextColor = keyTextColor,
                         specialKeyBackgroundColor = specialKeyBackgroundColor,
@@ -332,6 +337,7 @@ private fun StrokeKeyboardContent(
     isSttEnabled: Boolean = false,
     voiceSticky: Boolean = false,
     onVoiceModeChange: ((Boolean) -> Unit)? = null,
+    onSwipeKeyPress: ((String) -> Unit)? = null,
 ) {
     val ctrlFontSize = if (compactMode) 11.sp else androidx.compose.ui.unit.TextUnit.Unspecified
     val strokeFontSize = if (compactMode) 13.sp else 16.sp
@@ -371,11 +377,12 @@ private fun StrokeKeyboardContent(
     }
 
     fun swipesFor(id: String, fallbackDigit: String): StrokeKeySwipes {
+        val swipePress = onSwipeKeyPress ?: onKeyPress
         val gesture = KeysConfigHelper.getStrokeKeyGesture(id)
         if (gesture == null || (gesture.swipeUp == null && gesture.swipeDown == null)) {
             // 回退行为与内置默认（display: "key"）一致：仅键面提示，无滑动气泡
             return StrokeKeySwipes(
-                onSwipeUp = { onKeyPress(fallbackDigit) },
+                onSwipeUp = { swipePress(fallbackDigit) },
                 swipeUpKeyLabel = if (hintsActive) fallbackDigit else null,
             )
         }
@@ -394,7 +401,7 @@ private fun StrokeKeyboardContent(
             else -> hint(gesture.swipeDown)
         }
         return StrokeKeySwipes(
-            onSwipeUp = swipeHandlerFor(gesture.swipeUp, onKeyPress, onGestureAction),
+            onSwipeUp = swipeHandlerFor(gesture.swipeUp, swipePress, onGestureAction),
             onSwipeDown = swipeHandlerFor(gesture.swipeDown, onKeyPress, onGestureAction),
             swipeUpText = if (hintsActive && (gesture.swipeUp?.bubble ?: true)) hint(gesture.swipeUp) else null,
             swipeDownText = if (hintsActive && (gesture.swipeDown?.bubble ?: true)) hint(gesture.swipeDown) else null,

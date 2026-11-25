@@ -41,6 +41,7 @@ object SettingsPreferences {
     private const val KEY_PREDICTION_MODEL_REPO = "prediction_model_repo"
     private const val KEY_PREDICTION_SELECTED_MODEL = "prediction_selected_model"
     private const val KEY_SPACE_COMMIT_ASSOCIATION = "space_commit_association"
+    private const val KEY_SWIPE_SELECT_ASSOCIATION = "swipe_select_association"
     private const val KEY_ASSOCIATION_SINGLE_MODE = "association_single_mode"
     
     const val KEY_STT_ENABLED = "stt_enabled"
@@ -475,6 +476,15 @@ object SettingsPreferences {
 
     fun setSpaceCommitAssociationEnabled(context: Context, enabled: Boolean) {
         getPrefs(context).edit().putBoolean(KEY_SPACE_COMMIT_ASSOCIATION, enabled).apply()
+    }
+
+    /** 组合态下通过非数字上滑手势上屏候选词后是否触发智能联想，默认关闭（Issue #1071） */
+    fun isSwipeSelectAssociationEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SWIPE_SELECT_ASSOCIATION, false)
+    }
+
+    fun setSwipeSelectAssociationEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SWIPE_SELECT_ASSOCIATION, enabled).apply()
     }
 
     /**

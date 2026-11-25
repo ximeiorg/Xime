@@ -1025,6 +1025,23 @@ fun KeyboardView(
                                 else -> callbacks.onKeyPress(key, false)
                             }
                         }
+                        val fullScreenOnSwipeKeyPress: (String) -> Unit = { key ->
+                            when (key) {
+                                "shift", "shift_single", "shift_caps",
+                                "mode_change", "mode_change_symbol", "mode_change_number", "mode_change_common_symbol",
+                                "emoji", "symbol" -> fullScreenOnKeyPress(key)
+                                else -> {
+                                    (callbacks.onSwipeKeyPress ?: callbacks.onKeyPress)(key, isShifted)
+                                    viewModel.onCharacterTyped()
+                                }
+                            }
+                        }
+                        val strokeOnSwipeKeyPress: (String) -> Unit = { key ->
+                            when (key) {
+                                "abc", "number", "symbol", "emoji" -> strokeOnKeyPress(key)
+                                else -> (callbacks.onSwipeKeyPress ?: callbacks.onKeyPress)(key, false)
+                            }
+                        }
                         val currentOnKeyPress = when (keyboardState) {
                             is KeyboardLayoutState.Chinese,
                             is KeyboardLayoutState.English -> fullScreenOnKeyPress
@@ -1033,6 +1050,12 @@ fun KeyboardView(
                             is KeyboardLayoutState.Stroke -> strokeOnKeyPress
                             is KeyboardLayoutState.T9Pinyin -> t9OnKeyPress
                             is KeyboardLayoutState.Symbol -> symbolOnKeyPress
+                        }
+                        val currentOnSwipeKeyPress: ((String) -> Unit)? = when (keyboardState) {
+                            is KeyboardLayoutState.Chinese,
+                            is KeyboardLayoutState.English -> fullScreenOnSwipeKeyPress
+                            is KeyboardLayoutState.Stroke -> strokeOnSwipeKeyPress
+                            else -> null
                         }
                         CompositionLocalProvider(
                             LocalSuppressCursorMove provides suppressCursorMove,
@@ -1045,6 +1068,7 @@ fun KeyboardView(
                                 viewModel = viewModel,
                                 callbacks = callbacks,
                                 onKeyPress = currentOnKeyPress,
+                                onSwipeKeyPress = currentOnSwipeKeyPress,
                                 modifier = Modifier.weight(1f).then(cursorMod),
                                 isHandwritingLookup = isHandwritingLookup,
                                 onHandwritingCandidates = { candidates ->

@@ -12,11 +12,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 
 class PredictionManager(
     private val context: Context,
     private val serviceScope: CoroutineScope,
     private val onPredictionResult: (List<String>) -> Unit,
+    private val isSmartPredictionEnabled: () -> Boolean = { SettingsPreferences.isSmartPredictionEnabled(context) },
+    private val predictor: suspend (String, Int) -> List<String>? = { text, limit ->
+        val ready = AssociationManager.isInitialized() || withContext(Dispatchers.IO) {
+            AssociationManager.initialize(context)
+        }
+        if (!ready) null else AssociationManager.predict(text, limit).map { it.text }
+    },
 ) {
     companion object {
         private const val TAG = "PredictionManager"
@@ -45,24 +53,13 @@ class PredictionManager(
      * 使所有在途的异步预测结果失效。否则长按退格删除时，旧的联想结果会迟到并反复
      * 回填 associationCandidates，候选栏在"显示联想词 ↔ 空"之间闪动（一闪一闪）。
      */
-    private var requestEpoch = 0L
+    private val requestEpoch = AtomicLong()
+    internal val predictionEpoch: Long get() = requestEpoch.get()
 
     fun invalidatePendingPredictions() {
-        requestEpoch++
+        requestEpoch.incrementAndGet()
     }
 
-    /**
-     * 单次联想抑制标志：联想候选上屏（点击/空格）前置位，使 commitText 触发的下一轮
-     * 自动推理被跳过并清空联想候选（候选栏干净），等待用户下一次真实输入。
-     * 连续联想模式不置位——commitText 的自动推理即为"一直上屏一直推理"。
-     */
-    @Volatile
-    private var suppressNextPrediction = false
-
-    fun suppressNextPredictionOnce() {
-        suppressNextPrediction = true
-    }
-    
     fun appendCommittedText(text: String) {
         _lastCommittedText = (_lastCommittedText + text).takeLast(MAX_CONTEXT_LENGTH)
     }
@@ -112,10 +109,9 @@ class PredictionManager(
         }
     }
     
-    fun getPrediction(contextText: String) {
-        // 单次联想：消费抑制标志——联想上屏引发的本轮推理不执行，回调空结果清空候选栏
-        if (suppressNextPrediction) {
-            suppressNextPrediction = false
+    fun getPrediction(contextText: String, suppressPrediction: Boolean = false) {
+        if (suppressPrediction) {
+            invalidatePendingPredictions()
             onPredictionResult(emptyList())
             return
         }
@@ -128,41 +124,35 @@ class PredictionManager(
             return
         }
         
-        if (!SettingsPreferences.isSmartPredictionEnabled(context)) {
+        if (!isSmartPredictionEnabled()) {
             onPredictionResult(emptyList())
             return
         }
         
-        val epoch = requestEpoch
+        val epoch = requestEpoch.get()
         serviceScope.launch {
             try {
-                if (!AssociationManager.isInitialized()) {
-                    val initSuccess = withContext(Dispatchers.IO) {
-                        AssociationManager.initialize(context)
-                    }
-                    if (!initSuccess) {
-                        Log.e(TAG, "Failed to initialize AssociationManager")
-                        withContext(Dispatchers.Main) {
-                            if (epoch == requestEpoch) {
-                                onPredictionResult(emptyList())
-                            }
+                val candidates = predictor(contextText, MAX_ASSOCIATION_COUNT)
+                if (candidates == null) {
+                    Log.e(TAG, "Failed to initialize AssociationManager")
+                    withContext(Dispatchers.Main) {
+                        if (epoch == requestEpoch.get()) {
+                            onPredictionResult(emptyList())
                         }
-                        return@launch
                     }
+                    return@launch
                 }
-                
-                val candidates = AssociationManager.predict(contextText, MAX_ASSOCIATION_COUNT)
 
                 withContext(Dispatchers.Main) {
-                    // 代际过期说明上下文已被退格/清空修改，丢弃过期结果避免候选栏闪动
-                    if (epoch == requestEpoch) {
-                        onPredictionResult(candidates.map { it.text })
+                    // 代际过期说明上下文已被退格/清空/切换面板修改，丢弃过期结果避免旧联想残留或闪动
+                    if (epoch == requestEpoch.get()) {
+                        onPredictionResult(candidates)
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Prediction failed", e)
                 withContext(Dispatchers.Main) {
-                    if (epoch == requestEpoch) {
+                    if (epoch == requestEpoch.get()) {
                         onPredictionResult(emptyList())
                     }
                 }

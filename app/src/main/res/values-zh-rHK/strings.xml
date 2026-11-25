@@ -904,6 +904,8 @@
     <string name="s_lianxiangxingwei">聯想行為</string>
     <string name="s_konggeshangpinglianxianghouxuan">空格上屏聯想候選</string>
     <string name="s_youlianxianghouxuanshi_ankongg_00102">有聯想候選時，按空格鍵直接上屏第一個聯想詞</string>
+    <string name="s_shanghuaxuancichufalianxiang">上滑選詞觸發聯想</string>
+    <string name="s_shanghuaxuancichufalianxiang_shuoming">輸入編碼時，上滑標點等非數字按鍵使候選詞上屏後，繼續推薦聯想詞</string>
     <string name="s_lianxulianxiang">連續聯想</string>
     <string name="s_lianxiangcishangpinghoujixutui_d319f">聯想詞上屏後繼續推理，可連續空格上屏聯想詞</string>
     <string name="s_dancilianxiang">單次聯想</string>

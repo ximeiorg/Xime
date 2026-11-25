@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SwipeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -199,6 +200,9 @@ fun SmartPredictionSettingsContent(
                     var spaceCommitEnabled by remember {
                         mutableStateOf(SettingsPreferences.isSpaceCommitAssociationEnabled(context))
                     }
+                    var swipeSelectAssociationEnabled by remember {
+                        mutableStateOf(SettingsPreferences.isSwipeSelectAssociationEnabled(context))
+                    }
                     var singleMode by remember {
                         mutableStateOf(SettingsPreferences.isSingleAssociationMode(context))
                     }
@@ -211,6 +215,21 @@ fun SmartPredictionSettingsContent(
                             onCheckedChange = {
                                 spaceCommitEnabled = it
                                 SettingsPreferences.setSpaceCommitAssociationEnabled(context, it)
+                            }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+                        SettingsToggleItem(
+                            icon = Icons.Default.SwipeUp,
+                            title = tr(R.string.s_shanghuaxuancichufalianxiang),
+                            subtitle = tr(R.string.s_shanghuaxuancichufalianxiang_shuoming),
+                            checked = swipeSelectAssociationEnabled,
+                            onCheckedChange = {
+                                swipeSelectAssociationEnabled = it
+                                SettingsPreferences.setSwipeSelectAssociationEnabled(context, it)
                             }
                         )
                         HorizontalDivider(
