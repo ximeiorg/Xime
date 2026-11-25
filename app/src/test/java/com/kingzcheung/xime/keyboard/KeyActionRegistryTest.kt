@@ -10,10 +10,18 @@ class KeyActionRegistryTest {
     @Test
     fun `所有既有 action 取值均可查询且回指对应枚举`() {
         for (gesture in GestureAction.entries) {
+            if (gesture == GestureAction.COMMIT_LITERAL_DIGIT) continue
             val action = KeyActionRegistry.fromId(gesture.value)
             assertNotNull("action ${gesture.value} 应可查询", action)
             assertEquals(gesture, action!!.action)
         }
+    }
+
+    @Test
+    fun `字面数字组合模式分发到服务层`() {
+        val executor = RecordingExecutor()
+        KeyActionRegistry.execute(GestureAction.COMMIT_LITERAL_DIGIT, KeyActionContext(executor), "1")
+        assertEquals(listOf("commit_literal_digit:1"), executor.dispatched)
     }
 
     @Test

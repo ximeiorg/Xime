@@ -364,6 +364,7 @@ private fun parseKeyAction(
         var iconName = ""
         var action: GestureAction? = defaultAction
         var explicitAction = false
+        var literalComposition = false
         var value = ""
         var display = "key"
         var bubble = true
@@ -391,6 +392,7 @@ private fun parseKeyAction(
                     }
                 }
                 "value" -> (v as? YamlScalar)?.content?.let { value = it }
+                "composition" -> literalComposition = (v as? YamlScalar)?.content == "literal"
                 "display" -> (v as? YamlScalar)?.content?.let { display = it }
                 "bubble" -> bubble = (v as? YamlScalar)?.content?.toBooleanStrictOrNull() ?: true
                 // 图标名：`icon: mic` 与历史写法 `label: "@mic"` 等价
@@ -401,6 +403,12 @@ private fun parseKeyAction(
         val iconFromLabel = if (label.startsWith("@")) label.removePrefix("@") else ""
         val icon = iconName.ifEmpty { iconFromLabel }
         val cleanLabel = if (iconFromLabel.isNotEmpty()) "" else label
+        val commitValue = value.ifEmpty { cleanLabel }
+        if (explicitAction && action == GestureAction.COMMIT && literalComposition &&
+            commitValue.length == 1 && commitValue[0] in '0'..'9'
+        ) {
+            action = GestureAction.COMMIT_LITERAL_DIGIT
+        }
         return KeyAction(
             action = action,
             value = value,
