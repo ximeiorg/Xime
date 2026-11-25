@@ -35,4 +35,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Xime"
 include(":app")
+include(":lexicon-core")
 include(":plugin-core")

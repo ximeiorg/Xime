@@ -44,7 +44,8 @@ object SchemeFiles {
 
     /**
      * 跨包保留的用户数据白名单：
-     * `xime.custom.yaml`、`themes/`、`fonts/`、`custom_phrase*.txt`。
+     * `xime.custom.yaml`、`themes/`、`fonts/`、`custom_phrase*.txt`，
+     * 以及导入词库生成的 `xime_import_*.dict.yaml`（记录存在 SQLite 里，文件必须跟着保留）。
      *
      * 其余一切（`*.userdb/`、`sync/`、`*.custom.yaml`、`default.custom.yaml`）随包丢弃。
      */
@@ -54,6 +55,7 @@ object SchemeFiles {
         if (path == "themes" || path.startsWith("themes/")) return true
         if (path == "fonts" || path.startsWith("fonts/")) return true
         val base = path.substringAfterLast('/')
+        if (path == base && base.startsWith("xime_import_") && base.endsWith(".dict.yaml")) return true
         return path == base && base.startsWith("custom_phrase") && base.endsWith(".txt")
     }
 

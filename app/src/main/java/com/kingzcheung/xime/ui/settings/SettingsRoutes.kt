@@ -19,6 +19,7 @@ object SettingsRoutes {
     const val Dictionary = "dictionary"
     const val DictionaryUserDict = "dictionary_user_dict"
     const val DictionaryCustomPhrase = "dictionary_custom_phrase"
+    const val DictionaryImported = "dictionary_imported"
     const val Plugins = "plugins"
     const val PluginSettings = "plugin_settings"
     const val SmartPrediction = "smart_prediction"

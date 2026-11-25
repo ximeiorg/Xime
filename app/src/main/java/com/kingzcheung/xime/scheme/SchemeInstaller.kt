@@ -2,6 +2,7 @@ package com.kingzcheung.xime.scheme
 
 import android.content.Context
 import android.os.StatFs
+import com.kingzcheung.xime.dictionary.ImportedDictManager
 import com.kingzcheung.xime.rime.RimeConfigHelper
 import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.settings.MarketVersionStore
@@ -292,6 +293,13 @@ internal object SchemeInstaller {
         // 状态归一后立刻镜像 default.yaml：即使下面跳过部署，也不能把包内/基线的
         // 旧 schema_list 留给下一次部署去编译。
         SchemaManager.applyEnabledSchemasToDefaultYaml(context)
+        // 包内容重建会丢掉旧 `<方案>.custom.yaml`：按 DB 里的绑定重写 imported dict 的
+        // packs 块，并把已不存在的方案从记录里摘掉（记录本身/派生词典保留）。
+        runCatching {
+            runBlocking { ImportedDictManager.reconcileAfterPackageChange(context) }
+        }.onFailure {
+            FileLogger.w(TAG, "reconcile imported lexicons failed: ${it.message}")
+        }
         val installed = SchemeFiles.installedSchemaIds(rimeDir)
         val parseFailures = plannedSchemaIds.filter { it !in installed }
 

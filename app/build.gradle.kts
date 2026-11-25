@@ -51,8 +51,8 @@ android {
         applicationId = "com.kingzcheung.xime"
         minSdk = 28
         targetSdk = 35
-        versionCode = 20261115
-        versionName = "3.5.1"
+        versionCode = 20261124
+        versionName = "3.6.0-alpha.2"
 
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -189,6 +189,8 @@ androidComponents {
 }
 dependencies {
     implementation(project(":plugin-core"))
+    implementation(project(":lexicon-core"))
+    implementation("com.github.luben:zstd-jni:${libs.versions.zstdJni.get()}@aar")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)

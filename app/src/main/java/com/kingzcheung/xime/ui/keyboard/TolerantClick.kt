@@ -12,12 +12,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -38,17 +40,23 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [onLongClick] 非空时启用长按：按住超过系统长按超时且位移未超容差即触发
  * （触发一次后抬起不再 onClick，语义同 combinedClickable）。位移超容差则
  * 取消长按资格（视为滚动/滑动）。
+ *
+ * [longPressHaptic] 为 true 时长按触发的同时发长按触觉反馈（对齐 combinedClickable）。
+ * 默认关：多数按键调用方已有自己的触觉链路，默认开会重复震动。
  */
 fun Modifier.tolerantClick(
     enabled: Boolean = true,
     showRipple: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
+    longPressHaptic: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ): Modifier = composed {
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnLongClick by rememberUpdatedState(onLongClick)
     val currentEnabled by rememberUpdatedState(enabled)
+    val currentLongPressHaptic by rememberUpdatedState(longPressHaptic)
+    val hapticFeedback = LocalHapticFeedback.current
     val source = interactionSource ?: remember { MutableInteractionSource() }
     val resolvedIndication = if (showRipple) LocalIndication.current else null
 
@@ -86,6 +94,9 @@ fun Modifier.tolerantClick(
                         // 长按超时触发
                         longPressFired = true
                         awaitingLongPress = false
+                        if (currentLongPressHaptic) {
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
                         currentOnLongClick?.invoke()
                         source.tryEmit(PressInteraction.Cancel(press))
                         continue

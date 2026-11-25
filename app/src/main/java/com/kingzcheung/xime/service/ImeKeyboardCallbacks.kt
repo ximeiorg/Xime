@@ -357,20 +357,14 @@ internal fun rememberImeKeyboardCallbacks(
                     }
                 }
             },
-            onT9RightCommitUndone = { count ->
-                // 输入框模式：半提交文本与后续编码整体在 composing 区域内（如「这shi」），
-                // 不能在此清空组合区——setComposingText("") 会把光标带回编码起点，而此刻
-                // 宿主回报的候选区间已失效，会被误判为用户移动光标，进而丢弃本次撤销
-                // （编码被定稿成字面文本上屏）。交由随后的 applyComposition 原地重写组合区：
-                // 有组合区时 setComposingText 只替换该区间，光标仍落在编码内。
-                if (SettingsPreferences.getInputTextLocation(service)
-                    != SettingsPreferences.INPUT_TEXT_INPUT_BOX
-                ) {
-                    service.deleteBeforeCursor(count)
-                }
-                // undo 联动：撤销 right commit 段时回滚用户词典调频。
+            onT9RightCommitUndone = {
+                // 半提交文本只存在于候选栏展示（t9PartialSegments），从未写入宿主输入框；
+                // 输入框模式下它随编码一起在 composing 区域内，由随后的 applyComposition
+                // 原地重写。因此这里只移除累积段，不得回删宿主字符——曾按撤销步数
+                // deleteBeforeCursor，会把本次输入之前已上屏的文字误删。
                 val undone = service.t9PartialSegments.removeLastOrNull()
                 if (undone != null) {
+                    // undo 联动：撤销 right commit 段时回滚用户词典调频。
                     service.serviceScope.launch(service.keyProcessingDispatcher) {
                         service.rimeEngine.t9Forget(undone.text, undone.pinyin)
                     }

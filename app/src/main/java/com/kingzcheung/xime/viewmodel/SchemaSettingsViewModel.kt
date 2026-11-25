@@ -199,7 +199,7 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
                     refresh()
                     _importCompleted.tryEmit(Unit)
                     showToast(
-                        when {
+                        result.message ?: when {
                             !result.success -> tr(R.string.s_daorushibai)
                             result.installedDirect -> tr(R.string.s_daoruchenggong_yifangru_rime_mulu)
                             else -> tr(R.string.s_daoruchenggong_kezailiebiaozho_f4ac5)
@@ -228,8 +228,11 @@ class SchemaSettingsViewModel(application: Application) : AndroidViewModel(appli
             refresh()
             _importCompleted.tryEmit(Unit)
             showToast(
-                if (result.success) tr(R.string.s_daoruchenggong)
-                else tr(R.string.s_xiazaihuojieyashibai_qingjianc_5e8b6)
+                result.message ?: if (result.success) {
+                    tr(R.string.s_daoruchenggong)
+                } else {
+                    tr(R.string.s_xiazaihuojieyashibai_qingjianc_5e8b6)
+                }
             )
         }
     }

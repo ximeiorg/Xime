@@ -2308,6 +2308,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         schemaController.cycleSchema()
     }
 
+    override fun selectCandidateOrSpace(index: Int) {
+        keyRouter.selectCandidateOrSpace(index)
+    }
+
     // ── 原有方法 ──
 
     

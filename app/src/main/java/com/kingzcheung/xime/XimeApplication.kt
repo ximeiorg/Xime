@@ -7,6 +7,7 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.kingzcheung.xime.correction.CorrectionPriors
+import com.kingzcheung.xime.data.InstalledItemStore
 import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.plugin.PluginConfigStoreImpl
@@ -84,6 +85,10 @@ class XimeApplication : Application(), ImageLoaderFactory {
             }.start()
         }
         AppFonts.initialize(this)
+        // 安装元数据（方案包/方案/模型版本）预热：首次访问不在引擎初始化线程上同步读库
+        Thread {
+            runCatching { InstalledItemStore.warmUp(this) }
+        }.start()
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {

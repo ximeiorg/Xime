@@ -1487,6 +1487,25 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
     }
 
     /**
+     * 候选序号动作：选第 [index] 个候选（0 起），该序号不存在时退化为空格键语义。
+     *
+     * 判定与选择都在按键任务内按 keyJobs 顺序执行——前面按键（如刚敲的字母）的候选
+     * 若还没回填，直接在主线程判定会误判成「没有候选」而退化成空格。
+     */
+    internal fun selectCandidateOrSpace(index: Int) {
+        postRimeJob {
+            val state = service.candidateState.value
+            val hasComposing = state.isComposing || state.inputText.isNotEmpty()
+            if (candidateIndexForSelection(index, hasComposing, state.candidates.size) != null) {
+                selectCandidateAsync(index)
+            } else {
+                // 候选不足：等同按空格键（组合态提交首候选 / 空闲态上屏空格）
+                handleKeyPress("space", false)
+            }
+        }
+    }
+
+    /**
      * 长按候选删除自造词（键盘无关，T9/全键盘通用）。
      * 标准 C API delete_candidate_on_current_page：librime 对 userdb 词条
      * 做 tombstone 标记（UpdateEntry -1），对非用户词由 rime 侧自行判定。
@@ -1639,4 +1658,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             }
         }
     }
+
 }
+
+/**
+ * 候选序号动作解算：序号 [index]（0 起）落在 [candidateCount] 内且处于组合态时返回该索引，
+ * 否则返回 null —— 调用方据此退化为空格键语义。
+ */
+internal fun candidateIndexForSelection(index: Int, isComposing: Boolean, candidateCount: Int): Int? =
+    index.takeIf { isComposing && it in 0 until candidateCount }

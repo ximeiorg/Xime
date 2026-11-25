@@ -16,8 +16,9 @@ import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import com.kingzcheung.xime.clipboard.db.ClipboardDatabase
-import com.kingzcheung.xime.clipboard.db.ClipboardEntry
+import com.kingzcheung.xime.data.db.ClipboardDao
+import com.kingzcheung.xime.data.db.XimeDatabase
+import com.kingzcheung.xime.data.db.ClipboardEntry
 import com.kingzcheung.xime.plugin.core.api.ClipboardProfile
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -475,9 +476,12 @@ class ClipboardManager private constructor(private val context: Context) {
         selfClipboardImagePath = null
     }
 
-    private val database = ClipboardDatabase.getInstance(context)
-    private val dao = database.clipboardDao()
-    private val scope = ClipboardDatabase.scope()
+    // 备份恢复会关闭并替换数据库文件，这里每次取当前实例，避免抓住已关闭的连接。
+    private val database: XimeDatabase
+        get() = XimeDatabase.getInstance(context)
+    private val dao: ClipboardDao
+        get() = database.clipboardDao()
+    private val scope = XimeDatabase.scope()
 
     private val _clipboardItems = MutableStateFlow<List<ClipboardItem>>(emptyList())
     val clipboardItems: StateFlow<List<ClipboardItem>> = _clipboardItems.asStateFlow()
