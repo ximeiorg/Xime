@@ -47,7 +47,7 @@ fun SettingsPreviewFrame(
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    // 底板保持浅色（半透明 surfaceVariant），层次靠内部元素压深来体现，而不是把底板压黑。
+    // 与设置首页同一套卡片底色（surfaceContainerLow），样张用半透明 surfaceVariant 再压一档
     val frameColor = scheme.surfaceVariant.copy(alpha = 0.5f)
     Box(
         modifier = modifier
