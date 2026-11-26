@@ -905,6 +905,8 @@ internal object UiTextFallback {
         R.string.s_lianxiangxingwei to "联想行为",
         R.string.s_konggeshangpinglianxianghouxuan to "空格上屏联想候选",
         R.string.s_youlianxianghouxuanshi_ankongg_00102 to "有联想候选时，按空格键直接上屏第一个联想词",
+        R.string.s_shanghuaxuancichufalianxiang to "上滑选词触发联想",
+        R.string.s_shanghuaxuancichufalianxiang_shuoming to "输入编码时，上滑标点等非数字按键使候选词上屏后，继续推荐联想词",
         R.string.s_lianxulianxiang to "连续联想",
         R.string.s_lianxiangcishangpinghoujixutui_d319f to "联想词上屏后继续推理，可连续空格上屏联想词",
         R.string.s_dancilianxiang to "单次联想",

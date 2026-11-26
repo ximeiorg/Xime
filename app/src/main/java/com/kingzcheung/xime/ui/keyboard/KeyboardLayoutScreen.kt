@@ -31,6 +31,7 @@ fun KeyboardLayoutScreen(
     viewModel: KeyboardViewModel,
     callbacks: KeyboardCallbacks,
     onKeyPress: (String) -> Unit,
+    onSwipeKeyPress: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
     isHandwritingLookup: Boolean = false,
     onHandwritingCandidates: ((List<HandwritingCandidate>) -> Unit)? = null,
@@ -144,6 +145,7 @@ fun KeyboardLayoutScreen(
                 } else {
                     KeyboardLayout(
                         onKeyPress = onKeyPress,
+                        onSwipeKeyPress = onSwipeKeyPress,
                         viewModel = viewModel,
                         callbacks = callbacks,
                         uiState = uiState,
@@ -244,6 +246,7 @@ fun KeyboardLayoutScreen(
             is KeyboardLayoutState.Stroke -> {
                 StrokeKeyboardLayout(
                     onKeyPress = onKeyPress,
+                    onSwipeKeyPress = onSwipeKeyPress,
                     keyBackgroundColor = keyBgColor,
                     keyTextColor = keyTextColor,
                     specialKeyBackgroundColor = specialKeyBgColor,

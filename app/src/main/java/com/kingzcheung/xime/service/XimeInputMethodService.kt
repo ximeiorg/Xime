@@ -462,7 +462,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         serviceScope = serviceScope,
         onPredictionResult = { candidates ->
             candidateState.value = candidateState.value.copy(
-                associationCandidates = candidates
+                associationCandidates = if (isChineseMode && !uiState.value.isAsciiMode) candidates else emptyList()
             )
         },
     )
@@ -3142,7 +3142,11 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     internal val candidateTransform = CandidateTransformCoordinator(this)
 
     override fun commitText(text: String) {
-        commitTextAndPredict(text, isPaste = false)
+        commitText(text, suppressPrediction = false)
+    }
+
+    internal fun commitText(text: String, suppressPrediction: Boolean) {
+        commitTextAndPredict(text, isPaste = false, suppressPrediction = suppressPrediction)
     }
 
     /**
@@ -3155,15 +3159,25 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         commitTextAndPredict(text, isPaste = true)
     }
 
-    private fun commitTextAndPredict(text: String, isPaste: Boolean) {
+    private fun commitTextAndPredict(text: String, isPaste: Boolean, suppressPrediction: Boolean = false) {
         commitTextSilently(text, isPaste)
         // 空串上屏不改变上下文，跳过本轮推理。空格/标点/数字仍要进入：预测入口会判定
         // 上下文无效并清空候选栏（见 PredictionManager.isValidPredictionContext）。
-        if (isChineseMode && text.isNotEmpty()) {
-            mainHandler.post {
-                if (!uiState.value.isAsciiMode) {
-                    getPredictionFromPlugin(predictionManager.lastCommittedText)
+        if (text.isNotEmpty()) {
+            if (suppressPrediction) {
+                predictionManager.getPrediction(predictionManager.lastCommittedText, suppressPrediction = true)
+            } else if (isChineseMode) {
+                val epoch = predictionManager.predictionEpoch
+                mainHandler.post {
+                    if (epoch != predictionManager.predictionEpoch) return@post
+                    if (!uiState.value.isAsciiMode && isChineseMode) {
+                        getPredictionFromPlugin(predictionManager.lastCommittedText)
+                    } else {
+                        predictionManager.invalidatePendingPredictions()
+                    }
                 }
+            } else {
+                predictionManager.invalidatePendingPredictions()
             }
         }
     }
@@ -3237,8 +3251,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         // 详见 PluginEventDispatcher）
         pluginEvents.onTextCommitted(text, isPaste)
 
+        predictionManager.appendCommittedText(text)
         if (isChineseMode) {
-            predictionManager.appendCommittedText(text)
             predictionManager.recordInput(text)
         }
     }

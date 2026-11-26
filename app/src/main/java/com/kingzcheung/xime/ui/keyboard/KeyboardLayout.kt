@@ -145,6 +145,7 @@ fun KeyboardLayout(
     uiState: KeyboardUiState,
     isAsciiMode: Boolean,
     modifier: Modifier = Modifier,
+    onSwipeKeyPress: ((String) -> Unit)? = null,
 ) {
     val isShifted by viewModel.isShifted.collectAsStateWithLifecycle()
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
@@ -284,6 +285,7 @@ fun KeyboardLayout(
             if (useLandscapeSplitKeyboard) {
             LandscapeKeyboardContent(
                 onKeyPress = onKeyPress,
+                onSwipeKeyPress = onSwipeKeyPress,
                 viewModel = viewModel,
                 callbacks = callbacks,
                 uiState = uiState,
@@ -320,6 +322,7 @@ fun KeyboardLayout(
                         shadowElevation = shadowElevation,
                         shadowShapeRadius = shadowShapeRadius,
                         onKeyPress = onKeyPress,
+                        onSwipeKeyPress = onSwipeKeyPress,
                         onKeyPressDown = onKeyPressDown,
                         onKeyRelease = onKeyRelease,
                         onCommitText = onCommitText,
@@ -606,6 +609,7 @@ internal data class QwertyRowEnv(
     val shadowElevation: Dp,
     val shadowShapeRadius: Dp,
     val onKeyPress: (String) -> Unit,
+    val onSwipeKeyPress: ((String) -> Unit)? = null,
     val onKeyPressDown: ((String) -> Unit)?,
     val onKeyRelease: ((String) -> Unit)?,
     val onCommitText: ((String) -> Unit)?,
@@ -885,6 +889,7 @@ private fun QwertyRow(
                 KeyboardRowWithConfig(
                     keys = segment,
                     onKeyPress = env.onKeyPress,
+                    onSwipeKeyPress = env.onSwipeKeyPress,
                     config = rowConfig,
                     isShifted = env.isShifted,
                     isAsciiMode = env.isAsciiMode,
@@ -1481,7 +1486,7 @@ private fun CommaCell(env: QwertyRowEnv, modifier: Modifier) {
             swipeDownKeyLabel = k2SwipeDownKeyLabel,
             // 上滑与字母键同一条分发：尊重配置的 action（COMMIT 沿用按键路由，其余走手势分发）
             onSwipe = swipeUpHandlerFor(
-                k2SwipeUpRaw, k2SwipeUpCommitValue, env.onKeyPress, env.onCommitText, env.onGestureAction,
+                k2SwipeUpRaw, k2SwipeUpCommitValue, env.onSwipeKeyPress ?: env.onKeyPress, env.onCommitText, env.onGestureAction,
             ),
             onSwipeDown = k2OnSwipeDown,
             onSwipeLeft = k2Gestures.onLeft,
@@ -1550,7 +1555,7 @@ private fun EarthCell(env: QwertyRowEnv, modifier: Modifier) {
     }
     // 上滑与字母键同一条分发：尊重配置的 action（COMMIT 沿用按键路由，其余走手势分发）
     val k4OnSwipe: ((String) -> Unit)? = swipeUpHandlerFor(
-        k4SwipeUpRaw, k4SwipeUpValue, env.onKeyPress, env.onCommitText, env.onGestureAction,
+        k4SwipeUpRaw, k4SwipeUpValue, env.onSwipeKeyPress ?: env.onKeyPress, env.onCommitText, env.onGestureAction,
     )
     val k4OnSwipeDown: ((String) -> Unit)? = if (k4SwipeDownAction != null) {
         remember(k4SwipeDownAction, k4SwipeDownValue, k4SwipeDownLabel, env.onKeyPress, env.onGestureAction, env.onCommitText) {
@@ -1744,6 +1749,7 @@ fun KeyboardRowWithConfig(
     compactButton: Boolean = false,
     /** 当前是否暗色主题：按键级 background_dark 按此选择。 */
     isDarkTheme: Boolean = false,
+    onSwipeKeyPress: ((String) -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -1809,12 +1815,13 @@ fun KeyboardRowWithConfig(
                 { dispatchKeyActionOrPress(tapAction, commitValue, onKeyPress, onCommitText, onGestureAction) }
             }
             // 上滑动作接线（action: none 视为未绑定；COMMIT/未配置沿用旧上滑上屏）
+            val swipeKeyPress = onSwipeKeyPress ?: onKeyPress
             val onSwipeUp: ((String) -> Unit)? = remember(
-                key, swipeUpAction, swipeUpCommitValue, onKeyPress, onCommitText, onGestureAction
+                key, swipeUpAction, swipeUpCommitValue, swipeKeyPress, onCommitText, onGestureAction
             ) {
                 swipeUpHandlerFor(
                     KeysConfigHelper.getKeyGesture(key, isAsciiMode)?.swipeUp,
-                    swipeUpCommitValue, onKeyPress, onCommitText, onGestureAction,
+                    swipeUpCommitValue, swipeKeyPress, onCommitText, onGestureAction,
                 )
             }
             val onPress: (() -> Unit)? = remember(key, onKeyPressDown) { { onKeyPressDown?.invoke(key); Unit } }
@@ -2088,6 +2095,7 @@ private fun LandscapeKeyboardContent(
     keyRows: List<KeyboardRow>,
     configVersion: Int = 0,
     onSwipeStateChange: ((SwipeState, Rect) -> Unit)? = null,
+    onSwipeKeyPress: ((String) -> Unit)? = null,
 ) {
     val isShifted by viewModel.isShifted.collectAsStateWithLifecycle()
     val shiftMode by viewModel.shiftMode.collectAsStateWithLifecycle()
@@ -2136,6 +2144,7 @@ private fun LandscapeKeyboardContent(
         shadowElevation = shadowElevation,
         shadowShapeRadius = shadowShapeRadius,
         onKeyPress = onKeyPress,
+        onSwipeKeyPress = onSwipeKeyPress,
         onKeyPressDown = onKeyPressDown,
         onKeyRelease = onKeyRelease,
         onCommitText = onCommitText,

@@ -27,9 +27,22 @@ import kotlinx.coroutines.withContext
  * 所有共享状态通过 service 引用访问（同模块 internal 成员）。
  */
 internal class ImeKeyRouter(private val service: XimeInputMethodService) {
-    private companion object {
+    companion object {
         /** 纠错插件产出候选的标注（correction_translator 的 SimpleCandidate comment）。 */
-        const val CORRECTION_COMMENT = "纠错"
+        private const val CORRECTION_COMMENT = "纠错"
+
+        internal fun isLiteralSwipeDigit(key: String, isSwipe: Boolean): Boolean =
+            isSwipe && key.length == 1 && key[0] in '0'..'9'
+
+        /**
+         * 组合态下由非数字上滑手势触发候选上屏时，
+         * 是否抑制本轮上屏后的智能联想推理（Issue #1071）。
+         */
+        internal fun shouldSuppressSwipeSelectAssociation(
+            isSwipe: Boolean,
+            wasComposing: Boolean,
+            swipeSelectAssociationEnabled: Boolean,
+        ): Boolean = isSwipe && wasComposing && !swipeSelectAssociationEnabled
     }
 
 
@@ -89,7 +102,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         return newCandidates to newActions
     }
 
-    internal fun handleKeyPress(key: String, isShifted: Boolean) {
+    internal fun handleKeyPress(key: String, isShifted: Boolean, isSwipe: Boolean = false) {
         // 空键无任何按键语义，且下游 Rime 路由按 key[0] 取码（key.lowercase()[0]），
         // 空串会越界崩溃（2026-09-14 真机实证：滑动手势 commit 值为空时触发）。
         if (key.isEmpty()) return
@@ -464,13 +477,13 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                         // 空格上屏联想候选（中文模式 + 开关开启 + 联想候选存在）：上屏第一个联想词。
                         // 仅中文联想——英文模式此分支不生效，空格保持上屏空格字符；
                         // 连续联想模式：commitText 会自动触发下一轮推理（一直上屏一直推理）；
-                        // 单次联想模式：先置抑制标志，上屏引发的那轮推理被跳过并清空联想候选。
+                        // 单次联想模式：跳过本次上屏的推理并清空联想候选。
                         val association = candState.associationCandidates.first()
                         withContext(Dispatchers.Main) {
-                            if (SettingsPreferences.isSingleAssociationMode(service)) {
-                                service.predictionManager.suppressNextPredictionOnce()
-                            }
-                            service.commitText(association)
+                            service.commitText(
+                                association,
+                                suppressPrediction = SettingsPreferences.isSingleAssociationMode(service),
+                            )
                         }
                     } else {
                         withContext(Dispatchers.Main) {
@@ -513,15 +526,30 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                 else -> {
                     val isNumberKeyboard = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.Number
                     val isCommonSymbolKeyboard = service.keyboardViewModel.keyboardState.value is com.kingzcheung.xime.ui.keyboard.KeyboardLayoutState.CommonSymbol
+                    val literalSwipeDigit = isLiteralSwipeDigit(key, isSwipe)
 
                     val routeResult = com.kingzcheung.xime.calculator.routeCalculatorKey(
                         key = key,
                         isNumberKeyboard = isNumberKeyboard,
                         isCommonSymbolKeyboard = isCommonSymbolKeyboard,
                         calculatorEngine = service.calculatorEngine,
+                        isLiteralSwipeDigit = literalSwipeDigit,
                     )
                     if (routeResult is com.kingzcheung.xime.calculator.CalculatorRouteResult.Handled) {
-                        withContext(Dispatchers.Main) { service.commitText(routeResult.commitText) }
+                        if (literalSwipeDigit) {
+                            clearInputStateForKeys(clearCalculator = false)
+                            withContext(Dispatchers.Main) { service.commitTextSilently(routeResult.commitText) }
+                            updateCalculatorCandidates()
+                            return@launch
+                        }
+                        service.predictionManager.invalidatePendingPredictions()
+                        withContext(Dispatchers.Main) {
+                            service.commitText(routeResult.commitText)
+                            service.candidateState.value = service.candidateState.value.copy(
+                                pendingEnglishText = "",
+                                associationCandidates = emptyList(),
+                            )
+                        }
                         if (isNumberKeyboard) updateCalculatorCandidates()
                         needsUIUpdate = true
                         return@launch
@@ -599,7 +627,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                     // commitText 不走 CONFLATED channel：channel 会覆盖丢弃未消费事件，
                                     // 快速打字时中间的 commitText 会被吞（吃键）。
                                     if (result.committedText.isNotEmpty()) {
-                                        withContext(Dispatchers.Main) { service.commitText(result.committedText) }
+                                        val suppressPrediction = shouldSuppressSwipeSelectAssociation(
+                                            isSwipe = isSwipe,
+                                            wasComposing = candState.isComposing,
+                                            swipeSelectAssociationEnabled = SettingsPreferences.isSwipeSelectAssociationEnabled(service),
+                                        )
+                                        withContext(Dispatchers.Main) {
+                                            service.commitText(result.committedText, suppressPrediction)
+                                        }
                                     }
                                     sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                                 } else {
@@ -651,7 +686,14 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                                         sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                                     } else {
                                         if (committed.isNotEmpty()) {
-                                            withContext(Dispatchers.Main) { service.commitText(committed) }
+                                            val suppressPrediction = shouldSuppressSwipeSelectAssociation(
+                                                isSwipe = isSwipe,
+                                                wasComposing = candState.isComposing,
+                                                swipeSelectAssociationEnabled = SettingsPreferences.isSwipeSelectAssociationEnabled(service),
+                                            )
+                                            withContext(Dispatchers.Main) {
+                                                service.commitText(committed, suppressPrediction)
+                                            }
                                         }
                                         sendTransformedResult(result) { if (service.calculatorEngine.isActive()) updateCalculatorCandidates() }
                                     }
@@ -697,9 +739,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
             if (needsUIUpdate) {
                 val result = pendingResult
                 val textToCommit = committedText
+                val suppressCommitPrediction = textToCommit != null && shouldSuppressSwipeSelectAssociation(
+                    isSwipe = isSwipe,
+                    wasComposing = candState.isComposing,
+                    swipeSelectAssociationEnabled = SettingsPreferences.isSwipeSelectAssociationEnabled(service),
+                )
                 if (result != null) {
                     if (textToCommit != null) {
-                        withContext(Dispatchers.Main) { service.commitText(textToCommit) }
+                        withContext(Dispatchers.Main) {
+                            service.commitText(textToCommit, suppressCommitPrediction)
+                        }
                     }
                     sendTransformedResult(result) {
                         if (service.calculatorEngine.isActive()) {
@@ -724,7 +773,9 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
                     val displayCandidates: List<com.kingzcheung.xime.rime.RimeCandidate> =
                         transformed?.candidates ?: capturedCandidates.toList()
                     if (textToCommit != null) {
-                        withContext(Dispatchers.Main) { service.commitText(textToCommit) }
+                        withContext(Dispatchers.Main) {
+                            service.commitText(textToCommit, suppressCommitPrediction)
+                        }
                     }
                     service.uiEventChannel.trySend {
                         val pendingEnglish = service.candidateState.value.pendingEnglishText
@@ -941,6 +992,7 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         // 防止 T9 残留状态被 Rime 退格修改导致 UI 不一致
         val layoutState = service.keyboardViewModel.keyboardState.value
         if (layoutState is KeyboardLayoutState.Number || layoutState is KeyboardLayoutState.Symbol) {
+            service.predictionManager.deleteLastChar()
             withContext(Dispatchers.Main) {
                 service.sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             }
@@ -1316,9 +1368,12 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 显式清 preeditText（与提交路径"残留根治"一致），不依赖 updateUI 自愈；
      * 输入框模式清 composing 区；T9 方案重置左侧候选区（其他键盘无左栏，跳过）。
      */
-    private suspend fun clearInputStateForKeys() {
-        service.calculatorEngine.clear()
-        updateCalculatorCandidates()
+    private suspend fun clearInputStateForKeys(clearCalculator: Boolean = true) {
+        service.predictionManager.invalidatePendingPredictions()
+        if (clearCalculator) {
+            service.calculatorEngine.clear()
+            updateCalculatorCandidates()
+        }
         service.t9PartialSegments.clear()
         service.rimeEngine.clearComposition()
         service.candidateState.value = service.candidateState.value.copy(
