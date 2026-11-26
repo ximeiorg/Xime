@@ -11,6 +11,9 @@ enum class ImportKind {
     /** Rime 配置/词典 yaml、纯文本，落 rime 目录。 */
     CONFIG,
 
+    /** 语法模型（.gram），落 rime 目录，部署后生效。 */
+    GRAMMAR,
+
     FONT,
     IMAGE,
 
