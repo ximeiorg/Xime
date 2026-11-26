@@ -99,6 +99,42 @@ internal fun handwritingChromeFor(isTablet: Boolean, keyCornerRadius: Dp): Handw
     )
 }
 
+/** 手写退格的状态转移结果：每次只删一个已上屏字符（按 code point 计 UTF-16 长度），并清空活动区。 */
+internal data class HandwritingDeleteTransition(
+    val deleteCharsCount: Int,
+    val nextTail: String,
+    val nextActiveLen: Int,
+    val forwardSystemDelete: Boolean,
+)
+
+internal fun resolveHandwritingDelete(
+    tail: String,
+    @Suppress("UNUSED_PARAMETER") activeLen: Int,
+): HandwritingDeleteTransition {
+    if (tail.isEmpty()) {
+        return HandwritingDeleteTransition(
+            deleteCharsCount = 0,
+            nextTail = "",
+            nextActiveLen = 0,
+            forwardSystemDelete = true,
+        )
+    }
+    val deleteCount = Character.charCount(tail.codePointBefore(tail.length))
+    return HandwritingDeleteTransition(
+        deleteCharsCount = deleteCount,
+        nextTail = tail.dropLast(deleteCount),
+        nextActiveLen = 0,
+        forwardSystemDelete = false,
+    )
+}
+
+/** 识别回包闸门：仅当仍属当前代次且识别窗口尚有未固化笔画时才允许落地结果。 */
+internal fun shouldApplyHandwritingRecognition(
+    requestGeneration: Int,
+    currentGeneration: Int,
+    activeStrokeCount: Int,
+): Boolean = requestGeneration == currentGeneration && activeStrokeCount > 0
+
 @Composable
 fun HandwritingKeyboardLayout(
     onKeyPress: (String) -> Unit = {},
@@ -110,8 +146,6 @@ fun HandwritingKeyboardLayout(
     onRecognition: ((List<OverlappedHandwritingRecognizer.Segment>) -> Unit)? = null,
     /** 叠写满上限时最早段被固化（笔画已裁剪出识别窗口），携带该段首选字。 */
     onSegmentSettled: ((String) -> Unit)? = null,
-    /** 撤销最后一笔至空：屏上活动区字应一并撤销，由接收方处理。 */
-    onUndoActive: (() -> Unit)? = null,
     onButtonFeedback: ((String) -> Unit)? = null,
     keyTextColor: Color = Color(0xFF333333),
     keyBackgroundColor: Color = Color(0xFFE0E0E0),
@@ -149,8 +183,22 @@ fun HandwritingKeyboardLayout(
     val sidePadding = chrome.sidePaddingDp.dp
     val sheetWPx = with(density) { sheetWidth.toPx() }
     val barHPx = with(density) { barHeight.toPx() }
-    val recognizer = remember { OverlappedHandwritingRecognizer() }
+    var recognizer by remember { mutableStateOf(OverlappedHandwritingRecognizer()) }
     var recognizeJob by remember { mutableStateOf<Job?>(null) }
+    var recognitionGeneration by remember { mutableIntStateOf(0) }
+
+    fun resetStrokeWindow() {
+        recognizeJob?.cancel()
+        recognizeJob = null
+        recognitionGeneration++
+        recognizer = OverlappedHandwritingRecognizer()
+        strokes.clear()
+        fadingPrefix = 0
+        gonePrefix = 0
+        settledCount = 0
+        lastStrokeEndMs = 0L
+        dragVersion++
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -186,21 +234,11 @@ fun HandwritingKeyboardLayout(
                 scheduleGone(strokes.size)
             }
             delay(HW_CLEAR_IDLE_MS)
-            strokes.clear()
-            fadingPrefix = 0
-            gonePrefix = 0
-            settledCount = 0
-            dragVersion++
-            recognizer.reset()
+            resetStrokeWindow()
         }
     }
     LaunchedEffect(clearSignal) {
-        strokes.clear()
-        fadingPrefix = 0
-        gonePrefix = 0
-        settledCount = 0
-        dragVersion++
-        recognizer.reset()
+        resetStrokeWindow()
     }
 
     /** 当前未固化窗口的笔间时间间隔（gaps[j] = 第 j 笔起笔与上一笔收笔的间隔）。 */
@@ -217,34 +255,57 @@ fun HandwritingKeyboardLayout(
     fun scheduleRecognition() {
         recognizeJob?.cancel()
         if (settledCount >= strokes.size) return
+        val requestGeneration = recognitionGeneration
+        val activeRecognizer = recognizer
         recognizeJob = scope.launch {
             // 窗口超限：识别一次取最早段固化出窗，循环至不超限
             while (strokes.size - settledCount > HW_RECOGNIZE_WINDOW_LIMIT && isActive) {
                 val window = strokes.drop(settledCount)
                 val pairs = window.map { stroke -> stroke.map { Pair(it.x, it.y) } }
                 val result = withContext(Dispatchers.Default) {
-                    recognizer.recognize(pairs, windowGaps(window))
+                    activeRecognizer.recognize(pairs, windowGaps(window))
                 }
-                if (!isActive) return@launch
+                if (!isActive || !shouldApplyHandwritingRecognition(
+                        requestGeneration = requestGeneration,
+                        currentGeneration = recognitionGeneration,
+                        activeStrokeCount = strokes.size - settledCount,
+                    )
+                ) return@launch
                 val first = result.segments.firstOrNull() ?: return@launch
                 val firstChar = first.candidates.firstOrNull()?.char ?: return@launch
                 onSegmentSettled?.invoke(firstChar)
                 withContext(Dispatchers.Main) {
+                    if (!shouldApplyHandwritingRecognition(
+                            requestGeneration = requestGeneration,
+                            currentGeneration = recognitionGeneration,
+                            activeStrokeCount = strokes.size - settledCount,
+                        )
+                    ) return@withContext
                     settledCount = (settledCount + first.strokeCount).coerceAtMost(strokes.size)
                     if (settledCount > fadingPrefix) fadingPrefix = settledCount
                     dragVersion++
-                    recognizer.onStrokesTrimmed(first.strokeCount)
+                    activeRecognizer.onStrokesTrimmed(first.strokeCount)
                     scheduleGone(fadingPrefix)
                 }
             }
-            if (settledCount >= strokes.size || !isActive) return@launch
+            if (!isActive || !shouldApplyHandwritingRecognition(
+                    requestGeneration = requestGeneration,
+                    currentGeneration = recognitionGeneration,
+                    activeStrokeCount = strokes.size - settledCount,
+                )
+            ) return@launch
             // 正常识别上报（固化交给停顿分割）
             val window = strokes.drop(settledCount)
             val pairs = window.map { stroke -> stroke.map { Pair(it.x, it.y) } }
             val result = withContext(Dispatchers.Default) {
-                recognizer.recognize(pairs, windowGaps(window))
+                activeRecognizer.recognize(pairs, windowGaps(window))
             }
-            if (!isActive) return@launch
+            if (!isActive || !shouldApplyHandwritingRecognition(
+                    requestGeneration = requestGeneration,
+                    currentGeneration = recognitionGeneration,
+                    activeStrokeCount = strokes.size - settledCount,
+                )
+            ) return@launch
             if (result.segments.isNotEmpty()) {
                 onRecognition?.invoke(result.segments)
                 if (result.segments.size >= 2) {
@@ -256,7 +317,12 @@ fun HandwritingKeyboardLayout(
                         result.segments,
                         windowGaps(window),
                     )
-                    if (doneStrokes > 0) {
+                    if (doneStrokes > 0 && shouldApplyHandwritingRecognition(
+                            requestGeneration = requestGeneration,
+                            currentGeneration = recognitionGeneration,
+                            activeStrokeCount = strokes.size - settledCount,
+                        )
+                    ) {
                         val target = (settledCount + doneStrokes).coerceAtLeast(fadingPrefix)
                         if (target > fadingPrefix) {
                             fadingPrefix = target
@@ -421,26 +487,15 @@ fun HandwritingKeyboardLayout(
                                         scheduleRecognition()
                                     }
                                 } else {
-                                        if (sx >= w - sheetWPx && sy < h - barHPx) {
+                                    if (sx >= w - sheetWPx && sy < h - barHPx) {
                                         val cellH = (h - barHPx) / 5f
                                         val idx = (sy / cellH).toInt().coerceIn(0, 4)
                                         val action = listOf("，", "。", "？", "！", "delete")[idx]
-                                        if (action == "delete" && settledCount < strokes.size) {
-                                            // 撤销最后一笔未固化笔画并重新识别（屏上活动字随识别结果替换）
-                                            onButtonFeedback?.invoke("delete")
-                                            strokes.removeAt(strokes.size - 1)
-                                            dragVersion++
-                                            if (settledCount >= strokes.size) {
-                                                // 未固化笔画撤空：屏上活动区字一并撤销
-                                                recognizer.reset()
-                                                onUndoActive?.invoke()
-                                            } else {
-                                                scheduleRecognition()
-                                            }
-                                        } else {
-                                            onButtonFeedback?.invoke(action)
-                                            onKeyPress(action)
+                                        if (action == "delete") {
+                                            resetStrokeWindow()
                                         }
+                                        onButtonFeedback?.invoke(action)
+                                        onKeyPress(action)
                                     } else if (sy >= h - barHPx) {
                                         val seg = w / 5.2f
                                         val idx = when {

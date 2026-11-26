@@ -1068,27 +1068,19 @@ fun KeyboardView(
                             onKeyPress = { key ->
                                 when (key) {
                                     "delete" -> {
-                                        when {
-                                            handwritingActiveLen > 0 -> {
-                                                // 撤销当前字：删屏上活动区文本，清笔画重写
-                                                callbacks.onDeleteText?.invoke(handwritingActiveLen)
-                                                handwritingTail = handwritingTail.dropLast(handwritingActiveLen)
-                                                handwritingActiveLen = 0
-                                                handwritingLastSegLen = 0
-                                                handwritingCandidates = emptyList()
-                                                handwritingComments = emptyList()
-                                                handwritingClearSignal++
-                                            }
-                                            handwritingTail.isNotEmpty() -> {
-                                                // 无活动字：退格删固化尾字，tail 乐观修剪（下次替换校验兜底）。
-                                                // 候选栏同步失效（tail 已变，点选替换无意义）
-                                                callbacks.onDeleteText?.invoke(1)
-                                                handwritingTail = handwritingTail.dropLast(1)
-                                                handwritingLastSegLen = 0
-                                                handwritingCandidates = emptyList()
-                                                handwritingComments = emptyList()
-                                            }
-                                            else -> callbacks.onKeyPress("delete", false)
+                                        val transition = resolveHandwritingDelete(
+                                            tail = handwritingTail,
+                                            activeLen = handwritingActiveLen,
+                                        )
+                                        handwritingTail = transition.nextTail
+                                        handwritingActiveLen = transition.nextActiveLen
+                                        handwritingLastSegLen = 0
+                                        handwritingCandidates = emptyList()
+                                        handwritingComments = emptyList()
+                                        if (transition.forwardSystemDelete) {
+                                            callbacks.onKeyPress("delete", false)
+                                        } else {
+                                            callbacks.onDeleteText?.invoke(transition.deleteCharsCount)
                                         }
                                     }
                                     "symbol" -> viewModel.enterPanel(PanelType.COMMON_SYMBOL)
@@ -1145,16 +1137,6 @@ fun KeyboardView(
                             onSegmentSettled = { ch ->
                                 // 叠写满上限：最早段固化（屏上不动，退出活动区）
                                 handwritingActiveLen = (handwritingActiveLen - ch.length).coerceAtLeast(0)
-                            },
-                            onUndoActive = {
-                                if (handwritingActiveLen > 0) {
-                                    callbacks.onDeleteText?.invoke(handwritingActiveLen)
-                                    handwritingTail = handwritingTail.dropLast(handwritingActiveLen)
-                                    handwritingActiveLen = 0
-                                    handwritingCandidates = emptyList()
-                                    handwritingComments = emptyList()
-                                    handwritingClearSignal++
-                                }
                             },
                             onButtonFeedback = { key ->
                                 callbacks.onKeyPressDown?.invoke(key)
