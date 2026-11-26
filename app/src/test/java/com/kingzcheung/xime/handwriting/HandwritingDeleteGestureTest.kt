@@ -40,4 +40,26 @@ class HandwritingDeleteGestureTest {
             handwritingDeleteGesture(longPress = true, hasStrokes = false),
         )
     }
+
+    @Test
+    fun `叠写活动区多个字时退格只删最后一个字`() {
+        assertEquals(1, handwritingDeleteCharCount(activeLen = 3, lastSegLen = 1))
+        assertEquals(1, handwritingDeleteCharCount(activeLen = 2, lastSegLen = 1))
+    }
+
+    @Test
+    fun `活动区只有一个字时退格删一个`() {
+        assertEquals(1, handwritingDeleteCharCount(activeLen = 1, lastSegLen = 1))
+    }
+
+    @Test
+    fun `没有活动字时不删字符`() {
+        assertEquals(0, handwritingDeleteCharCount(activeLen = 0, lastSegLen = 1))
+    }
+
+    @Test
+    fun `末段长度缺失或越界时退格按一个字处理`() {
+        assertEquals(1, handwritingDeleteCharCount(activeLen = 2, lastSegLen = 0))
+        assertEquals(1, handwritingDeleteCharCount(activeLen = 1, lastSegLen = 3))
+    }
 }

@@ -43,6 +43,18 @@ fun handwritingDeleteGesture(longPress: Boolean, hasStrokes: Boolean): Handwriti
     else HandwritingDeleteGesture.DELETE_TEXT
 
 /**
+ * 退格要删掉的字符数：只删最后一个字，不整段撤销活动区。
+ *
+ * 叠写（连写）时活动区可同时包含多个字（[activeLen] > 1），按活动区整体删除会把
+ * 连着写的几个字一起清掉。识别段与上屏字一一对应，所以按最后一段的长度删。
+ *
+ * @param activeLen 活动区字数（尚未固化的已上屏字）
+ * @param lastSegLen 最后一个识别段占的字符数（单字模型通常为 1）
+ */
+fun handwritingDeleteCharCount(activeLen: Int, lastSegLen: Int): Int =
+    if (activeLen <= 0) 0 else lastSegLen.coerceIn(1, activeLen)
+
+/**
  * 手写叠写共享常量与纯函数（主手写键盘与手写查词键盘共用）。
  */
 object HandwritingStrokeFx {
