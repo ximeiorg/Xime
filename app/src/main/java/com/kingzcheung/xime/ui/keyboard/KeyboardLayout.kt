@@ -1786,7 +1786,11 @@ fun KeyboardRowWithConfig(
                 rawCommitValue
             }
             val displayText = if (isAsciiMode) {
-                commitValue
+                KeysConfigHelper.asciiKeyFaceText(
+                    tapLabel = KeysConfigHelper.getKeyTapLabel(key, isAsciiMode),
+                    rawCommitValue = rawCommitValue,
+                    isShifted = isShifted,
+                )
             } else {
                 KeysConfigHelper.getKeyDisplayLabel(key, isAsciiMode)
             }
