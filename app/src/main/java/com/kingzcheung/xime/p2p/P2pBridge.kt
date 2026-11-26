@@ -46,6 +46,23 @@ object P2pBridge {
     fun poll(max: Int = 32): List<P2pEvent> =
         if (!P2pNative.loaded) emptyList() else runCatching { P2pJson.events(P2pNative.poll(max)) }.getOrDefault(emptyList())
 
+    /** 原生侧当前的设备表（进程内镜像）。配对后读它写库。 */
+    fun peers(): List<P2pPeer> =
+        if (!P2pNative.loaded) emptyList()
+        else runCatching { P2pJson.peers(P2pNative.peers()) }.getOrDefault(emptyList())
+
+    /** 用宿主的存储覆盖原生镜像。 */
+    fun setPeers(peersJson: String): P2pResult =
+        if (!P2pNative.loaded) {
+            P2pResult(ok = false, error = NOT_LOADED)
+        } else {
+            runCatching { P2pJson.result(P2pNative.setPeers(peersJson)) }
+                .getOrElse { P2pResult(ok = false, error = describe(it)) }
+        }
+
+    /** 删除一台设备（只改原生镜像；Room 由 [P2pPeers.remove] 同步删）。 */
+    fun forget(did: String): Boolean = P2pNative.loaded && P2pNative.forget(did) == 1
+
     fun status(): P2pStatusInfo = if (!P2pNative.loaded) {
         P2pStatusInfo(ok = false, error = NOT_LOADED)
     } else {
@@ -81,11 +98,6 @@ object P2pBridge {
     }
 
     fun pairCancel(): Boolean = P2pNative.loaded && P2pNative.pairCancel() == 1
-
-    fun peers(dir: String): List<P2pPeer> =
-        if (!P2pNative.loaded) emptyList() else runCatching { P2pJson.peers(P2pNative.peers(dir)) }.getOrDefault(emptyList())
-
-    fun forget(dir: String, did: String): Boolean = P2pNative.loaded && P2pNative.forget(dir, did) == 1
 
     private fun describe(error: Throwable): String =
         "解析原生返回失败：${error.message ?: error.javaClass.simpleName}"

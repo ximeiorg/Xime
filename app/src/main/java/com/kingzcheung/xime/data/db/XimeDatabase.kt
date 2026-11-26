@@ -18,8 +18,9 @@ import java.io.File
         ImportedLexiconEntity::class,
         UserNgramEntity::class,
         InstalledItemEntity::class,
+        P2pPeerEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class XimeDatabase : RoomDatabase() {
@@ -27,6 +28,7 @@ abstract class XimeDatabase : RoomDatabase() {
     abstract fun importedLexiconDao(): ImportedLexiconDao
     abstract fun userNgramDao(): UserNgramDao
     abstract fun installedItemDao(): InstalledItemDao
+    abstract fun p2pPeerDao(): P2pPeerDao
 
     companion object {
         private const val DATABASE_NAME = "xime.db"
@@ -132,6 +134,26 @@ abstract class XimeDatabase : RoomDatabase() {
             }
         }
 
+        /** v7 → v8：局域网直连的已配对设备（与桌面端 `xime.db` 同名同列）。 */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override suspend fun migrate(connection: SQLiteConnection) {
+                connection.prepare(
+                    """
+                    CREATE TABLE IF NOT EXISTS p2p_peers (
+                        did TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        pub_ed TEXT NOT NULL,
+                        pub_x25519 TEXT NOT NULL,
+                        last_addr TEXT,
+                        last_seen INTEGER,
+                        paired_at INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(did)
+                    )
+                    """.trimIndent()
+                ).step()
+            }
+        }
+
         @Volatile
         private var instance: XimeDatabase? = null
 
@@ -147,7 +169,7 @@ abstract class XimeDatabase : RoomDatabase() {
                         .setQueryCoroutineContext(Dispatchers.IO)
                         .addMigrations(
                             MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                            MIGRATION_6_7,
+                            MIGRATION_6_7, MIGRATION_7_8,
                         )
                         .build()
                         .also { instance = it }

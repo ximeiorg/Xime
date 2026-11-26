@@ -48,12 +48,17 @@ object P2pSyncController {
             Log.w(TAG, "身份不可用：${identity.error}")
             return false
         }
-        val peers = P2pBridge.peers(dataDir)
+        val peers = P2pPeers.list(context)
         if (peers.isEmpty()) {
             Log.d(TAG, "尚无已配对设备，暂不启动")
             dir = dataDir
             did = identity.did
             pairedCount = 0
+            return false
+        }
+        // 先把 Room 里的设备表灌进原生镜像：协议库不再自己存文件。
+        if (!P2pPeers.pushToNative(context)) {
+            Log.w(TAG, "设备表未能写入原生层，跳过启动")
             return false
         }
         val started = P2pBridge.start(dataDir, listen = true, discover = true)

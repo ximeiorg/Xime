@@ -33,9 +33,11 @@ object P2pNative {
 
     external fun pairCancel(): Int
 
-    external fun peers(dir: String): String
+    external fun peers(): String
 
-    external fun forget(dir: String, did: String): Int
+    external fun setPeers(peersJson: String): String
+
+    external fun forget(did: String): Int
 
     external fun buildInfo(): String
 }

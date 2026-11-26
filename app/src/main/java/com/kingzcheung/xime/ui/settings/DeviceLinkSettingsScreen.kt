@@ -49,6 +49,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -64,6 +65,8 @@ import com.kingzcheung.xime.i18n.tr
 import com.kingzcheung.xime.p2p.P2pBridge
 import com.kingzcheung.xime.p2p.P2pNative
 import com.kingzcheung.xime.p2p.P2pPeer
+import com.kingzcheung.xime.p2p.P2pPeerStatus
+import com.kingzcheung.xime.p2p.P2pPeers
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -109,6 +112,9 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
 
     var did by remember { mutableStateOf<String?>(null) }
     var peers by remember { mutableStateOf(emptyList<P2pPeer>()) }
+    // 每台设备的实时状态（did → 状态）。节点没跑时为空，界面显示「状态未知」，
+    // 不能把「拿不到」画成「离线」——那是两件事。
+    var peerStates by remember { mutableStateOf<Map<String, P2pPeerStatus>>(emptyMap()) }
     var mode by remember { mutableStateOf(PairMode.None) }
     var session by remember { mutableIntStateOf(0) }
     var code by remember { mutableStateOf<String?>(null) }
@@ -122,7 +128,7 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
 
     fun refreshPeers() {
         scope.launch(Dispatchers.IO) {
-            val latest = P2pBridge.peers(dir)
+            val latest = P2pPeers.list(context)
             withContext(Dispatchers.Main) { peers = latest }
         }
     }
@@ -133,12 +139,21 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
         SettingsPreferences.setDeviceLinkName(context, resolved)
     }
 
+    LaunchedEffect(available) {
+        if (!available) return@LaunchedEffect
+        while (isActive) {
+            val status = withContext(Dispatchers.IO) { P2pBridge.status() }
+            peerStates = status.peers.filter { it.did.isNotEmpty() }.associateBy { it.did }
+            delay(2_000)
+        }
+    }
+
     LaunchedEffect(Unit) {
         deviceName = SettingsPreferences.getDeviceLinkName(context).ifBlank { defaultDeviceName() }
         if (!available) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             val identity = P2pBridge.identity(dir)
-            val loadedPeers = P2pBridge.peers(dir)
+            val loadedPeers = P2pPeers.list(context)
             withContext(Dispatchers.Main) {
                 did = identity.did
                 peers = loadedPeers
@@ -157,6 +172,8 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
             error = state.error
             secondsLeft = ((deadline - System.currentTimeMillis()) / 1000).toInt().coerceAtLeast(0)
             if (state.phase == "done") {
+                // 配对结果只存在于原生镜像里（带公钥），先写回 Room 再刷新。
+                withContext(Dispatchers.IO) { P2pPeers.syncFromNative(context) }
                 SettingsPreferences.bumpClipboardSyncPeersRevision(context)
                 refreshPeers()
             }
@@ -432,13 +449,27 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                                     fontFamily = FontFamily.Monospace,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                val live = peerStates[peer.did]
+                                val (label, tint) = when (live?.state) {
+                                    "online" -> tr(R.string.s_shebei_zaixian) to Color(0xFF2EA07D)
+                                    "nearby" -> tr(R.string.s_shebei_fujin) to Color(0xFFE58F2A)
+                                    "offline" -> tr(R.string.s_shebei_lixian) to
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    else -> tr(R.string.s_shebei_zhuangtai_weizhi) to
+                                        MaterialTheme.colorScheme.outline
+                                }
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = tint
+                                )
                             }
                             TextButton(
                                 onClick = {
                                     scope.launch(Dispatchers.IO) {
-                                        P2pBridge.forget(dir, peer.did)
+                                        P2pPeers.remove(context, peer.did)
                                         SettingsPreferences.bumpClipboardSyncPeersRevision(context)
-                                        val latest = P2pBridge.peers(dir)
+                                        val latest = P2pPeers.list(context)
                                         withContext(Dispatchers.Main) { peers = latest }
                                     }
                                 },

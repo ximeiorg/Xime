@@ -186,30 +186,41 @@ pub extern "system" fn Java_com_kingzcheung_xime_p2p_P2pNative_pairCancel<'local
     xime_p2p_c::xime_p2p_pair_cancel()
 }
 
+/// 已配对设备（进程内镜像）。存储归 Kotlin：配对或改动后读回，写进 Room。
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kingzcheung_xime_p2p_P2pNative_peers<'local>(
     mut env: JNIEnv<'local>,
     _this: JObject<'local>,
-    dir: JString<'local>,
 ) -> jstring {
-    let Some(dir) = read_string(&mut env, &dir) else {
-        return out(&mut env, MISSING_ARGUMENT.to_string());
-    };
-    let raw = xime_p2p_c::xime_p2p_peers(to_c(&dir).as_ptr());
+    let raw = xime_p2p_c::xime_p2p_peers();
     json_result(&mut env, raw)
 }
 
+/// 用 Room 里的设备表覆盖原生进程内镜像。节点启动前必须调一次。
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_kingzcheung_xime_p2p_P2pNative_setPeers<'local>(
+    mut env: JNIEnv<'local>,
+    _this: JObject<'local>,
+    peers_json: JString<'local>,
+) -> jstring {
+    let Some(peers_json) = read_string(&mut env, &peers_json) else {
+        return out(&mut env, MISSING_ARGUMENT.to_string());
+    };
+    let raw = xime_p2p_c::xime_p2p_set_peers(to_c(&peers_json).as_ptr());
+    json_result(&mut env, raw)
+}
+
+/// 删除一台设备（只改原生镜像，Room 由 Kotlin 同步删）。返回 1 表示确实删掉了。
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_kingzcheung_xime_p2p_P2pNative_forget<'local>(
     mut env: JNIEnv<'local>,
     _this: JObject<'local>,
-    dir: JString<'local>,
     did: JString<'local>,
 ) -> jint {
-    let (Some(dir), Some(did)) = (read_string(&mut env, &dir), read_string(&mut env, &did)) else {
+    let Some(did) = read_string(&mut env, &did) else {
         return 0;
     };
-    xime_p2p_c::xime_p2p_forget(to_c(&dir).as_ptr(), to_c(&did).as_ptr())
+    xime_p2p_c::xime_p2p_forget(to_c(&did).as_ptr())
 }
 
 #[unsafe(no_mangle)]

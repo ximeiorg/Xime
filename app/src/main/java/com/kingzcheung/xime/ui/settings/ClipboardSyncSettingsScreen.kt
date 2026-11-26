@@ -5,6 +5,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.withContext
 import com.kingzcheung.xime.p2p.P2pBridge
+import com.kingzcheung.xime.p2p.P2pPeers
 import com.kingzcheung.xime.clipboard.sync.ChannelPolicy
 
 import com.kingzcheung.xime.i18n.tr
@@ -101,7 +102,7 @@ fun ClipboardSyncSettingsContent(
     var pairedCount by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         pairedCount = withContext(Dispatchers.IO) {
-            runCatching { P2pBridge.peers(P2pBridge.dir(context)).size }.getOrDefault(0)
+            runCatching { P2pPeers.count(context) }.getOrDefault(0)
         }
     }
 
