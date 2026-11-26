@@ -21,6 +21,27 @@ const val HW_RECOGNIZE_WINDOW_LIMIT = 25
  */
 const val HW_FADE_GAP_MS = 400L
 
+/** 删除键长按判定阈值（ms）：达到即视为"撤笔"，否则按删已上屏文本处理。 */
+const val HW_DELETE_LONG_PRESS_MS = 500L
+
+/** 手写页删除键的两种语义。 */
+enum class HandwritingDeleteGesture {
+    /** 删已上屏文本（与其它键盘的退格一致） */
+    DELETE_TEXT,
+    /** 撤销最后一笔未固化笔画并重新识别 */
+    UNDO_STROKE,
+}
+
+/**
+ * 删除键语义判定：短按删文本；长按才撤笔，且必须有笔画可撤（窗口已清空则回退为删文本）。
+ *
+ * @param longPress 按下到抬起的时长达到 [HW_DELETE_LONG_PRESS_MS]
+ * @param hasStrokes 识别窗口内还有笔画
+ */
+fun handwritingDeleteGesture(longPress: Boolean, hasStrokes: Boolean): HandwritingDeleteGesture =
+    if (longPress && hasStrokes) HandwritingDeleteGesture.UNDO_STROKE
+    else HandwritingDeleteGesture.DELETE_TEXT
+
 /**
  * 手写叠写共享常量与纯函数（主手写键盘与手写查词键盘共用）。
  */
