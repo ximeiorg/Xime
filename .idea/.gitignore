@@ -1,3 +1,16 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+/usage.statistics.xml
+/statistics.xml
+/tasks.xml
+/dictionaries/
+/httpRequests/
+
+# 本机 / 用户级配置，不随仓库共享
+/gradle.xml
+/AndroidProjectSystem.xml
+/appInsightsSettings.xml
+/deviceManager.xml
+/markdown.xml
+/runConfigurations.xml

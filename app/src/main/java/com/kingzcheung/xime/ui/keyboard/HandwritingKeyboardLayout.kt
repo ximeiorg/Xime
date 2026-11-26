@@ -43,11 +43,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kingzcheung.xime.handwriting.HandwritingDeleteGesture
 import com.kingzcheung.xime.handwriting.HandwritingEngine
 import com.kingzcheung.xime.handwriting.HandwritingStrokeFx
+import com.kingzcheung.xime.handwriting.HW_DELETE_LONG_PRESS_MS
 import com.kingzcheung.xime.handwriting.HW_RECOGNIZE_WINDOW_LIMIT
 import com.kingzcheung.xime.handwriting.OverlappedHandwritingRecognizer
 import com.kingzcheung.xime.handwriting.StrokePoint
+import com.kingzcheung.xime.handwriting.handwritingDeleteGesture
 import com.kingzcheung.xime.handwriting.renderStrokes
 import com.kingzcheung.xime.settings.KeysConfigHelper
 import com.kingzcheung.xime.ui.isTablet
@@ -172,6 +175,21 @@ fun HandwritingKeyboardLayout(
         }
     }
 
+    /**
+     * 清空笔画窗口：作废在途识别（旧结果不得回写上屏）+ 清笔画/前缀 + 失效识别缓存。
+     * 窗口被清空后若还有在途任务，其结果会基于已撤销的笔画重新上屏（退格后"字又冒出来"）。
+     */
+    fun clearStrokeWindow() {
+        recognizeJob?.cancel()
+        recognizeJob = null
+        strokes.clear()
+        fadingPrefix = 0
+        gonePrefix = 0
+        settledCount = 0
+        dragVersion++
+        recognizer.reset()
+    }
+
     // 停顿处理（自适应阈值）：笔画变淡提示"已识别上屏"，但识别窗口全程保留——
     // 单字中途的笔序停顿（如"中"写完"口"后停顿）不会清窗，后续笔画落下时
     // 全窗口重新识别自动纠正（"口"→"中"）。分字完全交给 DP 的时间偏置+
@@ -186,21 +204,11 @@ fun HandwritingKeyboardLayout(
                 scheduleGone(strokes.size)
             }
             delay(HW_CLEAR_IDLE_MS)
-            strokes.clear()
-            fadingPrefix = 0
-            gonePrefix = 0
-            settledCount = 0
-            dragVersion++
-            recognizer.reset()
+            clearStrokeWindow()
         }
     }
     LaunchedEffect(clearSignal) {
-        strokes.clear()
-        fadingPrefix = 0
-        gonePrefix = 0
-        settledCount = 0
-        dragVersion++
-        recognizer.reset()
+        clearStrokeWindow()
     }
 
     /** 当前未固化窗口的笔间时间间隔（gaps[j] = 第 j 笔起笔与上一笔收笔的间隔）。 */
@@ -425,21 +433,34 @@ fun HandwritingKeyboardLayout(
                                         val cellH = (h - barHPx) / 5f
                                         val idx = (sy / cellH).toInt().coerceIn(0, 4)
                                         val action = listOf("，", "。", "？", "！", "delete")[idx]
-                                        if (action == "delete" && settledCount < strokes.size) {
-                                            // 撤销最后一笔未固化笔画并重新识别（屏上活动字随识别结果替换）
-                                            onButtonFeedback?.invoke("delete")
-                                            strokes.removeAt(strokes.size - 1)
-                                            dragVersion++
-                                            if (settledCount >= strokes.size) {
-                                                // 未固化笔画撤空：屏上活动区字一并撤销
-                                                recognizer.reset()
-                                                onUndoActive?.invoke()
-                                            } else {
-                                                scheduleRecognition()
-                                            }
-                                        } else {
+                                        val longPress =
+                                            ch.uptimeMillis - down.uptimeMillis >= HW_DELETE_LONG_PRESS_MS
+                                        if (action != "delete") {
                                             onButtonFeedback?.invoke(action)
                                             onKeyPress(action)
+                                        } else when (handwritingDeleteGesture(longPress, settledCount < strokes.size)) {
+                                            HandwritingDeleteGesture.UNDO_STROKE -> {
+                                                // 长按删除键：撤销最后一笔未固化笔画并重新识别
+                                                onButtonFeedback?.invoke(action)
+                                                strokes.removeAt(strokes.size - 1)
+                                                dragVersion++
+                                                if (settledCount >= strokes.size) {
+                                                    // 撤空：在途识别作废，屏上活动区字一并撤销
+                                                    recognizeJob?.cancel()
+                                                    recognizeJob = null
+                                                    recognizer.reset()
+                                                    onUndoActive?.invoke()
+                                                } else {
+                                                    scheduleRecognition()
+                                                }
+                                            }
+                                            HandwritingDeleteGesture.DELETE_TEXT -> {
+                                                // 短按删除键：删已上屏文本（与其它键盘退格一致），
+                                                // 同时清笔画窗口——否则在途识别会把刚删掉的字写回去
+                                                clearStrokeWindow()
+                                                onButtonFeedback?.invoke(action)
+                                                onKeyPress(action)
+                                            }
                                         }
                                     } else if (sy >= h - barHPx) {
                                         val seg = w / 5.2f

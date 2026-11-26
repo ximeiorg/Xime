@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kingzcheung.xime.handwriting.HandwritingCandidate
+import com.kingzcheung.xime.handwriting.handwritingDeleteCharCount
 import com.kingzcheung.xime.keyboard.KeyboardPage
 import com.kingzcheung.xime.rime.RimeEngine
 import com.kingzcheung.xime.keyboard.MainType
@@ -1070,9 +1071,14 @@ fun KeyboardView(
                                     "delete" -> {
                                         when {
                                             handwritingActiveLen > 0 -> {
-                                                // 撤销当前字：删屏上活动区文本，清笔画重写
-                                                callbacks.onDeleteText?.invoke(handwritingActiveLen)
-                                                handwritingTail = handwritingTail.dropLast(handwritingActiveLen)
+                                                // 退格只删最后一个字（叠写时活动区可能有多个字），
+                                                // 并结束当前笔画窗口：剩余已上屏字不再参与替换
+                                                val del = handwritingDeleteCharCount(
+                                                    handwritingActiveLen,
+                                                    handwritingLastSegLen,
+                                                )
+                                                callbacks.onDeleteText?.invoke(del)
+                                                handwritingTail = handwritingTail.dropLast(del)
                                                 handwritingActiveLen = 0
                                                 handwritingLastSegLen = 0
                                                 handwritingCandidates = emptyList()
@@ -1137,7 +1143,9 @@ fun KeyboardView(
                                     val ok = callbacks.onHandwritingAutoCommit?.invoke(newTail, handwritingTail) ?: false
                                     handwritingTail = if (ok || handwritingTail.isEmpty()) newTail else ""
                                     handwritingActiveLen = segText.length
-                                    handwritingLastSegLen = segText.length
+                                    // 最后一段 = 候选栏当前显示的那个字，点选/退格都按它定位
+                                    handwritingLastSegLen =
+                                        segments.last().candidates.firstOrNull()?.char?.length ?: 1
                                     handwritingCandidates = segments.last().candidates.map { it.char }
                                     handwritingComments = emptyList()
                                 }
@@ -1148,9 +1156,15 @@ fun KeyboardView(
                             },
                             onUndoActive = {
                                 if (handwritingActiveLen > 0) {
-                                    callbacks.onDeleteText?.invoke(handwritingActiveLen)
-                                    handwritingTail = handwritingTail.dropLast(handwritingActiveLen)
+                                    // 撤笔至空：只撤销最后一个字，不整段清活动区
+                                    val del = handwritingDeleteCharCount(
+                                        handwritingActiveLen,
+                                        handwritingLastSegLen,
+                                    )
+                                    callbacks.onDeleteText?.invoke(del)
+                                    handwritingTail = handwritingTail.dropLast(del)
                                     handwritingActiveLen = 0
+                                    handwritingLastSegLen = 0
                                     handwritingCandidates = emptyList()
                                     handwritingComments = emptyList()
                                     handwritingClearSignal++
