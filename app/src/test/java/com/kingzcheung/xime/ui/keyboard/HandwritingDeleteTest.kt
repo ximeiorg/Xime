@@ -130,4 +130,46 @@ class HandwritingDeleteTest {
             )
         )
     }
+
+    /** 模拟服务端 replaceBefore：光标前恰为 expected 才替换。 */
+    private class FakeEditor(var text: String) {
+        fun replaceTail(newTail: String, expectedTail: String): Boolean {
+            if (!text.endsWith(expectedTail)) return false
+            text = text.dropLast(expectedTail.length) + newTail
+            return true
+        }
+    }
+
+    @Test
+    fun supplementaryCharThenSpaceThenDeleteRemovesOnlyTheSpace() {
+        val editor = FakeEditor("\uD840\uDC00 ")
+        val transition = applyHandwritingDelete(tail = "\uD840\uDC00") { newTail, expected ->
+            editor.replaceTail(newTail, expected)
+        }
+        assertTrue(transition.forwardSystemDelete)
+        assertEquals("", transition.nextTail)
+        assertEquals("\uD840\uDC00 ", editor.text)
+    }
+
+    @Test
+    fun supplementaryCharThenPunctuationThenDeleteRemovesOnlyThePunctuation() {
+        val editor = FakeEditor("\uD840\uDC00，")
+        val transition = applyHandwritingDelete(tail = "\uD840\uDC00") { newTail, expected ->
+            editor.replaceTail(newTail, expected)
+        }
+        assertTrue(transition.forwardSystemDelete)
+        assertEquals("", transition.nextTail)
+        assertEquals("\uD840\uDC00，", editor.text)
+    }
+
+    @Test
+    fun supplementaryCharDeletesWholeCodePointWhenTailMatchesCursor() {
+        val editor = FakeEditor("a\uD840\uDC00")
+        val transition = applyHandwritingDelete(tail = "\uD840\uDC00") { newTail, expected ->
+            editor.replaceTail(newTail, expected)
+        }
+        assertFalse(transition.forwardSystemDelete)
+        assertEquals("", transition.nextTail)
+        assertEquals("a", editor.text)
+    }
 }

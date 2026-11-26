@@ -128,6 +128,25 @@ internal fun resolveHandwritingDelete(
     )
 }
 
+/**
+ * 手写退格按目标编辑器光标前的实际文本删除：仅当光标前恰为追踪的尾部时，经 [replaceTail]
+ * 把尾部换成去掉最后一个 code point 的结果；尾部不符（空格、换行、标点已上屏或光标移动过）
+ * 则清空追踪，交系统退格按实际字符删除。
+ */
+internal fun applyHandwritingDelete(
+    tail: String,
+    replaceTail: (newTail: String, expectedTail: String) -> Boolean,
+): HandwritingDeleteTransition {
+    val transition = resolveHandwritingDelete(tail = tail, activeLen = 0)
+    if (transition.forwardSystemDelete || replaceTail(transition.nextTail, tail)) return transition
+    return HandwritingDeleteTransition(
+        deleteCharsCount = 0,
+        nextTail = "",
+        nextActiveLen = 0,
+        forwardSystemDelete = true,
+    )
+}
+
 /** 识别回包闸门：仅当仍属当前代次且识别窗口尚有未固化笔画时才允许落地结果。 */
 internal fun shouldApplyHandwritingRecognition(
     requestGeneration: Int,

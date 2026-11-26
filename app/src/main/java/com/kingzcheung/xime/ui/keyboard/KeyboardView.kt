@@ -1068,10 +1068,9 @@ fun KeyboardView(
                             onKeyPress = { key ->
                                 when (key) {
                                     "delete" -> {
-                                        val transition = resolveHandwritingDelete(
-                                            tail = handwritingTail,
-                                            activeLen = handwritingActiveLen,
-                                        )
+                                        val transition = applyHandwritingDelete(handwritingTail) { newTail, expectedTail ->
+                                            callbacks.onHandwritingAutoCommit?.invoke(newTail, expectedTail) ?: false
+                                        }
                                         handwritingTail = transition.nextTail
                                         handwritingActiveLen = transition.nextActiveLen
                                         handwritingLastSegLen = 0
@@ -1079,8 +1078,6 @@ fun KeyboardView(
                                         handwritingComments = emptyList()
                                         if (transition.forwardSystemDelete) {
                                             callbacks.onKeyPress("delete", false)
-                                        } else {
-                                            callbacks.onDeleteText?.invoke(transition.deleteCharsCount)
                                         }
                                     }
                                     "symbol" -> viewModel.enterPanel(PanelType.COMMON_SYMBOL)
@@ -1094,6 +1091,7 @@ fun KeyboardView(
                                     "space" -> {
                                         // 当前字已自动上屏：空格=固化 + 上屏空格（全量 commitText 触发联想）。
                                         // 选择期结束：清候选栏
+                                        handwritingTail = ""
                                         handwritingActiveLen = 0
                                         handwritingLastSegLen = 0
                                         handwritingCandidates = emptyList()
@@ -1102,6 +1100,7 @@ fun KeyboardView(
                                     }
                                     "enter" -> {
                                         // 换行定稿：选择期结束
+                                        handwritingTail = ""
                                         handwritingActiveLen = 0
                                         handwritingLastSegLen = 0
                                         handwritingCandidates = emptyList()
@@ -1110,6 +1109,7 @@ fun KeyboardView(
                                     }
                                     else -> {
                                         // 标点等直接上屏：固化活动字 + 选择期结束
+                                        handwritingTail = ""
                                         handwritingActiveLen = 0
                                         handwritingLastSegLen = 0
                                         handwritingCandidates = emptyList()
