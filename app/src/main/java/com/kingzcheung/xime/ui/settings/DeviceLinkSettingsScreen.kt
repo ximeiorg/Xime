@@ -49,8 +49,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -67,7 +67,10 @@ import com.kingzcheung.xime.p2p.P2pNative
 import com.kingzcheung.xime.p2p.P2pPeer
 import com.kingzcheung.xime.p2p.P2pPeerStatus
 import com.kingzcheung.xime.p2p.P2pPeers
+import com.kingzcheung.xime.p2p.formatPairCode
 import com.kingzcheung.xime.settings.SettingsPreferences
+import com.kingzcheung.xime.ui.theme.SemanticColors
+import com.kingzcheung.xime.ui.theme.semanticColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -443,26 +446,30 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium
                                 )
-                                Text(
-                                    text = peer.did.take(8),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                // 状态胶囊：与桌面端（libximecore 的 pair.rs）同一套语义色——
+                                // 在线绿、附近橙、离线/未知中性灰，底色用同色低透明度。
+                                // 放在设备标识后面而不是最右侧，免得长设备名被挤成两行。
                                 val live = peerStates[peer.did]
                                 val (label, tint) = when (live?.state) {
-                                    "online" -> tr(R.string.s_shebei_zaixian) to Color(0xFF2EA07D)
-                                    "nearby" -> tr(R.string.s_shebei_fujin) to Color(0xFFE58F2A)
+                                    "online" -> tr(R.string.s_shebei_zaixian) to
+                                        semanticColor(SemanticColors.OnlineLight, SemanticColors.OnlineDark)
+                                    "nearby" -> tr(R.string.s_shebei_fujin) to
+                                        semanticColor(SemanticColors.NearbyLight, SemanticColors.NearbyDark)
                                     "offline" -> tr(R.string.s_shebei_lixian) to
                                         MaterialTheme.colorScheme.onSurfaceVariant
                                     else -> tr(R.string.s_shebei_zhuangtai_weizhi) to
                                         MaterialTheme.colorScheme.outline
                                 }
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = tint
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = peer.did.take(8),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    PeerStateBadge(label = label, color = tint)
+                                }
                             }
                             TextButton(
                                 onClick = {
@@ -529,10 +536,31 @@ private fun SettingRowIcon(icon: ImageVector) {
     }
 }
 
+/**
+ * 状态胶囊：文字色 + 同色低透明度底，圆角胶囊。
+ *
+ * 与桌面端 `pair.rs` 的 `badge()` 同构（12sp、左右 10dp、上下 3dp、全圆角），
+ * 比单行彩色小字更容易被看见，深浅色下也不会只剩一团灰。
+ */
+@Composable
+private fun PeerStateBadge(label: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(color.copy(alpha = 0.14f))
+            .padding(horizontal = 10.dp, vertical = 3.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = color
+        )
+    }
+}
+
 /** 只读的「标题 + 值」行，与 [SettingsItem] 同构，只是右侧不放箭头。 */
 @Composable
-private fun SettingValueRow(
-    icon: ImageVector,
+private fun SettingValueRow(    icon: ImageVector,
     title: String,
     value: String,
     monospace: Boolean = false
@@ -585,7 +613,7 @@ private fun DisplayPanel(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = code?.chunked(3)?.joinToString(" ") ?: "——— ———",
+                text = formatPairCode(code),
                 fontSize = 30.sp,
                 letterSpacing = 4.sp,
                 fontWeight = FontWeight.Medium,

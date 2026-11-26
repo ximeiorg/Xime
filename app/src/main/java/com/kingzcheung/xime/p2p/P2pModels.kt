@@ -240,13 +240,29 @@ internal object P2pJson {
                 }
             )
         }
-        return JSONObject().put("peers", array).toString()
+        // 原生侧 set_peers 直接按 `PairedPeer[]` 反序列化，不要再包一层 {"peers": ...}。
+        return array.toString()
     }
 
     fun peers(raw: String): List<P2pPeer> {
         val json = JSONObject(raw)
         if (!json.optBoolean("ok", false)) return emptyList()
         val array = json.optJSONArray("peers") ?: return emptyList()
+        return buildList(array.length()) {
+            for (index in 0 until array.length()) {
+                array.optJSONObject(index)?.let { add(peer(it)) }
+            }
+        }
+    }
+
+    /**
+     * v8 之前协议库自己落盘的 `files/p2p/peers.json`：`{"version":1,"peers":[...]}`。
+     *
+     * 只用于一次性迁移到 Room；与 [peers] 的区别是外层没有 `ok`、字段直接是设备列表。
+     * 解析失败抛异常，由调用方决定是丢掉还是保留文件。
+     */
+    fun legacyStorePeers(raw: String): List<P2pPeer> {
+        val array = JSONObject(raw).optJSONArray("peers") ?: return emptyList()
         return buildList(array.length()) {
             for (index in 0 until array.length()) {
                 array.optJSONObject(index)?.let { add(peer(it)) }
@@ -265,6 +281,18 @@ internal object P2pJson {
             peer = json.optJSONObject("peer")?.let(::peer)
         )
     }
+}
+
+/**
+ * 配对码的展示形式：只留数字、每 3 位一组，如 `482 719`。
+ *
+ * 原生 `code_text()` 返回的已经是分组后的 `482 719`，界面不能再按 3 位切一遍
+ * （那会把空格算进分组，变成 `482  71 9`）；统一从这里出，输入端贴进来的
+ * `482719` / `482-719` 也能显示成同一形态。
+ */
+internal fun formatPairCode(raw: String?): String {
+    val digits = raw.orEmpty().filter(Char::isDigit)
+    return if (digits.isEmpty()) "——— ———" else digits.chunked(3).joinToString(" ")
 }
 
 private fun JSONObject.stringOrNull(key: String): String? =

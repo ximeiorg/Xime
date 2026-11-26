@@ -13,7 +13,7 @@ import java.io.File
 object P2pBridge {
     private const val NOT_LOADED = "p2p 原生库未加载"
 
-    /** `identity.bin` / `peers.json` 所在目录；Rust 侧会自行创建。 */
+    /** `identity.bin` 所在目录；Rust 侧会自行创建。设备表已改存 Room，不再落这里。 */
     fun dir(context: Context): String = File(context.filesDir, "p2p").absolutePath
 
     fun buildInfo(): P2pBuildInfo = if (!P2pNative.loaded) {
