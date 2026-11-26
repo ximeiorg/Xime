@@ -260,6 +260,16 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
         val job = service.serviceScope.launch(service.keyProcessingDispatcher, start = CoroutineStart.LAZY) {
             val state = service.uiState.value
             val candState = service.candidateState.value
+            if (key.startsWith("commit_literal_digit:")) {
+                val digit = key.substringAfter(':')
+                if (digit.length != 1 || digit[0] !in '0'..'9') return@launch
+                service.predictionManager.invalidatePendingPredictions()
+                clearInputStateForKeys(clearCalculator = false)
+                service.calculatorEngine.handleDigit(digit)
+                withContext(Dispatchers.Main) { service.commitTextSilently(digit) }
+                updateCalculatorCandidates()
+                return@launch
+            }
             var needsUIUpdate = false
             var pendingResult: com.kingzcheung.xime.rime.RimeProcessResult? = null
             var committedText: String? = null
@@ -1316,9 +1326,11 @@ internal class ImeKeyRouter(private val service: XimeInputMethodService) {
      * 显式清 preeditText（与提交路径"残留根治"一致），不依赖 updateUI 自愈；
      * 输入框模式清 composing 区；T9 方案重置左侧候选区（其他键盘无左栏，跳过）。
      */
-    private suspend fun clearInputStateForKeys() {
-        service.calculatorEngine.clear()
-        updateCalculatorCandidates()
+    private suspend fun clearInputStateForKeys(clearCalculator: Boolean = true) {
+        if (clearCalculator) {
+            service.calculatorEngine.clear()
+            updateCalculatorCandidates()
+        }
         service.t9PartialSegments.clear()
         service.rimeEngine.clearComposition()
         service.candidateState.value = service.candidateState.value.copy(

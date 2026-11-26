@@ -11,6 +11,35 @@ import org.junit.Test
 
 class KeyboardGestureConfigTest {
 
+    @Test
+    fun `literal 组合模式只影响显式数字 commit`() {
+        val keys = parse("""
+            q: { swipe_up: { action: commit, value: "1", composition: literal } }
+            w: { swipe_up: { action: commit, value: "2" } }
+            e: { swipe_up: { action: send_rime, value: "3", composition: literal } }
+            r: { swipe_up: { action: commit, value: "4", composition: keep_composition } }
+            t: { swipe_up: { action: commit, value: "，", composition: literal } }
+            y: { swipe_up: { value: "1", composition: literal } }
+            u: { swipe_up: { action: select_candidate, value: "2", composition: literal } }
+        """.trimIndent())
+        assertEquals(GestureAction.COMMIT_LITERAL_DIGIT, keys["q"]!!.swipeUp!!.action)
+        assertNull(GestureAction.fromValue("commit_literal_digit"))
+        assertEquals(GestureAction.COMMIT, keys["w"]!!.swipeUp!!.action)
+        assertEquals(GestureAction.SEND_RIME, keys["e"]!!.swipeUp!!.action)
+        assertEquals(GestureAction.COMMIT, keys["r"]!!.swipeUp!!.action)
+        val punctuation = keys["t"]!!.swipeUp!!
+        assertEquals(GestureAction.COMMIT, punctuation.action)
+        assertTrue(punctuation.explicitAction)
+        assertEquals("，", punctuation.value)
+        val implicitCommit = keys["y"]!!.swipeUp!!
+        assertEquals(GestureAction.COMMIT, implicitCommit.action)
+        assertFalse(implicitCommit.explicitAction)
+        assertEquals("1", implicitCommit.value)
+        val selectCandidate = keys["u"]!!.swipeUp!!
+        assertEquals(GestureAction.SELECT_CANDIDATE, selectCandidate.action)
+        assertEquals("2", selectCandidate.value)
+    }
+
     // ── 槽位默认动作 ──
 
     @Test
