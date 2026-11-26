@@ -443,6 +443,9 @@ color_schemes:
 #   - 字符串 "a" → 按槽位默认动作（tap 为 send_rime：走按键路由进 rime，与手敲
 #     该键一致；swipe/长按为 commit），显示也是它。
 #     注意区分两种 commit：显式写 action: commit 的手势一律直接上屏（不经过引擎）；
+#     上滑数字如需丢弃当前组合编码，可写 swipe_up: { action: commit, value: "1", composition: literal }。
+#     literal 仅对显式 commit 的单个 ASCII 数字（0–9）生效：清除未上屏编码和候选，只上屏数字。
+#     非数字、未显式写 action: commit 或使用其他 action 时，composition 不改变原有行为。
 #     字符串简写 / 只写 value 的「槽位默认 commit」在 26 键字母区的 tap/上滑仍走按键
 #     路由（与手敲该键一致，保留组合态/候选/全半角/简繁语义）
 #   - { label, action, value }
