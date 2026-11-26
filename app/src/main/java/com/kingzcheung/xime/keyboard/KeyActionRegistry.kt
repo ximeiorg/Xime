@@ -168,6 +168,10 @@ object KeyActionRegistry {
 
     /** 执行一个动作类型。 */
     fun execute(action: GestureAction, context: KeyActionContext, value: String) {
+        if (action == GestureAction.COMMIT_LITERAL_DIGIT) {
+            context.service.dispatchKey("commit_literal_digit:$value")
+            return
+        }
         fromId(action.value)?.execute(context, value)
     }
 }

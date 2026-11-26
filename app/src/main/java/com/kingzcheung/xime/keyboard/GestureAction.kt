@@ -147,6 +147,8 @@ enum class GestureAction(val value: String) {
      */
     SELECT_CANDIDATE("select_candidate"),
 
+    COMMIT_LITERAL_DIGIT("commit_literal_digit"),
+
     /** 上滑清空：输入态清输入态 / 空闲态清空全部已上屏（记录撤回）。 */
     CLEAR_ALL("clear_all"),
 
