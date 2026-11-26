@@ -2467,6 +2467,31 @@ object KeysConfigHelper {
         return if (label.any { it in 'a'..'z' || it in 'A'..'Z' }) label.uppercase() else label
     }
 
+    /** 原始 tap.label（不做大写转换、无回退），未配置返回 null。 */
+    fun getKeyTapLabel(key: String, isAsciiMode: Boolean = false): String? {
+        val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
+        return config[key.lowercase()]?.tap?.label?.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * 英文键盘的键帽主文案。
+     *
+     * 英文键盘不能直接用 [getKeyDisplayLabel]：它对含字母的 label 一律大写、无 label 时回退
+     * 按键 id 大写，非 shift 状态下会显示成 "Q"；所以这里默认用提交值（跟随 shift）。
+     * 但自定义键的 label 与提交值并不相同（如 `qqq: { label: "123", value: "mode_change_number" }`），
+     * 这种情况必须显示 label，否则键面会露出手势命令值。
+     */
+    internal fun asciiKeyFaceText(
+        tapLabel: String?,
+        rawCommitValue: String,
+        isShifted: Boolean,
+    ): String {
+        if (!tapLabel.isNullOrEmpty() && !tapLabel.equals(rawCommitValue, ignoreCase = true)) {
+            return tapLabel
+        }
+        return if (isShifted) rawCommitValue.uppercase() else rawCommitValue
+    }
+
     fun getKeyCommitValue(key: String, isAsciiMode: Boolean = false): String {
         val config = if (isAsciiMode) _keyGestureConfigEn.value else _keyGestureConfig.value
         val value = config[key.lowercase()]?.tap?.value
