@@ -1184,6 +1184,10 @@
     <string name="s_shebeihulian_yiguanbi">裝置互聯已關閉：先開啟上方開關，再來配對。</string>
     <string name="s_jiuzhongzhong">（就緒中）</string>
     <string name="s_yipeiduishebei_shuliang">已配對裝置（%1$d）</string>
+    <string name="s_shebei_zaixian">在線</string>
+    <string name="s_shebei_fujin">附近</string>
+    <string name="s_shebei_lixian">離線</string>
+    <string name="s_shebei_zhuangtai_weizhi">狀態未知</string>
     <string name="s_jiechu">解除</string>
     <string name="s_shuoming_1">• 需要在系統設定中啟用本輸入法，裝置互聯依賴輸入法服務常駐執行。</string>
     <string name="s_shuoming_2">• 同步在鍵盤使用時進行：打開鍵盤後會自動連上已配對的裝置，並取回對方最新的剪貼簿內容。</string>

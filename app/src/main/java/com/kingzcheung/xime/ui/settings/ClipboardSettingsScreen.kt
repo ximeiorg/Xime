@@ -52,6 +52,7 @@ import com.kingzcheung.xime.clipboard.ImageUsage
 import com.kingzcheung.xime.plugin.ActivePluginSelection
 import com.kingzcheung.xime.plugin.ExtensionManager
 import com.kingzcheung.xime.p2p.P2pBridge
+import com.kingzcheung.xime.p2p.P2pPeers
 import com.kingzcheung.xime.settings.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -101,7 +102,7 @@ fun ClipboardSettingsContent(
     LaunchedEffect(syncChannels) {
         if (syncChannels.contains(ChannelPolicy.CHANNEL_P2P)) {
             p2pPairedCount = withContext(Dispatchers.IO) {
-                P2pBridge.peers(P2pBridge.dir(context)).size
+                P2pPeers.count(context)
             }
         }
     }

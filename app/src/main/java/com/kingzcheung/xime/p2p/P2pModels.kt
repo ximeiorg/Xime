@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.p2p
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** `buildInfo()` 的结果：`hasP2p=false` 说明包里的 .so 是空壳。 */
@@ -37,12 +38,23 @@ data class P2pPairStart(
     val port: Int = 0
 )
 
+/** 一台设备的实时状态：`online` 有会话、`nearby` 收到过公告、`offline` 都没有。 */
+data class P2pPeerStatus(
+    val did: String,
+    val name: String,
+    val state: String,
+    val lastSeen: Long? = null,
+    val addr: String? = null
+)
+
 data class P2pStatusInfo(
     val ok: Boolean,
     val error: String? = null,
     val running: Boolean = false,
     val did: String? = null,
-    val port: Int = 0
+    val port: Int = 0,
+    /** 每台设备的状态；节点没跑时为空——界面上「未知」不能画成「离线」。 */
+    val peers: List<P2pPeerStatus> = emptyList()
 )
 
 /** 剪贴板条目，与 Rust `Profile` 的 JSON 同构（本版只同步文本）。 */
@@ -69,7 +81,10 @@ data class P2pEvent(
 data class P2pPeer(
     val did: String,
     val name: String,
+    val pubEd: String = "",
+    val pubX25519: String = "",
     val lastAddr: String? = null,
+    val lastSeen: Long? = null,
     val pairedAt: Long = 0
 )
 
@@ -140,7 +155,28 @@ internal object P2pJson {
             error = json.stringOrNull("error"),
             running = json.optBoolean("running", false),
             did = json.stringOrNull("did"),
-            port = json.optInt("port", 0)
+            port = json.optInt("port", 0),
+            peers = json.optJSONArray("peers")?.let { array ->
+                buildList(array.length()) {
+                    for (index in 0 until array.length()) {
+                        array.optJSONObject(index)?.let { item ->
+                            add(
+                                P2pPeerStatus(
+                                    did = item.optString("did"),
+                                    name = item.optString("name"),
+                                    state = item.optString("state", "offline"),
+                                    lastSeen = if (item.has("last_seen") && !item.isNull("last_seen")) {
+                                        item.optLong("last_seen")
+                                    } else {
+                                        null
+                                    },
+                                    addr = item.stringOrNull("addr")
+                                )
+                            )
+                        }
+                    }
+                }
+            } ?: emptyList()
         )
     }
 
@@ -177,14 +213,56 @@ internal object P2pJson {
     fun peer(json: JSONObject): P2pPeer = P2pPeer(
         did = json.optString("did"),
         name = json.optString("name"),
+        pubEd = json.optString("pub_ed"),
+        pubX25519 = json.optString("pub_x25519"),
         lastAddr = json.stringOrNull("last_addr"),
+        lastSeen = if (json.has("last_seen") && !json.isNull("last_seen")) {
+            json.optLong("last_seen")
+        } else {
+            null
+        },
         pairedAt = json.optLong("paired_at", 0)
     )
+
+    /** 反向：喂给 `xime_p2p_set_peers`（字段与 Rust 侧 `PairedPeer` 逐字对应）。 */
+    fun peersJson(peers: List<P2pPeer>): String {
+        val array = JSONArray()
+        peers.forEach { peer ->
+            array.put(
+                JSONObject().apply {
+                    put("did", peer.did)
+                    put("name", peer.name)
+                    put("pub_ed", peer.pubEd)
+                    put("pub_x25519", peer.pubX25519)
+                    peer.lastAddr?.let { put("last_addr", it) }
+                    peer.lastSeen?.let { put("last_seen", it) }
+                    put("paired_at", peer.pairedAt)
+                }
+            )
+        }
+        // 原生侧 set_peers 直接按 `PairedPeer[]` 反序列化，不要再包一层 {"peers": ...}。
+        return array.toString()
+    }
 
     fun peers(raw: String): List<P2pPeer> {
         val json = JSONObject(raw)
         if (!json.optBoolean("ok", false)) return emptyList()
         val array = json.optJSONArray("peers") ?: return emptyList()
+        return buildList(array.length()) {
+            for (index in 0 until array.length()) {
+                array.optJSONObject(index)?.let { add(peer(it)) }
+            }
+        }
+    }
+
+    /**
+     * v8 之前协议库自己落盘的 `files/p2p/peers.json`：`{"version":1,"peers":[...]}`。
+     *
+     * 只用于一次性迁移到 Room；与 [peers] 的区别是外层没有 `ok`、字段直接是设备列表。
+     * 解析失败抛异常，由调用方决定是丢掉还是保留文件。
+     */
+    fun legacyStorePeers(raw: String): List<P2pPeer> {
+        val array = JSONObject(raw).optJSONArray("peers") ?: return emptyList()
         return buildList(array.length()) {
             for (index in 0 until array.length()) {
                 array.optJSONObject(index)?.let { add(peer(it)) }
@@ -203,6 +281,18 @@ internal object P2pJson {
             peer = json.optJSONObject("peer")?.let(::peer)
         )
     }
+}
+
+/**
+ * 配对码的展示形式：只留数字、每 3 位一组，如 `482 719`。
+ *
+ * 原生 `code_text()` 返回的已经是分组后的 `482 719`，界面不能再按 3 位切一遍
+ * （那会把空格算进分组，变成 `482  71 9`）；统一从这里出，输入端贴进来的
+ * `482719` / `482-719` 也能显示成同一形态。
+ */
+internal fun formatPairCode(raw: String?): String {
+    val digits = raw.orEmpty().filter(Char::isDigit)
+    return if (digits.isEmpty()) "——— ———" else digits.chunked(3).joinToString(" ")
 }
 
 private fun JSONObject.stringOrNull(key: String): String? =

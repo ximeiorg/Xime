@@ -1188,6 +1188,10 @@
     <string name="s_jiuzhongzhong">（就绪中）</string>
     <string name="s_yipeiduishebei_shuliang">已配对设备（%1$d）</string>
     <string name="s_jiechu">解除</string>
+    <string name="s_shebei_zaixian">在线</string>
+    <string name="s_shebei_fujin">附近</string>
+    <string name="s_shebei_lixian">离线</string>
+    <string name="s_shebei_zhuangtai_weizhi">状态未知</string>
     <string name="s_shuoming_1">• 需要在系统设置中启用本输入法，设备互联依赖输入法服务常驻运行。</string>
     <string name="s_shuoming_2">• 同步在键盘使用时进行：打开键盘后会自动连上已配对的设备，并取回对方最新的剪贴板内容。</string>
     <string name="s_shuoming_3">• 剪贴板内容只在两台设备之间加密传输，不经过任何第三方服务器，也不保存历史。</string>

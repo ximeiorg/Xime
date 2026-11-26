@@ -86,4 +86,86 @@ class P2pJsonTest {
         assertEquals("482719", start.code)
         assertEquals(47823, start.port)
     }
+
+    @Test
+    fun `状态快照带每台设备状态`() {
+        val raw = """
+            {"ok":true,"running":true,"did":"aa","port":47821,"peers":[
+              {"did":"bb","name":"Mac","state":"online","since":100,"last_seen":120,
+               "addr":"192.168.1.5:47821"},
+              {"did":"cc","name":"Pad","state":"nearby","last_seen":90},
+              {"did":"dd","name":"Old","state":"offline"}
+            ]}
+        """.trimIndent()
+
+        val status = P2pJson.status(raw)
+        assertTrue(status.running)
+        assertEquals(3, status.peers.size)
+        assertEquals("online", status.peers[0].state)
+        assertEquals(120L, status.peers[0].lastSeen)
+        assertEquals("192.168.1.5:47821", status.peers[0].addr)
+        assertEquals("nearby", status.peers[1].state)
+        assertEquals("offline", status.peers[2].state)
+        assertNull(status.peers[2].lastSeen)
+
+        // 节点没跑时没有 peers：界面据此显示「状态未知」，不能当成离线
+        val stopped = P2pJson.status("""{"ok":true,"running":false}""")
+        assertFalse(stopped.running)
+        assertTrue(stopped.peers.isEmpty())
+    }
+
+    /**
+     * 反向序列化喂给 `xime_p2p_set_peers`：Rust 侧直接按 `PairedPeer[]` 反序列化，
+     * 包一层 `{"peers":...}` 会让原生解析失败、节点拒绝启动。
+     */    @Test
+    fun `设备表序列化为裸数组`() {
+        val json = P2pJson.peersJson(
+            listOf(
+                P2pPeer(
+                    did = "bb",
+                    name = "Mac",
+                    pubEd = "ed",
+                    pubX25519 = "x",
+                    lastAddr = "192.168.1.5:47821",
+                    lastSeen = 120,
+                    pairedAt = 100
+                )
+            )
+        )
+        val array = org.json.JSONArray(json)
+        assertEquals(1, array.length())
+        val item = array.getJSONObject(0)
+        assertEquals("bb", item.getString("did"))
+        assertEquals("ed", item.getString("pub_ed"))
+        assertEquals("x", item.getString("pub_x25519"))
+        assertEquals("192.168.1.5:47821", item.getString("last_addr"))
+        assertEquals(120L, item.getLong("last_seen"))
+        assertEquals(100L, item.getLong("paired_at"))
+    }
+
+    /** v8 之前的 `files/p2p/peers.json`：外层没有 `ok`，直接是 `{version, peers[]}`。 */
+    @Test
+    fun `解析旧版设备表`() {
+        val raw = """
+            {"version":1,"peers":[
+              {"did":"aa","name":"Mac","pub_ed":"ed","pub_x25519":"x",
+               "last_addr":"192.168.1.5:47821","paired_at":100}
+            ]}
+        """.trimIndent()
+
+        val peers = P2pJson.legacyStorePeers(raw)
+        assertEquals(1, peers.size)
+        assertEquals("aa", peers[0].did)
+        assertEquals("Mac", peers[0].name)
+        assertEquals("ed", peers[0].pubEd)
+        assertEquals("x", peers[0].pubX25519)
+        assertEquals(100L, peers[0].pairedAt)
+
+        // 空表与缺字段都不能炸：迁移时按公钥是否齐全再过滤一次
+        assertTrue(P2pJson.legacyStorePeers("""{"version":1,"peers":[]}""").isEmpty())
+        assertTrue(P2pJson.legacyStorePeers("""{"version":1}""").isEmpty())
+        val partial = P2pJson.legacyStorePeers("""{"peers":[{"did":"bb"}]}""")
+        assertEquals(1, partial.size)
+        assertEquals("", partial[0].pubEd)
+    }
 }
