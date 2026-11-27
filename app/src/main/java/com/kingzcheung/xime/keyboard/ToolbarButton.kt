@@ -7,6 +7,8 @@ import com.kingzcheung.xime.i18n.tr
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.twotone.Assignment
 import androidx.compose.material.icons.automirrored.twotone.LastPage
+import androidx.compose.material.icons.automirrored.twotone.Redo
+import androidx.compose.material.icons.automirrored.twotone.Undo
 import androidx.compose.material.icons.twotone.ContentCopy
 import androidx.compose.material.icons.twotone.ContentPaste
 import androidx.compose.material.icons.twotone.EmojiEmotions
@@ -39,6 +41,8 @@ enum class ToolbarButton(
     SYMBOL("symbol", tr(R.string.s_fuhao), Icons.TwoTone.Paid),
     FLOAT("float", tr(R.string.s_xuanfu), Icons.Default.PictureInPicture),
     SELECT_ALL("select_all", tr(R.string.s_quanxuan), Icons.TwoTone.SelectAll),
+    UNDO("undo", tr(R.string.s_chexiao), Icons.AutoMirrored.TwoTone.Undo),
+    REDO("redo", tr(R.string.s_zhongzuo), Icons.AutoMirrored.TwoTone.Redo),
     COPY("copy", tr(R.string.s_fuzhi), Icons.TwoTone.ContentCopy),
     PASTE("paste", tr(R.string.s_zhantie), Icons.TwoTone.ContentPaste),
     HOME("home", tr(R.string.s_duanshou), Icons.TwoTone.FirstPage),

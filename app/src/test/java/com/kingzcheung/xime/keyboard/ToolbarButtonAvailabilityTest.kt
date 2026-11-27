@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.keyboard
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,9 +33,21 @@ class ToolbarButtonAvailabilityTest {
     }
 
     @Test
+    fun `撤销与重做始终可用（是否可点由宿主撤销栈决定）`() {
+        assertTrue(available(ToolbarButton.UNDO, isSttEnabled = false, hasModel = false))
+        assertTrue(available(ToolbarButton.REDO, isSttEnabled = false, hasModel = false))
+    }
+
+    @Test
     fun `其余内置按钮始终可用`() {
         assertTrue(available(ToolbarButton.EMOJI, isSttEnabled = false, hasModel = false))
         assertTrue(available(ToolbarButton.CLIPBOARD, isSttEnabled = false))
+    }
+
+    @Test
+    fun `撤销与重做 id 可回解为内置按钮`() {
+        assertEquals(ToolbarButton.UNDO, (resolveToolbarButtonItem("undo", emptyList()) as ToolbarButtonItem.Builtin).button)
+        assertEquals(ToolbarButton.REDO, (resolveToolbarButtonItem("redo", emptyList()) as ToolbarButtonItem.Builtin).button)
     }
 
     private fun available(
