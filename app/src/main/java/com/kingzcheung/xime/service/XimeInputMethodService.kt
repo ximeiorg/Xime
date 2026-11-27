@@ -2122,14 +2122,20 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun performEditorMenuAction(actionId: Int) {
         when (actionId) {
-            android.R.id.undo -> {
-                // performContextMenuAction 对 undo 支持不一致，改用 Ctrl+Z 键盘快捷键
+            android.R.id.undo, android.R.id.redo -> {
+                // performContextMenuAction 对 undo/redo 支持不一致，改用键盘快捷键：
+                // 撤销 Ctrl+Z、重做 Ctrl+Shift+Z（与小企鹅输入法同一套手势）
                 val now = SystemClock.uptimeMillis()
+                val meta = if (actionId == android.R.id.redo) {
+                    KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON
+                } else {
+                    KeyEvent.META_CTRL_ON
+                }
                 currentInputConnection?.sendKeyEvent(
-                    KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON)
+                    KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, meta)
                 )
                 currentInputConnection?.sendKeyEvent(
-                    KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, KeyEvent.META_CTRL_ON)
+                    KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, meta)
                 )
             }
             else -> currentInputConnection?.performContextMenuAction(actionId)
@@ -2145,7 +2151,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         } else {
             shiftComboDetected = true
         }
-        // Ctrl 编辑快捷键（复制/剪切/粘贴/全选/撤销）：必须在 rime 路由之前拦截，
+        // Ctrl 编辑快捷键（复制/剪切/粘贴/全选/撤销/重做）：必须在 rime 路由之前拦截，
         // 否则字母会被当作拼音吞掉（如 Ctrl+C 变成向引擎输入 c，复制失效）。
         // 执行链路与软键盘工具栏按钮一致（performEditorMenuAction）。
         if (e.isCtrlPressed) {
@@ -2154,7 +2160,7 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 KeyEvent.KEYCODE_X -> android.R.id.cut
                 KeyEvent.KEYCODE_V -> android.R.id.paste
                 KeyEvent.KEYCODE_A -> android.R.id.selectAll
-                KeyEvent.KEYCODE_Z -> android.R.id.undo
+                KeyEvent.KEYCODE_Z -> if (e.isShiftPressed) android.R.id.redo else android.R.id.undo
                 else -> 0
             }
             if (actionId != 0) {

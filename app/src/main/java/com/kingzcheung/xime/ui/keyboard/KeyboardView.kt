@@ -471,6 +471,8 @@ fun KeyboardView(
                             ToolbarButton.QUICK_PHRASE -> ({ viewModel.showOverlay(OverlayRoute.Clipboard(1)) })
                             ToolbarButton.SYMBOL -> ({ viewModel.showOverlay(OverlayRoute.Symbol) })
                             ToolbarButton.SELECT_ALL -> ({ callbacks.onToolbarEditingAction?.invoke("select_all") })
+                            ToolbarButton.UNDO -> ({ callbacks.onToolbarEditingAction?.invoke("undo") })
+                            ToolbarButton.REDO -> ({ callbacks.onToolbarEditingAction?.invoke("redo") })
                             ToolbarButton.COPY -> ({ callbacks.onToolbarEditingAction?.invoke("copy") })
                             ToolbarButton.PASTE -> ({ callbacks.onToolbarEditingAction?.invoke("paste") })
                             ToolbarButton.HOME -> ({ callbacks.onToolbarEditingAction?.invoke("home") })

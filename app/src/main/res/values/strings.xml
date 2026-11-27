@@ -276,6 +276,7 @@
     <string name="s_zhengzaishibie">正在识别...</string>
     <string name="s_shibiechucuo">识别出错</string>
     <string name="s_chexiao">撤销</string>
+    <string name="s_zhongzuo">重做</string>
     <string name="s_songkaijieshu">松开结束</string>
     <string name="s_guanbimianban">关闭面板</string>
     <string name="s_tuichuduoxuan">退出多选</string>

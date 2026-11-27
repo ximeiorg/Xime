@@ -135,6 +135,8 @@ internal class ImeSchemaController(private val service: XimeInputMethodService) 
         val ic = service.currentInputConnection ?: return
         when (action) {
             "select_all" -> ic.performContextMenuAction(android.R.id.selectAll)
+            "undo" -> service.performEditorMenuAction(android.R.id.undo)
+            "redo" -> service.performEditorMenuAction(android.R.id.redo)
             "copy" -> ic.performContextMenuAction(android.R.id.copy)
             "cut" -> ic.performContextMenuAction(android.R.id.cut)
             "paste" -> ic.performContextMenuAction(android.R.id.paste)
