@@ -411,7 +411,7 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                     Text(
                         text = tr(R.string.s_zanwuyipeiduishebei),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                         modifier = Modifier.padding(CardPadding)
                     )
                 } else {
@@ -456,7 +456,7 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                                         text = peer.did.take(8),
                                         style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = settingsSecondaryColor()
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     PeerStateBadge(label = label, color = tint)
@@ -526,7 +526,7 @@ private fun DeviceLinkHelpDialog(onDismiss: () -> Unit) {
                     Text(
                         text = tr(id),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -537,7 +537,7 @@ private fun DeviceLinkHelpDialog(onDismiss: () -> Unit) {
                 Text(
                     text = tr(R.string.s_peidui_shuoming_neirong),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
         },
@@ -615,7 +615,7 @@ private fun SettingValueRow(
                 text = value,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = if (monospace) FontFamily.Monospace else null,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = settingsSecondaryColor(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -698,7 +698,7 @@ private fun DisplayPanel(
         Text(
             text = tr(R.string.s_zaijisuanjianshang_xianshi_peiduima),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = settingsSecondaryColor(),
             textAlign = TextAlign.Center
         )
         if (phase == "waiting" && secondsLeft > 0) {
@@ -706,7 +706,7 @@ private fun DisplayPanel(
             Text(
                 text = tr(R.string.s_miaohouzidongshixiao, secondsLeft),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -763,7 +763,7 @@ private fun InputPanel(
             Text(
                 text = tr(R.string.s_zhengzaicha_shebei),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedButton(

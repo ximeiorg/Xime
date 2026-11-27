@@ -92,7 +92,7 @@ fun KeyEffectSettingsContent(
                             Text(
                                 text = tr(R.string.s_anjianshibofangyinxiao),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                         }
                         Switch(
@@ -149,7 +149,7 @@ fun KeyEffectSettingsContent(
                         Text(
                             text = tr(R.string.s_xuanzeshifougensuixitongshezhi),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
@@ -195,7 +195,7 @@ fun KeyEffectSettingsContent(
                                 Text(
                                     text = tr(R.string.s_shouzhitaiqishichufaduanzhendong),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = settingsSecondaryColor()
                                 )
                             }
                             Switch(
@@ -335,7 +335,7 @@ fun KeyEffectSettingsContent(
                         Text(
                             text = tr(R.string.s_dangzidingyishizhanghezhenfuju_2bff0),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                         )
                     }

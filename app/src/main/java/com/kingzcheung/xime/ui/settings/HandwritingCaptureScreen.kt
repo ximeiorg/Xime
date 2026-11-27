@@ -341,7 +341,7 @@ fun HandwritingCaptureScreen(onBack: () -> Unit) {
                     tr(R.string.s_gong_gemubiaozi_shengyu_ge, targetChars.size, remaining.size)
                 },
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = settingsSecondaryColor(),
             )
             Spacer(Modifier.height(8.dp))
 

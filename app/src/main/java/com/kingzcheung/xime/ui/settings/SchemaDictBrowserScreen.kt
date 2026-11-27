@@ -67,7 +67,7 @@ fun SchemaDictBrowserPanel(
                             Text(
                                 s.schemaId,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                         }
                     },
@@ -98,14 +98,14 @@ fun SchemaDictBrowserPanel(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                Text(tr(R.string.s_meiyoukeyongdeshurufangan), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr(R.string.s_meiyoukeyongdeshurufangan), color = settingsSecondaryColor())
             }
         } else {
             Text(
                 text = tr(R.string.s_gong_tiaocitiao, uiState.allEntries.size) +
                     if (uiState.searchQuery.isNotEmpty()) tr(R.string.s_sousuojieguo_tiao, uiState.displayedEntries.size) else "",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = settingsSecondaryColor(),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
@@ -116,7 +116,7 @@ fun SchemaDictBrowserPanel(
                 ) {
                     Text(
                         text = if (uiState.searchQuery.isEmpty()) tr(R.string.s_zanwucitiao) else tr(R.string.s_weizhaodaopipeicitiao),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
             } else {

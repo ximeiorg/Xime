@@ -330,17 +330,17 @@ private fun LogFilesList(
                         Text(
                             text = tr(R.string.s_zanwurizhiwenjian),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                         Text(
                             text = tr(R.string.s_yingyongyunxingzhengchang_meiy_cb24c),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = settingsSecondaryColor().copy(alpha = 0.7f)
                         )
                         Text(
                             text = tr(R.string.s_rizhimulu_logs, context.filesDir.absolutePath),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            color = settingsSecondaryColor().copy(alpha = 0.6f)
                         )
                     }
                 }
@@ -369,7 +369,7 @@ private fun LogFilesList(
                 Text(
                     text = tr(R.string.s_rizhiweizhi_logs, context.filesDir.absolutePath),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = settingsSecondaryColor().copy(alpha = 0.6f)
                 )
             }
         }
@@ -431,16 +431,16 @@ private fun LogFileItem(
                     Text(
                         text = formatFileSize(file.length()),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                     Text(
                         text = "•",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        color = settingsSecondaryColor().copy(alpha = 0.5f)
                     )
                     Text(
                         text = formatTimestamp(file.lastModified()),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
                 
@@ -535,7 +535,7 @@ private fun PluginErrorsCard(
                     Text(
                         text = "${formatTimestamp(error.timestamp)} · ${categoryLabel(error.category)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                     Text(
                         text = com.kingzcheung.xime.plugin.core.security.PluginErrorLog.userMessage(error),
@@ -607,7 +607,7 @@ private fun PluginErrorsDetailDialog(
                             Text(
                                 text = "${formatTimestamp(error.timestamp)} · ${categoryLabel(error.category)}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
@@ -618,7 +618,7 @@ private fun PluginErrorsDetailDialog(
                             Text(
                                 text = com.kingzcheung.xime.plugin.core.security.PluginErrorLog.userHint(error),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
@@ -631,7 +631,7 @@ private fun PluginErrorsDetailDialog(
                                 Text(
                                     text = stack,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    color = settingsSecondaryColor().copy(alpha = 0.7f)
                                 )
                             }
                         }
@@ -644,7 +644,7 @@ private fun PluginErrorsDetailDialog(
                     Text(
                         tr(R.string.s_zanwucuowujilu),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
             }

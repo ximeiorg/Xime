@@ -215,7 +215,7 @@ fun AboutContent(
                         Text(
                             text = tr(R.string.s_jiyurime_goujian_zhichiwubi_pi_a444c),
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
@@ -226,7 +226,7 @@ fun AboutContent(
                         Text(
                             text = tr(R.string.s_goujian, AppInfo.gitHash),
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         
@@ -293,7 +293,7 @@ fun AboutContent(
                                 Text(
                                     text = "github.com/kingzcheung",
                                     fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = settingsSecondaryColor()
                                 )
                             }
                             Icon(
@@ -338,7 +338,7 @@ fun AboutContent(
                             Text(
                                 text = "github.com/ximeiorg/Xime",
                                 fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                         }
                         Icon(
@@ -508,7 +508,7 @@ private fun InfoRow(label: String, value: String) {
         Text(
             text = label,
             fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = settingsSecondaryColor()
         )
         Text(
             text = value,
@@ -649,7 +649,7 @@ fun PrivacyPolicyContent(
                         Text(
                             text = tr(R.string.s_gengxinriqi_2026nian4yue),
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                     }
                 }

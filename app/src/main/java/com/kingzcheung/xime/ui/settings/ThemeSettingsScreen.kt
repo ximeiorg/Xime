@@ -140,7 +140,7 @@ fun ThemeSettingsContent(
                 Text(
                     text = tr(R.string.s_dianjipeiseyulanwanzhengjianpa_7949f),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
             }

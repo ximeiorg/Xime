@@ -126,7 +126,7 @@ internal fun OfflineModelCard(
                     Text(
                         text = model?.let { "${it.name} · ${it.size}" } ?: tr(R.string.s_shangweianzhuangmoxing),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
 
@@ -191,7 +191,7 @@ internal fun OfflineModelCard(
                 else
                     tr(R.string.s_shangweianzhuangmoxing_dianjiq_fd6b5),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
 
             // 已安装模型切换：与"在线服务"一致的单选弹窗交互。

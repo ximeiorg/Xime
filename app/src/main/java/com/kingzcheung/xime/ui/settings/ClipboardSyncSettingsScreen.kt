@@ -144,7 +144,7 @@ fun ClipboardSyncSettingsContent(
                 Text(
                     text = tr(R.string.s_tongbuyiguanbi_zaishangyiji_ji_5e4e4),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
 
@@ -206,7 +206,7 @@ fun ClipboardSyncSettingsContent(
                         Text(
                             text = tr(R.string.s_shebeihulian_shuoming),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                     }
                     Icon(
@@ -231,7 +231,7 @@ fun ClipboardSyncSettingsContent(
                                 Text(
                                     text = tr(R.string.s_weianzhuangjiantiebantongbucha_9bf61),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = settingsSecondaryColor()
                                 )
                                 Button(
                                     onClick = onNavigateToMarket,
@@ -343,7 +343,7 @@ private fun ChannelRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
         }
     }
@@ -391,7 +391,7 @@ private fun CurrentServiceItem(
                 Text(
                     text = pluginInfo.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
             val ability = if (capabilities?.attachments == true) tr(R.string.s_wenziyutupian) else tr(R.string.s_jinwenzi)

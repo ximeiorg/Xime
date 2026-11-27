@@ -281,12 +281,12 @@ fun PluginsSettingsContent(
                                 Text(
                                     text = tr(R.string.s_zanwuyianzhuangdechajian),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = settingsSecondaryColor()
                                 )
                                 Text(
                                     text = tr(R.string.s_anzhuangchajianhoujiangzaicixi_e8aa0),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                    color = settingsSecondaryColor().copy(alpha = 0.7f)
                                 )
                             }
                         }
@@ -495,17 +495,17 @@ private fun ExtensionItem(
                            else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text("•", style = MaterialTheme.typography.bodySmall, 
-                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                     color = settingsSecondaryColor().copy(alpha = 0.5f))
                 Text(
                     text = "${extension.versionName}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
                 
                 // 信任徽标
                 val trustBadge = trustBadge(extension.trustLevel)
                 Text("•", style = MaterialTheme.typography.bodySmall,
-                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                     color = settingsSecondaryColor().copy(alpha = 0.5f))
                 Text(
                     text = trustBadge.first,
                     style = MaterialTheme.typography.bodySmall,
@@ -524,7 +524,7 @@ private fun ExtensionItem(
                     Text(
                         text = extension.description,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = settingsSecondaryColor().copy(alpha = 0.7f)
                     )
                 }
 
@@ -611,7 +611,7 @@ private fun ExtensionItem(
                             Text(
                                 text = tr(R.string.s_yaoqiu_2, hostRange),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                color = settingsSecondaryColor().copy(alpha = 0.6f)
                             )
                         } else if (!isActive && onActivate != null) {
                             OutlinedButton(
@@ -729,7 +729,7 @@ private fun ExtensionItem(
                         Text(
                             text = tr(R.string.s_miaoshu, extension.description),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                     }
                 }
@@ -811,7 +811,7 @@ fun NetworkAccessSection(
                     Text(
                         text = host,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1005,13 +1005,13 @@ private fun PluginErrorDialog(
                     Text(
                         tr(R.string.s_zanwucuowujilu),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 } else {
                     Text(
                         tr(R.string.s_dianji_fuzhizhenduanxinxi_houz_55721),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Column(
@@ -1071,7 +1071,7 @@ private fun PluginErrorCard(index: Int, error: PluginErrorLog.PluginError) {
                 Text(
                     text = "#${index + 1} · ${formatErrorTime(error.timestamp)} · ${categoryLabel(error.category)}",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
             Spacer(modifier = Modifier.height(2.dp))
@@ -1083,7 +1083,7 @@ private fun PluginErrorCard(index: Int, error: PluginErrorLog.PluginError) {
             Text(
                 text = PluginErrorLog.userHint(error),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -1099,7 +1099,7 @@ private fun PluginErrorCard(index: Int, error: PluginErrorLog.PluginError) {
                 Text(
                     text = stackTraceText.take(200) + "...",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = settingsSecondaryColor().copy(alpha = 0.7f)
                 )
             }
         }

@@ -213,7 +213,7 @@ fun UserDictContent(onBack: () -> Unit) {
                         text = if (uiState.searchQuery.isEmpty()) tr(R.string.s_gong_tiao, uiState.entries.size)
                         else tr(R.string.s_pipei_tiao_2, uiState.filteredEntries.size, uiState.entries.size),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
 
@@ -226,7 +226,7 @@ fun UserDictContent(onBack: () -> Unit) {
                                     Text(
                                         tr(R.string.s_zhengzaiduquciku),
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = settingsSecondaryColor()
                                     )
                                 }
                             }
@@ -241,7 +241,7 @@ fun UserDictContent(onBack: () -> Unit) {
                         }
                         uiState.filteredEntries.isEmpty() -> {
                             Centered {
-                                Text(tr(R.string.s_weizhaodaopipeitiaomu), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(tr(R.string.s_weizhaodaopipeitiaomu), color = settingsSecondaryColor())
                             }
                         }
                         else -> {
@@ -420,7 +420,7 @@ private fun UserDictEntryRow(entry: DictEntry, onDelete: () -> Unit) {
                     Text(
                         tr(R.string.s_pinlv, entry.weight),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
             }

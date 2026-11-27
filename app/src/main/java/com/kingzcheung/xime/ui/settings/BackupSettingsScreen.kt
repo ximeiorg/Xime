@@ -369,7 +369,7 @@ fun BackupSettingsContent(
                             Text(
                                 text = tr(R.string.s_weianzhuangbeifenchajian_yundu_93b89),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                             Button(
                                 onClick = onNavigateToMarket,
@@ -787,7 +787,7 @@ private fun FeatureCardHeader(
         Text(
             text = infoText,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = settingsSecondaryColor()
         )
     }
 }
@@ -847,7 +847,7 @@ private fun ServiceGuideRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
         }
         Text(
@@ -911,7 +911,7 @@ private fun WordCardActions(
                 Text(
                     text = tr(R.string.s_yunduanshebeikuaizhao_tai, snapshotList.size),
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
@@ -968,7 +968,7 @@ private fun BackupCardActions(
                 Text(
                     text = tr(R.string.s_xianpeizhibeifenfuwucainengyun_ff570),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = onConfigure, enabled = !blocking) { Text(tr(R.string.s_qupeizhi)) }
@@ -1031,7 +1031,7 @@ private fun BackupCardActions(
                 Text(
                     text = tr(R.string.s_meiladaobeifenliebiao_jianchaw_d63c8),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(
@@ -1045,7 +1045,7 @@ private fun BackupCardActions(
                 Text(
                     text = tr(R.string.s_haimeiyoubeifen_dian_lijibeife_c3bae),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
             remoteList.forEach { entry ->
@@ -1194,7 +1194,7 @@ private fun CurrentBackupServiceItem(
                     tr(R.string.s_haimeiyouchenggongguo)
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
             if (protocols.isNotEmpty()) {
                 Text(

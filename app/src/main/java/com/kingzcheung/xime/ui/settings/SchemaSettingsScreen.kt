@@ -199,7 +199,7 @@ fun SchemaSettingsContent(
                         Text(
                             text = tr(R.string.s_zanweiqiyongrenhefangan),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(horizontal = 8.dp)
                         )
                     }
@@ -233,7 +233,7 @@ fun SchemaSettingsContent(
                         Text(
                             text = tr(R.string.s_meiyouqitakeyongfangan),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(horizontal = 8.dp)
                         )
                     }
@@ -301,7 +301,7 @@ private fun ActivePackageCard(
                 Text(
                     text = tr(R.string.s_dangqianfanganji),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
                 Text(
                     text = if (name.isBlank()) tr(R.string.s_xitongneizhifangan) else name,
@@ -317,7 +317,7 @@ private fun ActivePackageCard(
                         if (version.isNotBlank()) append(" · v$version")
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
