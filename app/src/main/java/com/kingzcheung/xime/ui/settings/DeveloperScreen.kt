@@ -127,7 +127,7 @@ fun DeveloperContent(
                             text = tr(R.string.s_diannaorediaoshiqianzhi_shouji_8f2c4) +
                                 tr(R.string.s_ranhouyong_xipm_dev_chajianmul_7938f),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(start = 72.dp, end = 16.dp, top = 2.dp, bottom = 12.dp)
                         )
                         HorizontalDivider(
@@ -161,7 +161,7 @@ fun DeveloperContent(
                             text = tr(R.string.s_kaiqihoujilumeicianjiandechumo_772f1) +
                                 tr(R.string.s_bushangchuan_buhanshuruneirong_3e49b),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(start = 72.dp, end = 16.dp, top = 2.dp, bottom = 12.dp)
                         )
                     }
@@ -171,7 +171,7 @@ fun DeveloperContent(
                 Text(
                     text = tr(R.string.s_kaifazhegongnengjinyongyushuju_9fa06),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
                 Spacer(modifier = Modifier.height(12.dp))

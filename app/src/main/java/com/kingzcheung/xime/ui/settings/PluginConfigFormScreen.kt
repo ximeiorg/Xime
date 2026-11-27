@@ -352,7 +352,7 @@ private fun UiNodeEditor(
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                     }
                 }
@@ -426,14 +426,14 @@ private fun UiNodeEditor(
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
                 if (options.isEmpty()) {
                     Text(
                         text = tr(R.string.s_zanwukeyongxuanxiang),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 } else {
                     FlowRow(

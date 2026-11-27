@@ -192,7 +192,7 @@ fun ImportedDictContent(onBack: () -> Unit) {
                             Text(
                                 text = tr(R.string.s_daoruciku_shuoming),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = settingsSecondaryColor(),
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                             )
                         }
@@ -343,7 +343,7 @@ private fun EmptyImportedDict(
         Text(
             text = tr(R.string.s_daoruciku_shuoming),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = settingsSecondaryColor(),
         )
         Spacer(Modifier.height(20.dp))
         Button(onClick = onImport) {
@@ -391,7 +391,7 @@ private fun ImportedDictCard(
                         text = "${item.formatName} · ${item.codeSystem} · " +
                             tr(R.string.s_daoruciku_tiaoshu, item.entryCount),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                 }
                 Switch(
@@ -416,7 +416,7 @@ private fun ImportedDictCard(
                             .ifEmpty { tr(R.string.s_ciku_weiguazai) },
                     ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = onRebind, enabled = !busy) {
@@ -497,7 +497,7 @@ private fun SchemePickerDialog(
                     Text(
                         text = tr(R.string.s_daoruciku_wukexuan),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                 } else {
                     options.forEach { option ->

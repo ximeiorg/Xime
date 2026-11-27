@@ -127,7 +127,7 @@ fun SettingsItem(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
         }
         if (badgeText != null) {
@@ -207,7 +207,7 @@ fun SettingsToggleItem(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
             if (showArrow) {
@@ -287,7 +287,7 @@ fun SettingsSliderItem(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
             }
@@ -315,12 +315,12 @@ fun SettingsSliderItem(
                 Text(
                     text = rangeStartLabel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = settingsSecondaryColor().copy(alpha = 0.7f)
                 )
                 Text(
                     text = rangeEndLabel,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = settingsSecondaryColor().copy(alpha = 0.7f)
                 )
             }
         }
@@ -386,7 +386,7 @@ fun SettingsRadioItem(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
         }
@@ -466,7 +466,7 @@ fun SchemaItem(
                 Text(
                     text = schema.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
             Row(
@@ -585,7 +585,7 @@ fun SchemaSelectDialog(
                             Text(
                                 text = schema.description,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                         }
                     }

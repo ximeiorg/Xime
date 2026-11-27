@@ -151,7 +151,7 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
                             currentDir.absolutePath.removePrefix(rootDir.absolutePath)
                         if (rel.isNotEmpty()) {
                             Text(rel, style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = settingsSecondaryColor(),
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
@@ -189,7 +189,7 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
         if (entries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(innerPadding),
                 contentAlignment = Alignment.Center) {
-                Text(tr(R.string.s_kongmulu), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr(R.string.s_kongmulu), color = settingsSecondaryColor())
             }
         } else {
             LazyColumn(
@@ -251,7 +251,7 @@ fun RimeFileBrowserContent(onBack: () -> Unit) {
                     tr(R.string.s_daochuzhengjiwanzhengkuaizhao_44789) +
                         tr(R.string.s_yuyunbeifenshitongyigebao_buha_44f27),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             },
             confirmButton = {
@@ -520,14 +520,14 @@ private fun FileEntryRow(entry: FileEntry, onView: () -> Unit, onDelete: () -> U
                     Text(
                         text = formatSize(entry.size),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
-                    Text(" · ", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(" · ", color = settingsSecondaryColor())
                 }
                 Text(
                     text = dateFormat.format(Date(entry.lastModified)),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = settingsSecondaryColor()
                 )
             }
         },

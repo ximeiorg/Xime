@@ -145,7 +145,7 @@ fun SmartPredictionSettingsContent(
                             Text(
                                 text = tr(R.string.s_jiyu_ai_moxingdezhinenglianxia_5cce9),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                         }
                         if (uiState.isLoading) {
@@ -287,7 +287,7 @@ fun SmartPredictionSettingsContent(
                                     Text(
                                         text = tr(R.string.s_jiluyonghushuruxiguanyitisheng_3888f),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = settingsSecondaryColor()
                                     )
                                 }
                                 Text(
@@ -375,7 +375,7 @@ private fun AssociationModeRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
         }
         RadioButton(selected = isSelected, onClick = onClick)
@@ -435,7 +435,7 @@ private fun PredictionModelCard(
                     Text(
                         text = modelInfo.size,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
                 Surface(

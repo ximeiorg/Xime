@@ -208,7 +208,7 @@ fun SchemaLocalContent(
                     Text(
                         tr(R.string.s_shuruyasuobaoxiazaidizhi),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -245,7 +245,7 @@ fun SchemaLocalContent(
                                         Text(
                                             "https://example.com/schema.tar.gz",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                            color = settingsSecondaryColor().copy(alpha = 0.5f)
                                         )
                                     }
                                     innerTextField()
@@ -264,7 +264,7 @@ fun SchemaLocalContent(
                             Text(
                                 text = tr(R.string.s_shiyongdaorufangangongnengshi_3fb80),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = settingsSecondaryColor(),
                                 modifier = Modifier.padding(12.dp)
                             )
                         }
@@ -277,7 +277,7 @@ fun SchemaLocalContent(
                         Text(
                             tr(R.string.s_zhengzaixiazaibingjieya),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                     }
                 }
@@ -378,7 +378,7 @@ fun SchemaLocalContent(
                         Text(
                             if (uiState.isLoading) tr(R.string.s_jiazaizhong_2) else tr(R.string.s_zanwubendifangan),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                         )
                     }
                 }

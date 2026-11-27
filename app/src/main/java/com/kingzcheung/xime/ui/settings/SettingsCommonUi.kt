@@ -86,7 +86,7 @@ fun RimeSearchField(
                 decorationBox = { innerTextField ->
                     Box {
                         if (query.isEmpty()) {
-                            Text(placeholder, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(placeholder, color = settingsSecondaryColor())
                         }
                         innerTextField()
                     }
@@ -147,7 +147,7 @@ fun ContextSelectorCard(
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -199,13 +199,13 @@ fun UsageHint(
         Text(
             title,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = settingsSecondaryColor()
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             message,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = settingsSecondaryColor()
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(

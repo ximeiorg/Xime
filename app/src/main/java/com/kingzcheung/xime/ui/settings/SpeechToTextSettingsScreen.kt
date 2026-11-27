@@ -318,7 +318,7 @@ fun OnlineAsrTab(
             Text(
                 text = tr(R.string.s_zaixianyuyinshibiefuwushangzhi_1752c),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = settingsSecondaryColor(),
                 modifier = Modifier.padding(bottom = 8.dp)
             )
         }
@@ -421,7 +421,7 @@ private fun CurrentAsrProviderItem(
             Text(
                 text = provider?.description ?: tr(R.string.s_qingxuanzeyaoshiyongdezaixiany_07ac7),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
             if (!provider?.features.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))

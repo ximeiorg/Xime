@@ -115,7 +115,7 @@ fun WirelessImportSheet(
             Text(
                 text = tr(R.string.s_quebaoshebeiheshoujizaitongyig_1690a),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = settingsSecondaryColor()
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -153,7 +153,7 @@ fun WirelessImportSheet(
                 Text(
                     text = tr(R.string.s_diannaoliulanqidakaishangfangw_0b91b),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     textAlign = TextAlign.Center
                 )
                 Text(
@@ -163,7 +163,7 @@ fun WirelessImportSheet(
                     tr(R.string.s_tuozhuaishurufanganhuochajianw_5164d)
                 },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                     textAlign = TextAlign.Center
                 )
             }
@@ -204,7 +204,7 @@ fun WirelessImportSheet(
                                     Text(
                                         text = hint,
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = settingsSecondaryColor(),
                                         maxLines = 2,
                                     )
                                 }

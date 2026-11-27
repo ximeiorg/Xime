@@ -124,7 +124,7 @@ fun CustomPhraseSettingsContent(onBack: () -> Unit) {
                                 Text(
                                     s.schemaId,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = settingsSecondaryColor()
                                 )
                             }
                         },
@@ -172,12 +172,12 @@ private fun CustomPhraseBody(
             text = tr(R.string.s_gong_tiao, uiState.entries.size) +
                 if (uiState.searchQuery.isNotEmpty()) tr(R.string.s_pipei_tiao, uiState.filteredEntries.size) else "",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = settingsSecondaryColor(),
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
         if (uiState.filteredEntries.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(tr(R.string.s_weizhaodaopipeitiaomu), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(tr(R.string.s_weizhaodaopipeitiaomu), color = settingsSecondaryColor())
             }
         } else {
             LazyColumn(

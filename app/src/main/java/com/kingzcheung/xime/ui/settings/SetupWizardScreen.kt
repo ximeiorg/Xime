@@ -360,7 +360,7 @@ private fun VerticalStepNavigation(
         Text(
             text = tr(R.string.s_wanchengyixiabuzhoujikekaishis_a88af),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = settingsSecondaryColor()
         )
         Spacer(Modifier.height(28.dp))
 
@@ -387,7 +387,7 @@ private fun VerticalStepNavigation(
                     Text(
                         text = step.navDescription,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = settingsSecondaryColor()
                     )
                 }
             }
@@ -456,7 +456,7 @@ private fun EnableImeStep(onNext: () -> Unit) {
     Text(
         text = tr(R.string.s_jiyu_rime_yinqingde_android_sh_4b613),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = settingsSecondaryColor()
     )
     Spacer(Modifier.height(48.dp))
 
@@ -469,7 +469,7 @@ private fun EnableImeStep(onNext: () -> Unit) {
     Text(
         text = tr(R.string.s_qingzaixitongshezhizhongqiyong_f6c5a),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = settingsSecondaryColor(),
         textAlign = TextAlign.Center
     )
     Spacer(Modifier.height(24.dp))
@@ -548,14 +548,14 @@ private fun SelectSchemasStep(
     Text(
         text = tr(R.string.s_dianjixiafanganniuqianwangshez_77d28),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = settingsSecondaryColor(),
         textAlign = TextAlign.Center
     )
     Spacer(Modifier.height(4.dp))
     Text(
         text = tr(R.string.s_qingzhishaoxuanzeyigefanganhou_e4dfa),
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = settingsSecondaryColor(),
         textAlign = TextAlign.Center
     )
     Spacer(Modifier.height(32.dp))
@@ -636,7 +636,7 @@ private fun SwitchToImeStep(onCompleted: () -> Unit) {
     Text(
         text = tr(R.string.s_yiqiezhunbeijiuxu_qingqiehuand_3e15e),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = settingsSecondaryColor(),
         textAlign = TextAlign.Center
     )
     Spacer(Modifier.height(24.dp))

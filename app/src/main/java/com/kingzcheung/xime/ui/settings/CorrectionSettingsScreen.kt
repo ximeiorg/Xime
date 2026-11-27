@@ -89,30 +89,30 @@ fun CorrectionSettingsContent(onBack: () -> Unit) {
                         Text(
                             text = tr(R.string.s_morenzhichi_wubi86_wubipinyin_048a6),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                         Text(
                             text = tr(R.string.s_jinggao1_cigongnengshiyanxingz_daa71),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
                             text = tr(R.string.s_jinggao2_buzhichirenhezidingyi_aaabd),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
                             text = tr(R.string.s_jiuzhenghouxuanbiaozhu_jiucuo_23e5d),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
                             text = tr(R.string.s_buhuizidongtihuannishurudeneir_d0291),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }

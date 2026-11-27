@@ -158,7 +158,7 @@ fun ClipboardSettingsContent(
                         Text(
                             text = tr(R.string.s_yiguanbi_zhishoujiwenzi_fuzhit_8bf4d),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                         )
                     }
@@ -182,7 +182,7 @@ fun ClipboardSettingsContent(
                         Text(
                             text = tr(R.string.s_yikaiqi_minganneironghuibaocun_3f987),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                         )
                     }
@@ -227,7 +227,7 @@ fun ClipboardSettingsContent(
                         Text(
                             text = tr(R.string.s_chaoguoshangxiandetupianbuhuib_f2e2d),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                     }
                     HorizontalDivider(
@@ -258,7 +258,7 @@ fun ClipboardSettingsContent(
                                 tr(R.string.s_zhang, it.count, Formatter.formatFileSize(context, it.fileBytes))
                             } ?: tr(R.string.s_tongjizhong),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = settingsSecondaryColor()
                         )
                     }
                 }

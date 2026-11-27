@@ -144,7 +144,7 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
                         else -> status ?: tr(R.string.s_fuzzy_scope_hint)
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
 
@@ -197,12 +197,12 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
                         Text(
                             text = tr(R.string.s_fuzzy_scope_hint),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                         )
                         Text(
                             text = tr(R.string.s_fuzzy_declare_hint),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                         )
                     }
                 }
@@ -217,7 +217,7 @@ fun FuzzyPinyinSettingsContent(onBack: () -> Unit) {
                         Text(
                             text = tr(R.string.s_fuzzy_transitive_hint),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                         )
                         conflicts.forEach { conflict ->
                             Text(

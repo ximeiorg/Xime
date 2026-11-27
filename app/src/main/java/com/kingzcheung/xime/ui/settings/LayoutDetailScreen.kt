@@ -145,7 +145,7 @@ fun LayoutMarketDetailContent(
                     Text(
                         tr(R.string.s_weizhaodaogaineirong),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { viewModel.loadLayouts(manual = true) }) { Text(tr(R.string.s_zhongxinjiazai)) }
@@ -240,7 +240,7 @@ private fun LayoutDetailBody(
                         Text(
                             tr(R.string.s_zuozhe_2, layout.author),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                         )
                     }
                 }
@@ -299,7 +299,7 @@ private fun LayoutDetailBody(
                     Text(
                         currentVersion.changelog,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                 }
             }
@@ -414,7 +414,7 @@ private fun LayoutMetaCard(
 private fun MetaRow(
     icon: ImageVector,
     text: String,
-    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    color: Color = settingsSecondaryColor(),
     underline: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {

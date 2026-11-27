@@ -148,7 +148,7 @@ fun ModelLocalContent(
                         Text(
                             if (uiState.isLoading) tr(R.string.s_jiazaizhong_2) else tr(R.string.s_zanwubendimoxing),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                         )
                     }
                 }

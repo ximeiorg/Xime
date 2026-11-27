@@ -156,7 +156,7 @@ fun StorageSpaceScreen(
                                 Text(
                                     text = tr(R.string.s_zhengzaisaomiao),
                                     fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = settingsSecondaryColor()
                                 )
                             }
                         } else {
@@ -170,7 +170,7 @@ fun StorageSpaceScreen(
                             Text(
                                 text = tr(R.string.s_jintongjiyingyongshujumulu_buh_06782),
                                 fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = settingsSecondaryColor()
                             )
                         }
                     }
@@ -222,7 +222,7 @@ fun StorageSpaceScreen(
                                     Text(
                                         text = category.description,
                                         fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = settingsSecondaryColor(),
                                         lineHeight = 16.sp
                                     )
                                 }

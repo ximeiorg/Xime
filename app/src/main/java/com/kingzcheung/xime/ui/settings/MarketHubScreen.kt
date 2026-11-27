@@ -999,7 +999,7 @@ private fun MarketStoreCard(
                         Text(
                             subtitle,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -1020,7 +1020,7 @@ private fun MarketStoreCard(
                         Text(
                             metaLine,
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false),
@@ -1174,7 +1174,7 @@ private fun DetailMetaRow(label: String, value: String) {
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = settingsSecondaryColor(),
             modifier = Modifier.width(96.dp),
         )
         Text(
@@ -1234,7 +1234,7 @@ fun MarketSchemeDetailContent(
                     Text(
                         tr(R.string.s_weizhaodaogaifangan),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { viewModel.loadSchemes() }) { Text(tr(R.string.s_zhongxinjiazai)) }
@@ -1297,7 +1297,7 @@ private fun SchemeDetailBody(
                         Text(
                             scheme.author,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = settingsSecondaryColor(),
                         )
                     }
                 }
@@ -1309,7 +1309,7 @@ private fun SchemeDetailBody(
                 Text(
                     scheme.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
         }
@@ -1509,14 +1509,14 @@ private fun SchemeVersionCard(
                 Text(
                     version.date,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
             if (version.changelog.isNotEmpty()) {
                 Text(
                     version.changelog,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
             val totalBytes = version.downloadUrls.sumOf { dl ->
@@ -1582,7 +1582,7 @@ fun MarketModelDetailContent(
                     Text(
                         tr(R.string.s_weizhaodaogaimoxing),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { viewModel.refresh() }) { Text(tr(R.string.s_zhongxinjiazai)) }
@@ -1644,7 +1644,7 @@ private fun ModelDetailBody(
                     Text(
                         modelCategoryLabel(model.category),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                 }
             }
@@ -1655,7 +1655,7 @@ private fun ModelDetailBody(
                 Text(
                     model.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
         }
@@ -1832,14 +1832,14 @@ private fun ModelVersionCard(
                 Text(
                     version.date,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
             if (version.changelog.isNotEmpty()) {
                 Text(
                     version.changelog,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
             if (version.size.isNotEmpty()) {
@@ -2043,7 +2043,7 @@ fun PluginMarketDetailContent(
                     Text(
                         tr(R.string.s_weizhaodaogaichajian),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(onClick = { viewModel.loadPlugins() }) { Text(tr(R.string.s_zhongxinjiazai)) }
@@ -2134,7 +2134,7 @@ private fun PluginDetailBody(
                     Text(
                         pluginCategoryLabel(plugin.pluginType).ifEmpty { tr(R.string.s_chajian) },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = settingsSecondaryColor(),
                     )
                 }
             }
@@ -2145,7 +2145,7 @@ private fun PluginDetailBody(
                 Text(
                     plugin.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
         }
@@ -2396,14 +2396,14 @@ private fun PluginVersionCard(
                 Text(
                     version.date,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
             if (version.changelog.isNotEmpty()) {
                 Text(
                     version.changelog,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = settingsSecondaryColor(),
                 )
             }
             if (version.size.isNotEmpty()) {
