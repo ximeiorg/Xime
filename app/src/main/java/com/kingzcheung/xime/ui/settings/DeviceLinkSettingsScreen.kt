@@ -20,11 +20,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.twotone.Badge
 import androidx.compose.material.icons.twotone.Fingerprint
+import androidx.compose.material.icons.twotone.Info
 import androidx.compose.material.icons.twotone.Link
 import androidx.compose.material.icons.twotone.Smartphone
 import androidx.compose.material.icons.twotone.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -51,13 +54,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
@@ -128,6 +131,8 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
     var codeInput by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var deviceName by remember { mutableStateOf("") }
+    var showHelp by rememberSaveable { mutableStateOf(false) }
+    var showNameDialog by rememberSaveable { mutableStateOf(false) }
 
     fun refreshPeers() {
         scope.launch(Dispatchers.IO) {
@@ -248,6 +253,14 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = { showHelp = true }) {
+                        Icon(
+                            imageVector = Icons.TwoTone.Info,
+                            contentDescription = tr(R.string.s_shuoming)
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface
@@ -288,40 +301,24 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
 
             // ── 本机 ──────────────────────────────────────────────
             SettingsSection(title = tr(R.string.s_benji)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(CardPadding),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    SettingRowIcon(Icons.TwoTone.Badge)
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = tr(R.string.s_shebeimingcheng),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = deviceName,
-                            onValueChange = { deviceName = it.take(32) },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyLarge,
-                            shape = RoundedCornerShape(10.dp),
-                            supportingText = {
-                                Text(
-                                    text = tr(R.string.s_shebeimingcheng_shuoming),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .onFocusChanged { state -> if (!state.isFocused) saveDeviceName() }
-                        )
+                SettingValueRow(
+                    icon = Icons.TwoTone.Badge,
+                    title = tr(R.string.s_shebeimingcheng),
+                    value = deviceName.ifBlank { defaultDeviceName() },
+                    trailing = {
+                        IconButton(
+                            onClick = { showNameDialog = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = tr(R.string.s_bianji),
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                }
+                )
 
                 HorizontalDivider(
                     modifier = Modifier.padding(start = RowContentIndent),
@@ -405,12 +402,6 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                     }
 
                     PairStatusText(phase = phase, peerName = peerName, error = error)
-
-                    Text(
-                        text = tr(R.string.s_peidui_shuoming_neirong),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
 
@@ -492,29 +483,68 @@ fun DeviceLinkSettingsContent(onBack: () -> Unit) {
                 }
             }
 
-            // ── 说明 ──────────────────────────────────────────────
-            SettingsSection(title = tr(R.string.s_shuoming)) {
-                Column(
-                    modifier = Modifier.padding(CardPadding),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(
-                        R.string.s_shuoming_1,
-                        R.string.s_shuoming_2,
-                        R.string.s_shuoming_3,
-                        R.string.s_shuoming_4,
-                        R.string.s_shuoming_5
-                    ).forEach { id ->
-                        Text(
-                            text = tr(id),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
         }
     }
+
+    if (showHelp) {
+        DeviceLinkHelpDialog(onDismiss = { showHelp = false })
+    }
+    if (showNameDialog) {
+        DeviceNameDialog(
+            initial = deviceName,
+            onDismiss = { showNameDialog = false },
+            onConfirm = { name ->
+                deviceName = name.trim().ifEmpty { defaultDeviceName() }.take(32)
+                saveDeviceName()
+                showNameDialog = false
+            }
+        )
+    }
+}
+
+/**
+ * 「说明」弹窗：原本固定占页面底部一整块，收起后只留导航栏的说明图标，
+ * 页面回到纯操作区（本机 / 配对 / 已配对设备）。
+ */
+@Composable
+private fun DeviceLinkHelpDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr(R.string.s_shuoming)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    R.string.s_shuoming_1,
+                    R.string.s_shuoming_2,
+                    R.string.s_shuoming_3,
+                    R.string.s_shuoming_4,
+                    R.string.s_shuoming_5,
+                ).forEach { id ->
+                    Text(
+                        text = tr(id),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = tr(R.string.s_peidui_shuoming),
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    text = tr(R.string.s_peidui_shuoming_neirong),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(tr(R.string.s_zhidaole)) }
+        }
+    )
 }
 
 /** 行首图标：40dp 圆角底 + 22dp 主题色图标，与 [SettingsItem] 同一套 token。 */
@@ -558,12 +588,14 @@ private fun PeerStateBadge(label: String, color: Color) {
     }
 }
 
-/** 只读的「标题 + 值」行，与 [SettingsItem] 同构，只是右侧不放箭头。 */
+/** 「标题 + 值」行，与 [SettingsItem] 同构：右侧可放操作按钮（[trailing]），不放箭头。 */
 @Composable
-private fun SettingValueRow(    icon: ImageVector,
+private fun SettingValueRow(
+    icon: ImageVector,
     title: String,
     value: String,
-    monospace: Boolean = false
+    monospace: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -583,10 +615,52 @@ private fun SettingValueRow(    icon: ImageVector,
                 text = value,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = if (monospace) FontFamily.Monospace else null,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
+        trailing?.invoke()
     }
+}
+
+/**
+ * 设备名称编辑弹窗：名称只在配对握手时用一次，没必要常驻一个输入框占着页面，
+ * 行内展示当前值、点铅笔再改。
+ */
+@Composable
+private fun DeviceNameDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var text by remember(initial) { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr(R.string.s_shebeimingcheng)) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it.take(32) },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge,
+                shape = RoundedCornerShape(10.dp),
+                supportingText = {
+                    Text(
+                        text = tr(R.string.s_shebeimingcheng_shuoming),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(text) }) { Text(tr(R.string.s_baocun)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(tr(R.string.s_quxiao)) }
+        }
+    )
 }
 
 @Composable
