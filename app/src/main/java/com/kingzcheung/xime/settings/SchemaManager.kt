@@ -939,7 +939,7 @@ object SchemaManager {
             else -> {
                 val ok = saveInto(getRimeDir(context), name, inputStream)
                 if (!ok) return@withContext ImportResult(false)
-                copyToOverlay(context, name)
+                if (keepsOverlayCopy(name)) copyToOverlay(context, name)
                 if (autoEnable && name.endsWith(".schema.yaml")) {
                     val schemaId = name.removeSuffix(".schema.yaml")
                     setEnabledSchemas(context, getEnabledSchemas(context) + schemaId)
@@ -999,13 +999,13 @@ object SchemaManager {
         return importLexiconFile(context, name, bytes, parser, schemeIds)
     }
 
-    /** yaml / txt 视为 Rime 配置，其余算普通文件。 */
-    private fun configKind(name: String): ImportKind =
-        if (name.endsWith(".yaml", true) || name.endsWith(".yml", true) || name.endsWith(".txt", true)) {
-            ImportKind.CONFIG
-        } else {
-            ImportKind.FILE
-        }
+    /** yaml / txt 视为 Rime 配置，.gram 视为语法模型，其余算普通文件。 */
+    internal fun configKind(name: String): ImportKind = when {
+        name.endsWith(".gram", true) -> ImportKind.GRAMMAR
+        name.endsWith(".yaml", true) || name.endsWith(".yml", true) ||
+            name.endsWith(".txt", true) -> ImportKind.CONFIG
+        else -> ImportKind.FILE
+    }
 
     /** 内容识别不出词库格式时，按原来的普通文件流程落地。 */
     private fun savePlainImport(
@@ -1123,6 +1123,14 @@ object SchemaManager {
         FileLogger.e(TAG, "Failed to import $name", e)
         false
     }
+
+    /**
+     * 单文件导入是否同步到当前包 overlay。
+     *
+     * 语法模型动辄几百 MB，只落 rime 目录：再复制一份等于双倍占用（备份包也会多一份）。
+     */
+    internal fun keepsOverlayCopy(name: String): Boolean =
+        !name.endsWith(".gram", ignoreCase = true)
 
     /** 单文件导入属于当前方案包：复制一份到 `market/<id>/overlay/`，切包后可恢复。 */
     private fun copyToOverlay(context: Context, name: String) {

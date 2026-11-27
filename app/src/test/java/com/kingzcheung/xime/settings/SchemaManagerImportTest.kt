@@ -1,6 +1,8 @@
 package com.kingzcheung.xime.settings
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** SchemaManager 里保留的纯解析函数：sha256 与归档壳目录剥离。 */
@@ -72,5 +74,29 @@ class SchemaManagerImportTest {
             "",
             SchemaManager.findSchemaBaseDir(listOf("cangjie5.schema.yaml", "cangjie5.dict.yaml")),
         )
+    }
+
+    // ── configKind：浏览器上传成功后给用户的落点提示（.gram 是语法模型，不是普通文件） ──
+
+    @Test
+    fun `configKind marks grammar model as GRAMMAR`() {
+        assertEquals(ImportKind.GRAMMAR, SchemaManager.configKind("wanxiang-lts-zh-hans.gram"))
+        assertEquals(ImportKind.GRAMMAR, SchemaManager.configKind("WANXIANG-LTS-ZH-HANS.GRAM"))
+    }
+
+    @Test
+    fun `grammar model is not copied into package overlay`() {
+        // 语法模型几百 MB，只落 rime；再复制到 scheme-overlay 就是双倍占用
+        assertFalse(SchemaManager.keepsOverlayCopy("wanxiang-lts-zh-hans.gram"))
+        assertFalse(SchemaManager.keepsOverlayCopy("WANXIANG.GRAM"))
+        assertTrue(SchemaManager.keepsOverlayCopy("xime.custom.yaml"))
+        assertTrue(SchemaManager.keepsOverlayCopy("rime_ice.schema.yaml"))
+    }
+
+    @Test
+    fun `configKind keeps yaml and txt as CONFIG`() {
+        assertEquals(ImportKind.CONFIG, SchemaManager.configKind("xime.custom.yaml"))
+        assertEquals(ImportKind.CONFIG, SchemaManager.configKind("custom_phrase.txt"))
+        assertEquals(ImportKind.FILE, SchemaManager.configKind("english_trie.bin"))
     }
 }

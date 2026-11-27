@@ -303,79 +303,79 @@ class WirelessImportHelper(
                             )
                         )
                     }
-                    ImportManager.isPluginFile(name) ||
-                    name.endsWith(".zip", ignoreCase = true) ||
-                    name.endsWith(".tar.gz", ignoreCase = true) ||
-                    name.endsWith(".tgz", ignoreCase = true) ||
-                    name.endsWith(".yaml") || name.endsWith(".schema.yaml") || name.endsWith(".dict.yaml") ||
-                    name.endsWith(".scel", ignoreCase = true) ||
-                    name.endsWith(".bdict", ignoreCase = true) ||
-                    name.endsWith(".bin", ignoreCase = true) ||
-                    name.endsWith(".dict", ignoreCase = true) ||
-                    name.endsWith(".txt", ignoreCase = true) ||
-                    name.endsWith(".jpg", ignoreCase = true) || name.endsWith(".jpeg", ignoreCase = true) ||
-                    name.endsWith(".png", ignoreCase = true) ||
-                    name.endsWith(".ttf", ignoreCase = true) || name.endsWith(".otf", ignoreCase = true) ||
-                    name.endsWith(".woff", ignoreCase = true) || name.endsWith(".woff2", ignoreCase = true) -> {
-                        // 经临时文件传递给 ImportManager，避免大文件 ByteArray OOM
-                        val partFile = File.createTempFile("part_", "_$name", context.cacheDir)
-                        try {
-                            partFile.outputStream().use { out ->
-                                raf.channel.transferTo(contentStart, contentLen, out.channel)
+                    ImportManager.isUploadSupported(name) -> {
+                        // 直接按分段区间流式导入，不再复制一份 partFile：语法模型动辄数百 MB，
+                        // 多一次整文件复制就多一份峰值占用。
+                        val result = if (ImportManager.isPluginFile(name)) {
+                            // 插件安装需要可随机访问的包文件，仍落一份临时文件
+                            val partFile = File.createTempFile("part_", "_$name", context.cacheDir)
+                            try {
+                                partFile.outputStream().use { out ->
+                                    copyRegion(raf, contentStart, contentLen, out.channel)
+                                }
+                                ImportManager.importFile(
+                                    context, name, partFile,
+                                    autoEnable = false,
+                                    lexiconSchemeIds = lexiconSchemeIds,
+                                )
+                            } finally {
+                                partFile.delete()
                             }
-                            when (val result = ImportManager.importFile(
-                                context, name, partFile,
-                                autoEnable = false,
-                                lexiconSchemeIds = lexiconSchemeIds,
-                            )) {
-                                is ImportManager.ImportResult.Plugin -> {
-                                    PluginManager.loadEnabledPlugins()
-                                    saved = true
-                                    lastKind = "plugin"
-                                    lastMessage = tr(R.string.s_chajian_anzhuangchenggong, result.pluginInfo?.name ?: name)
-                                    _uploadResults.trySend(
+                        } else {
+                            PartInputStream(tmpFile, contentStart, contentLen).use { stream ->
+                                ImportManager.importStream(
+                                    context, name, stream,
+                                    autoEnable = false,
+                                    lexiconSchemeIds = lexiconSchemeIds,
+                                )
+                            }
+                        }
+                        when (result) {
+                            is ImportManager.ImportResult.Plugin -> {
+                                PluginManager.loadEnabledPlugins()
+                                saved = true
+                                lastKind = "plugin"
+                                lastMessage = tr(R.string.s_chajian_anzhuangchenggong, result.pluginInfo?.name ?: name)
+                                _uploadResults.trySend(
+                                    UploadResult(
+                                        fileName = name,
+                                        success = true,
+                                        kind = lastKind,
+                                        message = lastMessage,
+                                    )
+                                )
+                            }
+                            is ImportManager.ImportResult.Content -> {
+                                saved = result.success
+                                val kind = result.kind?.name?.lowercase()
+                                val message = result.message ?: kindHint(result.kind) ?: ""
+                                lastKind = kind ?: ""
+                                lastMessage = message
+                                _uploadResults.trySend(
+                                    if (result.success) {
                                         UploadResult(
                                             fileName = name,
                                             success = true,
-                                            kind = lastKind,
-                                            message = lastMessage,
+                                            message = message,
+                                            kind = kind,
                                         )
-                                    )
-                                }
-                                is ImportManager.ImportResult.Content -> {
-                                    saved = result.success
-                                    val kind = result.kind?.name?.lowercase()
-                                    val message = result.message ?: kindHint(result.kind) ?: ""
-                                    lastKind = kind ?: ""
-                                    lastMessage = message
-                                    _uploadResults.trySend(
-                                        if (result.success) {
-                                            UploadResult(
-                                                fileName = name,
-                                                success = true,
-                                                message = message,
-                                                kind = kind,
-                                            )
-                                        } else {
-                                            lastError = message ?: tr(R.string.s_baocunshibai)
-                                            UploadResult(
-                                                fileName = name,
-                                                success = false,
-                                                error = lastError,
-                                                kind = kind,
-                                            )
-                                        }
-                                    )
-                                }
-                                else -> {
-                                    lastError = tr(R.string.s_buzhichidewenjianleixing)
-                                    _uploadResults.trySend(
-                                        UploadResult(fileName = name, success = false, error = lastError)
-                                    )
-                                }
+                                    } else {
+                                        lastError = message ?: tr(R.string.s_baocunshibai)
+                                        UploadResult(
+                                            fileName = name,
+                                            success = false,
+                                            error = lastError,
+                                            kind = kind,
+                                        )
+                                    }
+                                )
                             }
-                        } finally {
-                            partFile.delete()
+                            else -> {
+                                lastError = tr(R.string.s_buzhichidewenjianleixing)
+                                _uploadResults.trySend(
+                                    UploadResult(fileName = name, success = false, error = lastError)
+                                )
+                            }
                         }
                     }
                     else -> {
@@ -415,6 +415,7 @@ class WirelessImportHelper(
     private fun kindHint(kind: ImportKind?): String? = when (kind) {
         ImportKind.SCHEME_PACKAGE -> tr(R.string.s_daoru_fanganbao_tishi)
         ImportKind.CONFIG -> tr(R.string.s_daoru_peizhi_tishi)
+        ImportKind.GRAMMAR -> tr(R.string.s_daoru_yufa_moxing_tishi)
         ImportKind.FONT, ImportKind.IMAGE -> tr(R.string.s_daoru_ziyuan_tishi)
         else -> null
     }
@@ -500,6 +501,23 @@ class WirelessImportHelper(
 
     val isRunning: Boolean get() = server != null
 
+    /** 把 raf 的 [start, start+length) 区间完整写入 target。transferTo 可能只搬一部分，需循环补齐。 */
+    private fun copyRegion(
+        raf: java.io.RandomAccessFile,
+        start: Long,
+        length: Long,
+        target: java.nio.channels.FileChannel,
+    ) {
+        var pos = start
+        var remaining = length
+        while (remaining > 0) {
+            val n = raf.channel.transferTo(pos, remaining, target)
+            if (n <= 0) throw java.io.IOException("transferTo stalled at offset $pos")
+            pos += n
+            remaining -= n
+        }
+    }
+
     /** 在 RandomAccessFile 中查找字节模式，返回起始位置，未找到返回 -1 */
     private fun findBytes(raf: java.io.RandomAccessFile, pattern: ByteArray, startPos: Long): Long {
         val buf = ByteArray(8192)
@@ -565,5 +583,38 @@ class WirelessImportHelper(
 
     companion object {
         private const val TAG = "WirelessImport"
+    }
+}
+
+/**
+ * 只读取 multipart 请求体里某一段的输入流：上传的大文件（如 .gram 语法模型）
+ * 直接按区间交给导入管线，不再整段复制成第二个临时文件。
+ */
+internal class PartInputStream(
+    file: File,
+    start: Long,
+    private var remaining: Long,
+) : java.io.InputStream() {
+
+    private val raf = java.io.RandomAccessFile(file, "r").also { it.seek(start) }
+
+    override fun read(): Int {
+        if (remaining <= 0) return -1
+        val b = raf.read()
+        if (b >= 0) remaining--
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        if (remaining <= 0) return -1
+        if (len == 0) return 0
+        val want = minOf(len.toLong(), remaining).toInt()
+        val n = raf.read(b, off, want)
+        if (n > 0) remaining -= n
+        return n
+    }
+
+    override fun close() {
+        raf.close()
     }
 }

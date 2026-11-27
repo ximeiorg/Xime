@@ -72,6 +72,7 @@ function typeIcon(name, isDir) {
   const lower = name.toLowerCase()
   if (lower.endsWith('.schema.yaml')) return '⚙️'
   if (lower.endsWith('.dict.yaml') || lower.endsWith('.yaml')) return '📘'
+  if (lower.endsWith('.gram')) return '📖'
   if (lower.endsWith('.zip')) return '📦'
   if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) return '🗜️'
   if (lower.endsWith('.txt') || lower.endsWith('.md')) return '📝'
@@ -86,6 +87,7 @@ function typeBadge(name, isDir) {
   const lower = name.toLowerCase()
   if (lower.endsWith('.schema.yaml')) return '方案'
   if (lower.endsWith('.dict.yaml')) return '词典'
+  if (lower.endsWith('.gram')) return '语法模型'
   if (lower.endsWith('.zip')) return 'ZIP'
   if (lower.endsWith('.xipk')) return '插件'
   if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) return '归档'
@@ -362,7 +364,7 @@ export default function App() {
         >
           <div className="mb-2 text-3xl text-gray-400 md:mb-3 md:text-4xl">📄</div>
           <div className="text-sm text-gray-400">拖拽文件到此处</div>
-          <div className="mt-2 text-xs text-gray-300">          {lexiconOnly ? '支持词库：.scel / .bdict / .bin / .dict / .txt' : '支持方案(.yaml/.zip/.tar.gz) / 词库(.scel/.bdict/.bin/.dict/.txt) / 插件(.xipk) / 图片(.jpg/.png) / 字体(.ttf/.otf)'}</div>
+          <div className="mt-2 text-xs text-gray-300">          {lexiconOnly ? '支持词库：.scel / .bdict / .bin / .dict / .txt' : '支持方案(.yaml/.zip/.tar.gz) / 词库(.scel/.bdict/.bin/.dict/.txt) / 语法模型(.gram) / 插件(.xipk) / 图片(.jpg/.png) / 字体(.ttf/.otf)'}</div>
         </div>
 
         <input
@@ -411,6 +413,7 @@ export default function App() {
             <div>· 方案压缩包(.zip/.tar.gz) → market 目录（到「方案管理」安装）</div>
             <div>· 词库(.scel/.bdict/.bin/.dict/.txt) → 导入词库（未选方案时先在手机上挂载）</div>
             <div>· 配置文件(.yaml) → rime 目录（部署后生效）</div>
+            <div>· 语法模型(.gram) → rime 目录（部署后生效）</div>
             <div>· 插件(.xipk) → 安装插件</div>
             <div>· 图片(.jpg/.png) → themes 目录</div>
             <div>· 字体(.ttf/.otf) → fonts 目录</div>

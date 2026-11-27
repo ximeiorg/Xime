@@ -521,6 +521,7 @@
     <string name="s_daoru_fanganbao_tishi">方案包已下載，請到「方案管理」安裝</string>
     <string name="s_daoru_peizhi_tishi">已儲存到 rime 目錄，部署後生效</string>
     <string name="s_daoru_ziyuan_tishi">已匯入到本機資源</string>
+    <string name="s_daoru_yufa_moxing_tishi">語法模型已匯入，請回手機點「部署」</string>
     <string name="s_daoruciku_tiaoshu">%1$s 條</string>
     <string name="s_daoruciku_guazai">掛到：%1$s</string>
     <string name="s_daoruciku_yibianyi">已編譯</string>

@@ -49,6 +49,24 @@ object ImportManager {
     fun isPluginFile(name: String): Boolean =
         name.endsWith(".xipk", ignoreCase = true)
 
+    /**
+     * 浏览器上传（web /upload）允许的文件类型。
+     *
+     * 清单等价于导入管线能落地的类型，集中在这里而不是散在路由里：网页 accept 里
+     * 早就有 `.gram`，服务端白名单漏掉它，语法模型才会「传到 100% 提示类型不支持」。
+     */
+    fun isUploadSupported(name: String): Boolean = UPLOAD_SUFFIXES.any { name.endsWith(it, ignoreCase = true) }
+
+    private val UPLOAD_SUFFIXES = listOf(
+        ".schema.yaml", ".dict.yaml", ".yaml", ".yml",
+        ".gram",
+        ".zip", ".tar.gz", ".tgz",
+        ".xipk",
+        ".scel", ".bdict", ".bin", ".dict", ".txt",
+        ".jpg", ".jpeg", ".png",
+        ".ttf", ".otf", ".woff", ".woff2",
+    )
+
     /** 从 URI 导入（文件选择器、分享等）。按文件名自动路由。 */
     suspend fun import(
         context: Context,
@@ -107,6 +125,27 @@ object ImportManager {
             )
             ImportResult.Content(r.success, r.installedDirect, r.message, r.kind)
         }
+    }
+
+    /**
+     * 从流导入（浏览器上传的 multipart 分段等）。按文件名自动路由。
+     *
+     * 插件必须是可随机访问的文件（安装要校验包），此入口只接受非插件文件。
+     */
+    suspend fun importStream(
+        context: Context,
+        name: String,
+        inputStream: InputStream,
+        autoEnable: Boolean = true,
+        lexiconSchemeIds: List<String> = emptyList(),
+    ): ImportResult = withContext(Dispatchers.IO) {
+        val safe = SchemaManager.sanitizeDisplayName(name)
+        if (isPluginFile(safe)) return@withContext ImportResult.Unsupported(safe)
+        val r = SchemaManager.saveImportedFile(
+            context, safe, inputStream,
+            autoEnable = autoEnable, lexiconSchemeIds = lexiconSchemeIds,
+        )
+        ImportResult.Content(r.success, r.installedDirect, r.message, r.kind)
     }
 
     private fun queryDisplayName(context: Context, uri: Uri): String? {
