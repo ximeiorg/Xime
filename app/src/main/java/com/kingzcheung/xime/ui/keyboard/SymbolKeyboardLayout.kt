@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.glassRim
 import com.kingzcheung.xime.i18n.localizeData
 
 import com.kingzcheung.xime.R
@@ -264,9 +265,12 @@ private fun SymbolButton(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
             .background(
-                if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)
-                else backgroundColor
+                glassFill(
+                    if (isPressed) androidx.compose.ui.graphics.lerp(backgroundColor, Color.Black, 0.2f)
+                    else backgroundColor
+                )
             )
+            .glassRim(RoundedCornerShape(LocalKeyCornerRadius.current))
             .tolerantClick(
                 showRipple = false,
                 interactionSource = interactionSource,

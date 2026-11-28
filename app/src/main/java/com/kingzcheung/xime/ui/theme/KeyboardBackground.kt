@@ -11,8 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -66,26 +69,31 @@ fun resolveSolidColor(config: BackgroundConfig, isDark: Boolean): Color? {
  *
  * - solid / gradient：直接用 [Modifier.background]
  * - image：用 [Modifier.drawWithContent] 在内容下方绘制图片
+ *
+ * [alpha] 只压底板、不压按键：玻璃态要让下面的内容透上来，键帽的可读性另算。
+ * 纯色、渐变、图片三种背景一视同仁（图片用 saveLayer 整层乘 alpha）。
  */
 @Composable
 fun Modifier.keyboardBackground(
     background: BackgroundConfig?,
     isDark: Boolean,
     fallbackColor: Color = Color(0xFFE3E4E8),
+    alpha: Float = 1f,
 ): Modifier {
-    if (background == null) return this.then(Modifier.background(fallbackColor))
+    val tint = alpha.coerceIn(0f, 1f)
+    if (background == null) return this.then(Modifier.background(fallbackColor.copy(alpha = fallbackColor.alpha * tint)))
 
     when (background.type) {
         "solid" -> {
             val hex = if (isDark) background.colorDark ?: background.color else background.color
             val color = hex?.let { Color(0xFF000000 or it) }
-            return if (color != null) this.then(Modifier.background(color))
-            else this.then(Modifier.background(fallbackColor))
+            return if (color != null) this.then(Modifier.background(color.copy(alpha = tint)))
+            else this.then(Modifier.background(fallbackColor.copy(alpha = fallbackColor.alpha * tint)))
         }
         "gradient" -> {
             val hexes = if (isDark) background.colorsDark ?: background.colors else background.colors
             if (hexes != null && hexes.size >= 2) {
-                val colors = hexes.map { Color(0xFF000000 or it) }
+                val colors = hexes.map { (Color(0xFF000000 or it)).copy(alpha = tint) }
                 val (startRatio, endRatio) = angleToFractionalPoints(background.angle ?: 0)
                 return this.then(
                     Modifier.drawWithContent {
@@ -99,7 +107,7 @@ fun Modifier.keyboardBackground(
                     }
                 )
             }
-            return this.then(Modifier.background(fallbackColor))
+            return this.then(Modifier.background(fallbackColor.copy(alpha = fallbackColor.alpha * tint)))
         }
         "image" -> {
             val context = LocalContext.current
@@ -127,12 +135,28 @@ fun Modifier.keyboardBackground(
                 }
                 return this.then(
                     Modifier.drawWithContent {
-                        drawImageBackground(bitmap, fit)
-                        // 半透明黑色遮罩压暗背景，提升按键对比度
-                        if (overlayAlpha != null && overlayAlpha > 0f) {
-                            drawRect(
-                                color = Color.Black.copy(alpha = overlayAlpha.coerceIn(0f, 1f)),
-                            )
+                        // 图片背景同样参与 alpha：整层乘一次，和纯色/渐变行为一致
+                        val faded = tint < 1f
+                        if (faded) {
+                            drawIntoCanvas { canvas ->
+                                canvas.saveLayer(
+                                    Rect(0f, 0f, size.width, size.height),
+                                    Paint().also { it.alpha = tint },
+                                )
+                                drawImageBackground(bitmap, fit)
+                                if (overlayAlpha != null && overlayAlpha > 0f) {
+                                    drawRect(color = Color.Black.copy(alpha = overlayAlpha.coerceIn(0f, 1f)))
+                                }
+                                canvas.restore()
+                            }
+                        } else {
+                            drawImageBackground(bitmap, fit)
+                            // 半透明黑色遮罩压暗背景，提升按键对比度
+                            if (overlayAlpha != null && overlayAlpha > 0f) {
+                                drawRect(
+                                    color = Color.Black.copy(alpha = overlayAlpha.coerceIn(0f, 1f)),
+                                )
+                            }
                         }
                         drawContent()
                     }

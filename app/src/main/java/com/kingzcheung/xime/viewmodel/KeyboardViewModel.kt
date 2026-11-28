@@ -58,6 +58,10 @@ data class KeyboardUiState(
     val schemaSwitches: List<SchemaSwitchUiState> = emptyList(),
     val enterKeyText: String = tr(R.string.s_fasong),
     val isDarkTheme: Boolean = false,
+    /** 背景模糊生效时的底色不透明度（<1）；键帽按它做玻璃化，1 表示普通不透明。 */
+    val glassAlpha: Float = 1f,
+    /** 键帽不透明度（玻璃态）。 */
+    val glassKeyAlpha: Float = 1f,
     val darkMode: Int = 2,
     val themeId: String = "ocean_blue",
     val keyboardHeightDp: Int = 0,

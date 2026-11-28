@@ -1,5 +1,6 @@
 package com.kingzcheung.xime.ui.keyboard
 
+import com.kingzcheung.xime.ui.theme.glassRim
 import com.kingzcheung.xime.R
 
 import com.kingzcheung.xime.i18n.tr
@@ -241,7 +242,8 @@ private fun CircularDPad(
             .aspectRatio(1f)
             .then(shadowModifier)
             .clip(CircleShape)
-            .background(keyBg)
+            .background(glassFill(keyBg))
+            .glassRim(CircleShape)
             .pointerInput(isSelecting) {
                 detectTapGestures(
                     onPress = { offset ->

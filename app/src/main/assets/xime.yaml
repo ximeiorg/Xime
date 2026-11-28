@@ -499,7 +499,26 @@ keyboard:
     key_text_color_dark: 0xE8EAED
     candidate_text_color: 0x202124
     candidate_text_color_dark: 0xE8EAED
-  
+
+  # ── 背景（可选，默认等于现状：不透明、不模糊）──
+  # alpha:        底板最终不透明度（%，默认 100）
+  #               对主题的 keyboard_background（纯色/渐变/图片）与 colors.keyboard_bg_color
+  #               一律生效——调小才会透出后面的内容
+  # alpha_dark:   深色主题下的底板不透明度（%），不写时沿用 alpha。
+  #               深色底板透出亮内容更容易发脏，通常要比浅色高一些
+  # blur_radius:  窗口模糊半径（0-150，默认 0 = 不申请窗口模糊）
+  #               需要 Android 12+ 且系统允许窗口模糊。
+  #               ⚠️ 注意：系统只把「窗口背景模糊」给浮动窗口，输入法窗口类型（TYPE_INPUT_METHOD）
+  #               在 AOSP 与各家 ROM 上都拿不到，所以**多数机型上这个值不会真的产生模糊**，
+  #               只有透明度与圆角生效。保留该参数是为将来系统放开或个别 ROM 支持。
+  # corner_radius: 键盘底板顶部两角的圆角（dp，0 = 直角，上限 96）
+  #                底部贴着屏幕边，不做圆角
+  # 玻璃效果 = 把 alpha 调小；要模糊就再给 blur_radius 一个值
+  # background:
+  #   alpha: 62
+  #   blur_radius: 80
+  #   corner_radius: 24
+
   # ── 按键配置（可选，不设置则使用默认值）──
   # corner_radius:      按键圆角半径（dp，默认 8），独立于 shadow.shape_radius
   # spacing_x:          按键横向间距（dp，默认 2），未设置时各键盘使用自身默认值
@@ -510,8 +529,15 @@ keyboard:
   # 例如：t9: { corner_radius: 8, spacing_x: 1, spacing_y: 2 }
   # 单个按键也可在对应键盘的 keys.<id> 下写 corner_radius / background / background_dark
   # 覆盖外观（见下方「26 键全键盘手势配置」说明），未写则沿用这里的全局值。
+  # alpha_dark:    深色主题下的键帽不透明度上限（%），不写时沿用 alpha
+  # alpha:         键帽不透明度**上限**（%，默认 100 = 不限制）。只压低不抬高：
+  #                浅色键帽 0xFFFFFF 会被压到该值；暗色键帽 0x60FFFFFF（38%）本来就是半透明，
+  #                配 72 时保持 38%，不会被顶亮
+  # rim:           键帽高光边强度（0-1，默认 0 = 不画）；玻璃键帽靠它立起质感
   key:
     corner_radius: 8
+    alpha: 100
+    rim: 0
     spacing_x: 2
     spacing_y: 4.25
     t9: { spacing_x: 2, spacing_y: 2 }

@@ -106,6 +106,7 @@ import com.kingzcheung.xime.viewmodel.KeyboardUiState
 import com.kingzcheung.xime.viewmodel.KeyboardViewModel
 import com.kingzcheung.xime.viewmodel.ShiftMode
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
+import com.kingzcheung.xime.ui.theme.glassRim
 import com.kingzcheung.xime.ui.theme.keyboardBackground
 
 import androidx.compose.material.icons.twotone.KeyboardControlKey
@@ -151,7 +152,7 @@ fun KeyboardLayout(
     val (visualIsShifted, visualShiftMode) = rememberVisualShiftState(isShifted, shiftMode, delayMillis = 0L)
 
     val context = LocalContext.current
-    val palette = resolveKeyboardPalette(uiState.themeId, uiState.isDarkTheme)
+    val palette = resolveKeyboardPalette(uiState.themeId, uiState.isDarkTheme, uiState.glassKeyAlpha, uiState.glassAlpha)
     val keyboardBackgroundColor = palette.keyboardBackgroundColor
     val keyBackgroundColor = palette.keyBackgroundColor
     val keyTextColor = palette.keyTextColor
@@ -692,13 +693,36 @@ internal data class KeyboardPalette(
     val bubbleBgColor: Color,
 )
 
-internal fun resolveKeyboardPalette(themeId: String, isDarkTheme: Boolean): KeyboardPalette {
+/**
+ * 玻璃态下键帽颜色的不透明度处理（键盘所有绘制路径共用）。
+ *
+ * - 不透明键帽（浅色 0xFFFFFF）：压到 `key.alpha`（默认 100 → 不变）
+ * - 半透明键帽（暗色 0x60FFFFFF，38% 白）：它的配色是按「不透明底板」调的，
+ *   底板变透明后同一层白会浮起来发亮，所以按底板不透明度等比压低
+ *   （0.38 × 0.62 ≈ 0.24），观感与原来实心深色底板上的 38% 一致
+ */
+internal fun tintKeyForGlass(color: Color, keyAlpha: Float, boardAlpha: Float): Color {
+    val cap = keyAlpha.coerceIn(0f, 1f)
+    if (cap >= 1f) return color
+    return if (color.alpha >= 0.99f) color.copy(alpha = cap)
+    else color.copy(alpha = (color.alpha * boardAlpha.coerceIn(0f, 1f)).coerceAtLeast(0f))
+}
+
+internal fun resolveKeyboardPalette(
+    themeId: String,
+    isDarkTheme: Boolean,
+    /** 玻璃生效时的键帽不透明度（<1），1 = 普通不透明。 */
+    keyAlpha: Float = 1f,
+    /** 玻璃生效时的底板不透明度（<1）；半透明键帽按它等比压低，避免深色下发亮。 */
+    boardAlpha: Float = 1f,
+): KeyboardPalette {
     val kbColors = KeysConfigHelper.getKeyboardColors()
     val longToColor: (Long) -> Color = { if (it > 0xFFFFFF) Color(it) else Color(0xFF000000 or it) }
     val themeScheme = KeyboardThemes.getThemeById(themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(themeId, isDarkTheme)
     val keyBackgroundColor = KeyboardThemes.getKeyBgColorOverride(themeId, isDarkTheme)
         ?: if (isDarkTheme) longToColor(kbColors.keyBgColorDark) else longToColor(kbColors.keyBgColor)
+    fun tintKey(c: Color): Color = tintKeyForGlass(c, keyAlpha, boardAlpha)
     val keyTextColor = KeyboardThemes.getKeyTextColorOverride(themeId, isDarkTheme)
         ?: if (isDarkTheme) longToColor(kbColors.keyTextColorDark) else longToColor(kbColors.keyTextColor)
     val specialKeyBackgroundColor = if (isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) }
@@ -708,9 +732,9 @@ internal fun resolveKeyboardPalette(themeId: String, isDarkTheme: Boolean): Keyb
     )
     return KeyboardPalette(
         keyboardBackgroundColor = KeyboardThemes.getKeyboardBackgroundColor(themeId, isDarkTheme),
-        keyBackgroundColor = keyBackgroundColor,
+        keyBackgroundColor = tintKey(keyBackgroundColor),
         keyTextColor = keyTextColor,
-        specialKeyBackgroundColor = specialKeyBackgroundColor,
+        specialKeyBackgroundColor = tintKey(specialKeyBackgroundColor),
         specialKeyTextColor = specialKeyTextColor,
         bubbleBgColor = if (isDarkTheme) themeScheme.specialKeyDark else themeScheme.specialKeyLight,
     )
@@ -1718,7 +1742,7 @@ private fun DummyKeyButton(
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(backgroundColor)
+            .background(glassFill(backgroundColor))
     )
 }
 
@@ -2020,11 +2044,14 @@ private fun ShiftCapsKeyButton(
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
-                if (isPressed) darkenColor(backgroundColor, 0.1f)
-                else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
-                else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
-                else backgroundColor
+                glassFill(
+                    if (isPressed) darkenColor(backgroundColor, 0.1f)
+                    else if (shiftMode == ShiftMode.CAPS) darkenColor(backgroundColor, 0.2f)
+                    else if (shiftMode == ShiftMode.SINGLE) darkenColor(backgroundColor, 0.1f)
+                    else backgroundColor
+                )
             )
+            .glassRim(keyClipShape)
             .keySemantics(
                 tr(R.string.s_daxiaoxieqiehuan),
                 when (shiftMode) {
@@ -2100,7 +2127,7 @@ private fun LandscapeKeyboardContent(
     val landscapeFontSize = if (compactStyle) 12.sp else TextUnit.Unspecified
     val landscapeSwipeFontSize = if (compactStyle) 7.sp else 9.sp
 
-    val palette = resolveKeyboardPalette(uiState.themeId, uiState.isDarkTheme)
+    val palette = resolveKeyboardPalette(uiState.themeId, uiState.isDarkTheme, uiState.glassKeyAlpha, uiState.glassAlpha)
     val keyboardBackgroundColor = palette.keyboardBackgroundColor
     val keyBackgroundColor = palette.keyBackgroundColor
     val keyTextColor = palette.keyTextColor
@@ -2423,6 +2450,7 @@ private fun SpaceKey(
             .then(shadowModifier)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
             .background(keyBackgroundColor)
+            .glassRim(RoundedCornerShape(LocalKeyCornerRadius.current))
             .keySemantics(
                 when {
                     voiceSticky -> tr(R.string.s_qingchujieshuyuyin)

@@ -26,6 +26,10 @@ data class InputUIState(
     val keyboardBottomPaddingDp: Int = 0,
     /** 键盘贴底显示：忽略底部系统 inset（隐藏导航栏/手势条时把键盘下移到屏幕底边）。 */
     val keyboardFlushBottom: Boolean = false,
+    /** 键盘底板不透明度（已按深浅主题解析）；1 = 不透明。 */
+    val glassAlpha: Float = 1f,
+    /** 键帽不透明度上限（已按深浅主题解析）；1 = 沿用颜色自带 alpha。 */
+    val glassKeyAlpha: Float = 1f,
     /** 键盘左边距（dp）：>0 时键盘左缘内收（宽度调节的落盘值，左右独立可偏移）。 */
     val keyboardMarginStartDp: Int = 0,
     /** 键盘右边距（dp）：>0 时键盘右缘内收。 */

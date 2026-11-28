@@ -141,6 +141,45 @@ data class KeyboardShadowConfig(
 )
 
 /**
+ * 液态玻璃配置，从 xime.yaml keyboard.glass 加载（Android 12+）。
+ *
+ * 窗口模糊只覆盖窗口边界内的背后内容，所以开玻璃时输入法窗口会被压到键盘高度；
+ * 系统关闭窗口模糊（省电模式/开发者选项/机型不支持）时整体退回不透明。
+ */
+data class KeyboardGlassConfig(
+    /** 键盘底板（键盘 background 段） */
+    val background: GlassBackgroundConfig = GlassBackgroundConfig(),
+    /** 键帽（并入键盘 key 段） */
+    val key: GlassKeyConfig = GlassKeyConfig(),
+)
+
+/** 键盘底板：整块键盘的底（默认 100 / 0 = 保持主题原样） */
+data class GlassBackgroundConfig(
+    /** 底板最终不透明度（%，亮色主题）；对主题的纯色/渐变/图片底一律生效 */
+    val alpha: Int = 100,
+    /** 底板不透明度（%，深色主题）；未配置时沿用 [alpha] */
+    val alphaDark: Int = alpha,
+    /** 窗口模糊半径（px，0-150）；0 = 不申请窗口模糊 */
+    val blurRadius: Int = 0,
+    /** 键盘底板顶部两角的圆角（dp，0 = 直角）；底部贴着屏幕边，不做圆角 */
+    val cornerRadius: Int = 0,
+) {
+    fun alphaFor(isDark: Boolean): Int = if (isDark) alphaDark else alpha
+}
+
+/** 键帽：每个按键的面（默认 100 / 0 = 保持颜色配置原样） */
+data class GlassKeyConfig(
+    /** 键帽不透明度上限（%，亮色主题） */
+    val alpha: Int = 100,
+    /** 键帽不透明度上限（%，深色主题）；未配置时沿用 [alpha] */
+    val alphaDark: Int = alpha,
+    /** 高光边强度（0-1）；0 = 不画 */
+    val rim: Float = 0f,
+) {
+    fun alphaFor(isDark: Boolean): Int = if (isDark) alphaDark else alpha
+}
+
+/**
  * 单个键盘的间距覆盖配置。
  */
 data class KeyboardSpacingConfig(
@@ -651,6 +690,24 @@ internal data class KeyboardColorsPartial(
     val candidateTextColorDark: Long? = null,
 )
 
+internal data class GlassBackgroundPartial(
+    val alpha: Int? = null,
+    val alphaDark: Int? = null,
+    val blurRadius: Int? = null,
+    val cornerRadius: Int? = null,
+)
+
+internal data class GlassKeyPartial(
+    val alpha: Int? = null,
+    val alphaDark: Int? = null,
+    val rim: Float? = null,
+)
+
+internal data class KeyboardGlassPartial(
+    val background: GlassBackgroundPartial? = null,
+    val key: GlassKeyPartial? = null,
+)
+
 internal data class KeyboardShadowPartial(
     val enabled: Boolean? = null,
     val elevation: Int? = null,
@@ -844,6 +901,7 @@ object KeysConfigHelper {
     
     // 键盘阴影配置缓存
     private var keyboardShadowConfig: KeyboardShadowConfig = KeyboardShadowConfig()
+    private var keyboardGlassConfig: KeyboardGlassConfig = KeyboardGlassConfig()
 
     // 键盘按键配置缓存
     private var keyboardKeyConfig: KeyboardKeyConfig = KeyboardKeyConfig()
@@ -1136,6 +1194,7 @@ object KeysConfigHelper {
             keyboardColorsConfig = parseKeyboardColorsFromAssets(context)
             // 键盘阴影（从原始 YAML 手动解析）
             keyboardShadowConfig = parseKeyboardShadowFromAssets(context)
+            keyboardGlassConfig = parseKeyboardGlassFromAssets(context)
             // 键盘按键（从原始 YAML 手动解析）
             keyboardKeyConfig = parseKeyboardKeyFromAssets(context)
             // 字体配置（从原始 YAML 手动解析）
@@ -1399,6 +1458,92 @@ object KeysConfigHelper {
             elevation = tiered(custom?.elevation, builtIn?.elevation, 1),
             shapeRadius = tiered(custom?.shapeRadius, builtIn?.shapeRadius, 8),
         )
+
+    private fun parseKeyboardGlassFromAssets(context: Context): KeyboardGlassConfig {
+        val builtIn = readAssetText(context, XIME_CONFIG_FILE)?.let { parseKeyboardGlassYamlText(it) }
+        val custom = readCustomText(context)?.let { parseKeyboardGlassYamlText(it) }
+        return mergeGlassConfigs(custom, builtIn)
+    }
+
+    /** 字段级 fallback：custom → builtIn → 代码默认值（默认值等于「没有玻璃」）。 */
+    internal fun mergeGlassConfigs(custom: KeyboardGlassPartial?, builtIn: KeyboardGlassPartial?): KeyboardGlassConfig {
+        val defaults = KeyboardGlassConfig()
+        val cb = custom?.background
+        val bb = builtIn?.background
+        val ck = custom?.key
+        val bk = builtIn?.key
+        return KeyboardGlassConfig(
+            background = GlassBackgroundConfig(
+                alpha = tiered(cb?.alpha, bb?.alpha, defaults.background.alpha).coerceIn(10, 100),
+                alphaDark = tiered(
+                    cb?.alphaDark, bb?.alphaDark,
+                    tiered(cb?.alpha, bb?.alpha, defaults.background.alpha),
+                ).coerceIn(10, 100),
+                blurRadius = tiered(cb?.blurRadius, bb?.blurRadius, defaults.background.blurRadius).coerceIn(0, 150),
+                cornerRadius = tiered(cb?.cornerRadius, bb?.cornerRadius, defaults.background.cornerRadius)
+                    .coerceIn(0, 96),
+            ),
+            key = GlassKeyConfig(
+                alpha = tiered(ck?.alpha, bk?.alpha, defaults.key.alpha).coerceIn(10, 100),
+                alphaDark = tiered(
+                    ck?.alphaDark, bk?.alphaDark,
+                    tiered(ck?.alpha, bk?.alpha, defaults.key.alpha),
+                ).coerceIn(10, 100),
+                rim = tiered(ck?.rim, bk?.rim, defaults.key.rim).coerceIn(0f, 1f),
+            ),
+        )
+    }
+
+    /**
+     * 从 YAML 文本提取玻璃参数：
+     * - 底板：`keyboard.background.{alpha, blur_radius}`
+     * - 键帽：`keyboard.key.{alpha, rim}`（与 corner_radius 等同一段）
+     */
+    internal fun parseKeyboardGlassYamlText(yamlText: String): KeyboardGlassPartial? {
+        return try {
+            val root = cachedYamlNode(yamlText) as? YamlMap ?: return null
+            val keyboardNode = root.opt<YamlMap>("keyboard") ?: return null
+            var background: GlassBackgroundPartial? = null
+            keyboardNode.opt<YamlMap>("background")?.let { node ->
+                var alpha: Int? = null
+                var alphaDark: Int? = null
+                var blur: Int? = null
+                var corner: Int? = null
+                for ((k, v) in node.entries) {
+                    val field = (k as? YamlScalar)?.content ?: continue
+                    val value = (v as? YamlScalar)?.content ?: continue
+                    when (field) {
+                        "alpha" -> alpha = value.toIntOrNull()
+                        "alpha_dark" -> alphaDark = value.toIntOrNull()
+                        "blur_radius" -> blur = value.toIntOrNull()
+                        "corner_radius" -> corner = value.toIntOrNull()
+                    }
+                }
+                background = GlassBackgroundPartial(alpha, alphaDark, blur, corner)
+            }
+            var key: GlassKeyPartial? = null
+            keyboardNode.opt<YamlMap>("key")?.let { node ->
+                var alpha: Int? = null
+                var alphaDark: Int? = null
+                var rim: Float? = null
+                for ((k, v) in node.entries) {
+                    val field = (k as? YamlScalar)?.content ?: continue
+                    val value = (v as? YamlScalar)?.content ?: continue
+                    when (field) {
+                        "alpha" -> alpha = value.toIntOrNull()
+                        "alpha_dark" -> alphaDark = value.toIntOrNull()
+                        "rim" -> rim = value.toFloatOrNull()
+                    }
+                }
+                key = GlassKeyPartial(alpha, alphaDark, rim)
+            }
+            if (background == null && key == null) return null
+            KeyboardGlassPartial(background, key)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse keyboard glass params", e)
+            null
+        }
+    }
 
     /** 从 YAML 文本中提取 keyboard.shadow 段（仅显式字段非 null）。 */
     internal fun parseKeyboardShadowYamlText(yamlText: String): KeyboardShadowPartial? {
@@ -2397,6 +2542,30 @@ object KeysConfigHelper {
 
     /** 获取键盘颜色配置（从 xime.yaml keyboard.colors 加载）。 */
     fun getKeyboardColors(): KeyboardColorsConfig = keyboardColorsConfig
+
+    /** 获取液态玻璃配置（从 xime.yaml keyboard.background / keyboard.key 加载）。 */
+    fun getKeyboardGlass(): KeyboardGlassConfig = keyboardGlassConfig
+
+    /**
+     * 按文件时间戳热重载玻璃配置。
+     *
+     * 全量 [loadConfig] 要解析整份 YAML（真机约 1.8s），不能每次按键都跑；
+     * 而玻璃是"改 xime.custom.yaml 就想立刻看到"的参数，所以只重解析这一小段。
+     * 文件没变（mtime+size 相同）时直接返回。
+     */
+    fun refreshGlassConfig(context: Context) {
+        val customFile = File(context.filesDir, "rime/$XIME_CUSTOM_CONFIG_FILE")
+        val stamp = if (customFile.exists()) {
+            customFile.lastModified() to customFile.length()
+        } else {
+            0L to 0L
+        }
+        if (_glassConfigStamp == stamp) return
+        _glassConfigStamp = stamp
+        keyboardGlassConfig = parseKeyboardGlassFromAssets(context)
+    }
+
+    private var _glassConfigStamp: Pair<Long, Long>? = null
 
     /** 获取键盘阴影配置（从 xime.yaml keyboard.shadow 加载）。 */
     fun getKeyboardShadow(): KeyboardShadowConfig = keyboardShadowConfig

@@ -18,6 +18,8 @@ class VoiceKeyboardContainer(
     private val setRecording: (Boolean) -> Unit,
     private val onVoiceDismiss: () -> Unit = {},
     private val onTouchCancel: () -> Unit = {},
+    /** 键盘内容高度落到 View 上之后回调（px）：开窗口模糊时窗口高度要跟着它走。 */
+    private val onHeightApplied: (Int) -> Unit = {},
 ) : FrameLayout(context) {
 
     private var isTrackingVoiceButtons = false
@@ -41,6 +43,7 @@ class VoiceKeyboardContainer(
             layoutParams = params
             requestLayout()
         }
+        onHeightApplied(heightPx)
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {

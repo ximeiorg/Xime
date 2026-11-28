@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import com.kingzcheung.xime.R
 import com.kingzcheung.xime.rime.T9InputController
 import com.kingzcheung.xime.service.CandidateState
+import com.kingzcheung.xime.ui.theme.glassRim
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.util.PermissionHelper
 import com.kingzcheung.xime.util.SubcharHelper
@@ -492,6 +493,7 @@ private fun T9KeyboardContent(
                 .then(candidateShadowModifier)
                 .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
                 .background(keyBackgroundColor)
+                .glassRim(RoundedCornerShape(LocalKeyCornerRadius.current))
         ) {
             val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
             val currentFirstOptions = controller.firstOptions
@@ -1246,7 +1248,8 @@ private fun T9SpaceKey(
                 .fillMaxSize()
                 .then(spaceShadowModifier)
                 .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                .background(backgroundColor)
+                .background(glassFill(backgroundColor))
+                .glassRim(RoundedCornerShape(LocalKeyCornerRadius.current))
         )
         if (voiceSticky) {
             Text(
