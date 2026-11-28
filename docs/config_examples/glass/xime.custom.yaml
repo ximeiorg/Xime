@@ -1,0 +1,35 @@
+metadata:
+  app_name: Xime
+  app_version: ">=3.6.1"
+  platform: android
+  config_version: 1
+  generator: "Xime Config Generator"
+  modified_time: "2026-07-05"
+
+keyboard:
+  # ── 键盘底板（整块键盘的底）──
+  # alpha:       底板最终不透明度（%）。100 = 不透明；调小才会透出后面的内容。
+  #              对主题的纯色/渐变/图片底都生效。
+  # blur_radius: 窗口模糊半径（0-150）。0 = 不申请窗口模糊。
+  #              需要 Android 12+ 且系统允许窗口模糊（省电模式、开发者选项、
+  #              部分机型会关掉；拿不到时只有透明度生效）。
+  #              超过 150 会明显拖性能；磨砂手感在 60-100 之间。
+  background:
+    alpha: 58
+    alpha_dark: 58
+    blur_radius: 80
+
+  # ── 键帽（每个按键的面）──
+  # alpha: 键帽不透明度上限（%）。只压低不抬高：
+  #        浅色主题的不透明键帽会被压到这个值；
+  #        暗色主题的键帽本来就是 0x60FFFFFF（38% 白），会自动按底板比例再压低，
+  #        不会被顶亮。
+  # rim:   键帽高光边强度（0-1）。0 = 不画；玻璃键帽靠它立起来。
+  #        光只在左上两条边，右下留空（迎光/背光）。
+  key:
+    alpha: 62
+    rim: 1.0
+
+  # 阴影与玻璃互不影响。但半透明键帽上叠投影会显脏，开玻璃时建议关掉：
+  shadow:
+    enabled: false

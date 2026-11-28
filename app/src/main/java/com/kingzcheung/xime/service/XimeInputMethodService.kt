@@ -120,6 +120,7 @@ import com.kingzcheung.xime.settings.SyncManager
 import com.kingzcheung.xime.ui.keyboard.KeyboardView
 import com.kingzcheung.xime.ui.keyboard.isT9Schema
 import com.kingzcheung.xime.ui.keyboard.isHandwritingSchema
+import com.kingzcheung.xime.ui.theme.KeyboardGlass
 import com.kingzcheung.xime.ui.theme.KeyboardThemes
 import com.kingzcheung.xime.ui.theme.keyboardBackground
 import kotlin.math.abs
@@ -323,6 +324,14 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
      * 键盘高度必须按这个实测值夹取（见 [KeyboardHostFit]）。
      */
     private val hostAreaHeightPxState = mutableStateOf(0)
+    /** 键盘内容高度（px）。开窗口模糊时窗口高度必须等于它。 */
+    private var keyboardContentHeightPx = 0
+    /** 已下发的背景模糊半径，避免每帧重复调 Window。 */
+    private var appliedBlurRadius = -1
+    /** 已下发的玻璃着色，避免每帧重建 drawable。 */
+    private var appliedTint = Int.MIN_VALUE
+    /** 系统窗口模糊开关监听（Android 12+），销毁时注销。 */
+    private var blurEnabledListener: java.util.function.Consumer<Boolean>? = null
     private val hostAreaLayoutListener =
         View.OnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
             val h = bottom - top
@@ -696,6 +705,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             window.window?.attributes?.layoutInDisplayCutoutMode =
                 android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        if (KeyboardGlass.isSupported()) {
+            // 省电模式、开发者选项、机型策略都会随时关掉窗口模糊：跟上，别让半透明底压在清晰画面上
+            val wm = getSystemService(android.view.WindowManager::class.java)
+            val listener = java.util.function.Consumer<Boolean> {
+                serviceScope.launch(Dispatchers.Main) { applyGlassWindow() }
+            }
+            wm?.addCrossWindowBlurEnabledListener(listener)
+            blurEnabledListener = listener
         }
         savedStateRegistryController.performRestore(null)
         window.window?.decorView?.setViewTreeLifecycleOwner(this)
@@ -1559,6 +1577,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                 action?.invoke()
                 endVoiceSession()
             },
+            onHeightApplied = { px ->
+                keyboardContentHeightPx = px
+                applyKeyboardWindowHeight(
+                    KeyboardGlass.isBlurActive(this) &&
+                        !uiState.value.isFloatingMode && !uiState.value.isCompact
+                )
+            },
             onTouchCancel = {
                 uiState.value = uiState.value.copy(
                     swipeCancelEpoch = uiState.value.swipeCancelEpoch + 1
@@ -1795,7 +1820,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     .height(if (state.showKeyboardResize) (state.resizePreviewHeightDp + state.keyboardBottomPaddingDp + activeBottomDp).dp else (floatingCardContentHeight + state.keyboardBottomPaddingDp + overlayPanelExtra + activeBottomDp).dp)
                                     .padding(start = keyboardMarginStartDp.dp, end = keyboardMarginEndDp.dp)
                                     .align(androidx.compose.ui.Alignment.BottomCenter)
-                                    .keyboardBackground(rootTheme.keyboardBackground, isDark, keyboardBgColor)
+                                    .clip(
+                                        androidx.compose.foundation.shape.RoundedCornerShape(
+                                            topStart = com.kingzcheung.xime.settings.KeysConfigHelper
+                                                .getKeyboardGlass().background.cornerRadius.dp,
+                                            topEnd = com.kingzcheung.xime.settings.KeysConfigHelper
+                                                .getKeyboardGlass().background.cornerRadius.dp,
+                                        )
+                                    )
+                                    .keyboardBackground(rootTheme.keyboardBackground, isDark, keyboardBgColor, state.glassAlpha)
                             )
                         }
                         Box(
@@ -1819,7 +1852,10 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     )
                                 )
                         ) {
-                        CompositionLocalProvider(LocalStretchFactor provides state.stretchFactor) {
+                        CompositionLocalProvider(
+                            LocalStretchFactor provides state.stretchFactor,
+                            com.kingzcheung.xime.ui.theme.LocalGlassKeyAlpha provides state.glassKeyAlpha,
+                        ) {
                             // 注意：kbState 只承载键盘按键/布局状态，不承载候选数据。
                             // 候选数据单独通过 candidateState 传给 KeyboardView。
                             // remember 的 key 均为候选无关依赖：候选变化时 kbState 实例保持不变，
@@ -1845,6 +1881,8 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
                                     schemaSwitches = state.schemaSwitches,
                                     enterKeyText = state.enterKeyText,
                                     isDarkTheme = isDarkTheme,
+                                    glassAlpha = state.glassAlpha,
+                                    glassKeyAlpha = state.glassKeyAlpha,
                                     darkMode = state.darkMode,
                                     themeId = state.themeId,
                                     keyboardHeightDp = effectiveKeyboardHeight,
@@ -2024,7 +2062,15 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
     }
 
     override fun onConfigureWindow(win: Window, isFullscreen: Boolean, isCandidatesOnly: Boolean) {
-        win.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT)
+        // 申请了窗口模糊时把窗口压到键盘高度：一旦系统愿意给模糊，全屏窗口会把键盘上方
+        // 的应用画面一起糊掉。内容高度首次测量前先沿用上一次的高度。
+        val state = uiState.value
+        val blurHeight = KeyboardGlass.isBlurActive(this) && !state.isFloatingMode && !state.isCompact
+        win.setLayout(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            if (blurHeight && keyboardContentHeightPx > 0) keyboardContentHeightPx
+            else android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        )
     }
 
     override fun setInputView(view: View) {
@@ -2777,6 +2823,79 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
         } catch (e: Exception) {
             FileLogger.e(TAG, "applyWindowBackground failed", e)
         }
+        applyGlassWindow()
+    }
+
+    /**
+     * 把玻璃参数下发到窗口：窗口高度、模糊半径、底色着色、键盘窗口高度。
+     *
+     * 系统窗口模糊只对浮动窗口开放，输入法窗口类型（TYPE_INPUT_METHOD）拿不到，
+     * 所以在多数机型上 `blur_radius` 只会被写入、不会真的糊；透明度与圆角不受影响。
+     */
+    private fun applyGlassWindow() {
+        if (!KeyboardGlass.isSupported()) return
+        // 改完 xime.custom.yaml 回手机不重启也能生效
+        com.kingzcheung.xime.settings.KeysConfigHelper.refreshGlassConfig(this)
+        val win = window.window ?: return
+        val state = uiState.value
+        val blurActive = KeyboardGlass.isBlurActive(this) && !state.isFloatingMode && !state.isCompact
+        val glassCfg = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardGlass()
+        val radius = if (blurActive) glassCfg.background.blurRadius else 0
+        if (appliedBlurRadius != radius) {
+            win.setBackgroundBlurRadius(radius)
+            appliedBlurRadius = radius
+        }
+        // 窗口底色的用途：Compose 只画键盘内容区，窗口比内容高出来的部分（导航栏、顶部圆角外）
+        // 由这层底色兜住，颜色必须和键盘底色一致，否则边角会露出另一种颜色。
+        val tint = if (glassCfg.background.alphaFor(isDarkTheme()) < 100) {
+            val bg = com.kingzcheung.xime.ui.theme.KeyboardThemes
+                .getKeyboardBackgroundColor(state.themeId, isDarkTheme())
+            val a = glassCfg.background.alphaFor(isDarkTheme())
+            android.graphics.Color.argb(
+                a * 255 / 100,
+                (bg.red * 255).toInt(),
+                (bg.green * 255).toInt(),
+                (bg.blue * 255).toInt(),
+            )
+        } else {
+            android.graphics.Color.TRANSPARENT
+        }
+        if (appliedTint != tint) {
+            win.setBackgroundDrawable(buildWindowBackground(tint))
+            appliedTint = tint
+        }
+        applyKeyboardWindowHeight(blurActive)
+        val dark = isDarkTheme()
+        val alpha = glassCfg.background.alphaFor(dark) / 100f
+        val keyAlpha = glassCfg.key.alphaFor(dark) / 100f
+        if (state.glassAlpha != alpha || state.glassKeyAlpha != keyAlpha) {
+            uiState.value = state.copy(glassAlpha = alpha, glassKeyAlpha = keyAlpha)
+        }
+    }
+
+    /**
+     * 窗口底色：配了顶部圆角时用 GradientDrawable，四角才不会露出方角着色层。
+     * 顺序是 [左上x,左上y, 右上x,右上y, 右下x,右下y, 左下x,左下y]。
+     */
+    private fun buildWindowBackground(color: Int): android.graphics.drawable.Drawable {
+        val radiusDp = com.kingzcheung.xime.settings.KeysConfigHelper
+            .getKeyboardGlass().background.cornerRadius
+        if (radiusDp <= 0) return android.graphics.drawable.ColorDrawable(color)
+        val px = radiusDp * resources.displayMetrics.density
+        return android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadii = floatArrayOf(px, px, px, px, 0f, 0f, 0f, 0f)
+        }
+    }
+
+    /** 窗口高度跟随键盘内容高度；模糊关闭时恢复全屏（内容仍贴底，不影响 insets）。 */
+    private fun applyKeyboardWindowHeight(active: Boolean) {
+        val win = window.window ?: return
+        val target: Int = if (active && keyboardContentHeightPx > 0) keyboardContentHeightPx
+        else android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        if (win.attributes.height != target) {
+            win.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, target)
+        }
     }
 
     private fun applyCompactMode() {
@@ -2967,6 +3086,13 @@ class XimeInputMethodService : InputMethodService(), LifecycleOwner, SavedStateR
 
     override fun onDestroy() {
         super.onDestroy()
+        blurEnabledListener?.let { listener ->
+            runCatching {
+                getSystemService(android.view.WindowManager::class.java)
+                    ?.removeCrossWindowBlurEnabledListener(listener)
+            }
+        }
+        blurEnabledListener = null
         sharedPrefsListener?.let {
             SettingsPreferences.getPrefsPublic(this).unregisterOnSharedPreferenceChangeListener(it)
         }

@@ -29,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.kingzcheung.xime.correction.KeyTapLogger
 import com.kingzcheung.xime.settings.ButtonLayout
+import com.kingzcheung.xime.ui.theme.LocalGlassKeyAlpha
+import com.kingzcheung.xime.ui.theme.glassRim
 import com.kingzcheung.xime.util.CharInfo
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,6 +141,26 @@ data class SwipeState(
 
 private val shadowColorCache = HashMap<Color, Color>()
 
+/**
+ * 玻璃态下给键帽填充兜底：把不透明度压到 key.alpha 以下。
+ *
+ * 键帽颜色有多个来源（调色板、主题 accent、每键覆盖），调色板只覆盖了其中一条；
+ * 在这里统一封顶，accent 键（shift / ?123 / 搜索 / 清空）才不会漏掉。
+ * 已经比上限更透的颜色原样返回，不会二次压暗。
+ */
+@androidx.compose.runtime.Composable
+internal fun glassFill(color: Color): Color {
+    val limit = LocalGlassKeyAlpha.current
+    if (limit >= 0.99f) return color
+    return if (color.alpha > limit) color.copy(alpha = limit) else color
+}
+
+/** 玻璃是否启用（任一侧 alpha 被调小过）。投影只在玻璃态下禁用。 */
+internal fun glassKeysEnabled(): Boolean {
+    val cfg = com.kingzcheung.xime.settings.KeysConfigHelper.getKeyboardGlass()
+    return cfg.key.alpha < 100 || cfg.key.alphaDark < 100
+}
+
 internal fun crispShadowColor(backgroundColor: Color): Color {
     return shadowColorCache.getOrPut(backgroundColor) {
         val r = backgroundColor.red
@@ -230,8 +252,11 @@ fun KeyButton(
     // 父层光标手势已接管横向滑动时，本键不再判定点击（否则会"移动光标 + 打出一个字母"）
     val cursorGestureActive = LocalCursorGestureActive.current
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    // 只有玻璃态才禁用投影：半透明键帽上叠投影会透成一圈脏边。
+    // 不能按「颜色是否半透明」判断——暗色主题的键帽本来就是 0x60FFFFFF。
+    val drawShadow = shadowEnabled && !glassKeysEnabled()
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -394,10 +419,13 @@ fun KeyButton(
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
-                if (isPressed) darkenColor(backgroundColor, 0.2f)
-                else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
-                else backgroundColor
+                glassFill(
+                    if (isPressed) darkenColor(backgroundColor, 0.2f)
+                    else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
+                    else backgroundColor
+                )
             )
+            .glassRim(keyClipShape)
             .keySemantics(a11yDescription, a11yState) { currentOnClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -558,8 +586,11 @@ fun SwipeableKeyButton(
         currentOnClick()
     }
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    // 只有玻璃态才禁用投影：半透明键帽上叠投影会透成一圈脏边。
+    // 不能按「颜色是否半透明」判断——暗色主题的键帽本来就是 0x60FFFFFF。
+    val drawShadow = shadowEnabled && !glassKeysEnabled()
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -841,10 +872,13 @@ fun SwipeableKeyButton(
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
-                if (isPressed) backgroundColor.copy(alpha = 0.7f)
-                else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
-                else backgroundColor
+                glassFill(
+                    if (isPressed) backgroundColor.copy(alpha = 0.7f)
+                    else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
+                    else backgroundColor
+                )
             )
+            .glassRim(keyClipShape)
             .keySemantics(a11yDescription, a11yState) { currentOnClick() },
         contentAlignment = if (layoutMode == ButtonLayout.COMPACT) Alignment.TopStart else Alignment.Center
     ) {
@@ -1153,8 +1187,11 @@ fun IconKeyButton(
     val density = LocalDensity.current
     val currentOnClick by rememberUpdatedState(onClick)
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    // 只有玻璃态才禁用投影：半透明键帽上叠投影会透成一圈脏边。
+    // 不能按「颜色是否半透明」判断——暗色主题的键帽本来就是 0x60FFFFFF。
+    val drawShadow = shadowEnabled && !glassKeysEnabled()
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -1204,10 +1241,13 @@ fun IconKeyButton(
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
-                if (isPressed) darkenColor(backgroundColor, 0.1f)
-                else if (isHighlighted) darkenColor(backgroundColor, 0.2f)
-                else backgroundColor
+                glassFill(
+                    if (isPressed) darkenColor(backgroundColor, 0.1f)
+                    else if (isHighlighted) darkenColor(backgroundColor, 0.2f)
+                    else backgroundColor
+                )
             )
+            .glassRim(keyClipShape)
             .keySemantics(a11yDescription, a11yState) { currentOnClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1338,8 +1378,11 @@ fun SwipeableIconKeyButton(
         }
     }
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    // 只有玻璃态才禁用投影：半透明键帽上叠投影会透成一圈脏边。
+    // 不能按「颜色是否半透明」判断——暗色主题的键帽本来就是 0x60FFFFFF。
+    val drawShadow = shadowEnabled && !glassKeysEnabled()
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -1663,10 +1706,13 @@ fun SwipeableIconKeyButton(
             .then(shadowModifier)
             .clip(keyClipShape)
             .background(
-                if (isPressed) darkenColor(backgroundColor, 0.2f)
-                else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
-                else backgroundColor
+                glassFill(
+                    if (isPressed) darkenColor(backgroundColor, 0.2f)
+                    else if (isHighlighted) backgroundColor.copy(alpha = 0.8f)
+                    else backgroundColor
+                )
             )
+            .glassRim(keyClipShape)
             .keySemantics(a11yDescription, a11yState) { currentOnClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1808,8 +1854,11 @@ fun SwipeableKeyButtonLandscape(
         if (shouldClick) currentOnClick()
     }
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    // 只有玻璃态才禁用投影：半透明键帽上叠投影会透成一圈脏边。
+    // 不能按「颜色是否半透明」判断——暗色主题的键帽本来就是 0x60FFFFFF。
+    val drawShadow = shadowEnabled && !glassKeysEnabled()
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -2092,7 +2141,8 @@ fun SwipeableKeyButtonLandscape(
             .padding(LocalKeyVisualPadding.current)
             .then(shadowModifier)
             .clip(keyClipShape)
-            .background(if (isPressed) darkenColor(backgroundColor) else backgroundColor),
+            .background(if (isPressed) darkenColor(backgroundColor) else backgroundColor)
+            .glassRim(keyClipShape),
         contentAlignment = Alignment.TopStart
     ) {
         val contentScale = adaptiveKeyContentScale(

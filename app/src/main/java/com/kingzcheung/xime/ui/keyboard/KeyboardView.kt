@@ -233,18 +233,22 @@ fun KeyboardView(
     val kbKey = KeysConfigHelper.getKeyboardKeyConfig()
     val longToColor: (Long) -> androidx.compose.ui.graphics.Color = { if (it > 0xFFFFFF) androidx.compose.ui.graphics.Color(it) else androidx.compose.ui.graphics.Color(0xFF000000 or it) }
     val keyboardBgColor = KeyboardThemes.getKeyboardBackgroundColor(state.themeId, state.isDarkTheme)
-    val keyBgColor = KeyboardThemes.getKeyBgColorOverride(state.themeId, state.isDarkTheme)
+    // 键帽不透明度：用配置里已按深浅主题解析好的值（浮动键盘一律不透明）
+    val keyGlassAlpha = if (state.isFloatingMode) 1f else state.glassKeyAlpha
+    val boardGlassAlpha = if (state.isFloatingMode) 1f else state.glassAlpha
+    val keyBgColor = (KeyboardThemes.getKeyBgColorOverride(state.themeId, state.isDarkTheme)
         ?: if (state.isDarkTheme) longToColor(kbColors.keyBgColorDark)
-        else longToColor(kbColors.keyBgColor)
+        else longToColor(kbColors.keyBgColor)).let { tintKeyForGlass(it, keyGlassAlpha, boardGlassAlpha) }
     val keyTextColor = KeyboardThemes.getKeyTextColorOverride(state.themeId, state.isDarkTheme)
         ?: if (state.isDarkTheme) longToColor(kbColors.keyTextColorDark)
         else longToColor(kbColors.keyTextColor)
     val accentColor = KeyboardThemes.getAccentColor(state.themeId, state.isDarkTheme)
     val themeScheme = KeyboardThemes.getThemeById(state.themeId)
     val themeSpecialKeyColor = KeyboardThemes.getSpecialKeyColor(state.themeId, state.isDarkTheme)
-    val specialKeyBgColor = if (state.isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) }
+    val specialKeyBgColor = (if (state.isDarkTheme) kbColors.specialKeyBgColorDark?.let { longToColor(it) }
         ?: themeSpecialKeyColor
-        else kbColors.specialKeyBgColor?.let { longToColor(it) } ?: themeSpecialKeyColor
+        else kbColors.specialKeyBgColor?.let { longToColor(it) } ?: themeSpecialKeyColor)
+        .let { tintKeyForGlass(it, keyGlassAlpha, boardGlassAlpha) }
     val specialKeyTextColor = KeyboardThemes.getSpecialKeyTextColorForBackground(
         specialKeyBgColor, keyTextColor
     )
