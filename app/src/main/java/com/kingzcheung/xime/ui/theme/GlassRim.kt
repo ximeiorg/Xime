@@ -18,7 +18,7 @@ import com.kingzcheung.xime.settings.KeysConfigHelper
 val LocalGlassKeyAlpha = compositionLocalOf { 1f }
 
 /**
- * 玻璃键帽的一圈边：左上一条亮线，右下一条暗线。
+ * 玻璃键帽的一圈边：上下两条边迎光，左右两条边留空。
  *
  * 半透明面本身只是着色，没有这条边就和塑料片一样平——玻璃"立起来"全靠它。
  * 纯绘制，不采样背景，所以任何 Android 版本都能用；折射那套才需要采样。
@@ -32,13 +32,17 @@ fun Modifier.glassRim(shape: Shape): Modifier {
     if (LocalGlassKeyAlpha.current >= 0.99f) return this
     val strength = KeysConfigHelper.getKeyboardGlass().key.rim.coerceIn(0f, 1f)
     if (strength <= 0f) return this
-    // 只有迎光的两条边（左上）有高光，背光的两条边（右下）完全不上色。
-    // 早先加过右下暗线，压在半透明键帽上会显成一道脏边，这里索性留空。
-    val edge = Brush.linearGradient(
-        0.00f to Color.White.copy(alpha = 0.38f * strength),
-        0.30f to Color.White.copy(alpha = 0.16f * strength),
-        0.52f to Color.Transparent,
-        1.00f to Color.Transparent,
+    // 光源在正上方：顶边最亮，底边是桌面回弹的余光——明显弱于顶边，但要留得住（约 2.3:1），
+    // 压太狠就整条看不见了。左右两侧只在与顶/底相接的转角处淡淡过渡：边框走到左右两边
+    // 中段时颜色已经归零。早先用过左上→右下的斜向渐变，宽键（空格）上的高光会沿着宽度
+    // 衰减，看着像半边亮。
+    // 线宽与不透明度都要克制：这是照在半透明面上的光，不是给键帽描白边。
+    val edge = Brush.verticalGradient(
+        0.00f to Color.White.copy(alpha = 0.40f * strength),
+        0.16f to Color.White.copy(alpha = 0.06f * strength),
+        0.50f to Color.Transparent,
+        0.85f to Color.White.copy(alpha = 0.03f * strength),
+        1.00f to Color.White.copy(alpha = 0.17f * strength),
     )
-    return border(BorderStroke(0.9.dp, edge), shape)
+    return border(BorderStroke(0.85.dp, edge), shape)
 }
