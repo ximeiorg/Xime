@@ -58,8 +58,9 @@ fun SpaceKeyButton(
     val longPressTimeout = 400L
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -79,10 +80,7 @@ fun SpaceKeyButton(
             .height((44 * LocalStretchFactor.current).dp)
             .then(shadowModifier)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(
-                if (isPressed) backgroundColor.copy(alpha = 0.7f)
-                else backgroundColor
-            )
+            .background(glassFillPressed(backgroundColor, isPressed))
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)

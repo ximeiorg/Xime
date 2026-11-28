@@ -557,6 +557,8 @@ keyboard:
 
   # ── 按键阴影（可选，不设置则使用默认值）──
   # enabled:            是否启用阴影
+  #                     玻璃态（下面 key.alpha / alpha_dark 小于 100）下一律不画：
+  #                     投影是与键面同尺寸的实心块，会从半透明键帽里透出来，显灰、下沿发脏
   # elevation:          阴影高度（dp，默认 0.5）
   shadow:
     enabled: true
