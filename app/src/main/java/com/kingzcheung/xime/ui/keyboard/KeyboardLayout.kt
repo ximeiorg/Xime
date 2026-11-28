@@ -1981,8 +1981,9 @@ private fun ShiftCapsKeyButton(
     val currentOnSwipe by rememberUpdatedState(onSwipe)
     val density = LocalDensity.current
 
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -2290,8 +2291,9 @@ private fun SpaceKey(
     val context = LocalContext.current
 
     val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(keyBackgroundColor)
@@ -2449,7 +2451,7 @@ private fun SpaceKey(
             .fillMaxHeight()
             .then(shadowModifier)
             .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-            .background(keyBackgroundColor)
+            .background(glassFill(keyBackgroundColor))
             .glassRim(RoundedCornerShape(LocalKeyCornerRadius.current))
             .keySemantics(
                 when {

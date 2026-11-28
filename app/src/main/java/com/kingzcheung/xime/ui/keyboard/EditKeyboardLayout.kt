@@ -223,8 +223,9 @@ private fun CircularDPad(
 
     var pressedAction by remember { mutableStateOf<String?>(null) }
     val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, density, keyBg) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, density, keyBg) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val color = crispShadowColor(keyBg)
             Modifier.drawBehind {

@@ -443,8 +443,9 @@ private fun T9KeyboardContent(
     }
 
     val density = LocalDensity.current
-    val candidateShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
+    val candidateDrawShadow = keyShadowEnabled(shadowEnabled)
+    val candidateShadowModifier = remember(candidateDrawShadow, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
+        if (candidateDrawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(keyBackgroundColor)
@@ -492,7 +493,7 @@ private fun T9KeyboardContent(
                 .padding(LocalKeyVisualPadding.current)
                 .then(candidateShadowModifier)
                 .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                .background(keyBackgroundColor)
+                .background(glassFill(keyBackgroundColor))
                 .glassRim(RoundedCornerShape(LocalKeyCornerRadius.current))
         ) {
             val showCandidates = controller.leftPanelState != T9InputController.LeftPanelState.IDLE
@@ -1091,8 +1092,9 @@ private fun ResetKey(
     val currentOnPress by rememberUpdatedState(onPress)
     val density = LocalDensity.current
     val shape = RoundedCornerShape(shadowShapeRadius)
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -1113,7 +1115,7 @@ private fun ResetKey(
             .padding(horizontal = 2.dp, vertical = 4.dp)
             .then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .background(glassFillPressed(backgroundColor, isPressed))
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -1170,8 +1172,9 @@ private fun T9SpaceKey(
     val currentOnVoiceModeChange by rememberUpdatedState(onVoiceModeChange)
     val currentOnSwipeUp by rememberUpdatedState(onSwipeUp)
     val density = LocalDensity.current
-    val spaceShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val spaceDrawShadow = keyShadowEnabled(shadowEnabled)
+    val spaceShadowModifier = remember(spaceDrawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (spaceDrawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)

@@ -161,6 +161,21 @@ internal fun glassKeysEnabled(): Boolean {
     return cfg.key.alpha < 100 || cfg.key.alphaDark < 100
 }
 
+/**
+ * 键面是否画投影：玻璃态下一律不画。
+ *
+ * 投影是与键面同尺寸的实心块，压在背后会从半透明键帽里透出来，
+ * 看起来就是键帽发灰、下沿一道脏边——所有键面（含空格、功能键）都要走这里。
+ */
+internal fun keyShadowEnabled(shadowEnabled: Boolean): Boolean = shadowEnabled && !glassKeysEnabled()
+
+/** 按压反馈的键面填充：非玻璃态等价于原来的 `alpha 0.7`，玻璃态下把已封顶的 alpha 再压一档。 */
+@androidx.compose.runtime.Composable
+internal fun glassFillPressed(color: Color, isPressed: Boolean): Color {
+    val fill = glassFill(color)
+    return if (isPressed) fill.copy(alpha = fill.alpha * 0.7f) else fill
+}
+
 internal fun crispShadowColor(backgroundColor: Color): Color {
     return shadowColorCache.getOrPut(backgroundColor) {
         val r = backgroundColor.red

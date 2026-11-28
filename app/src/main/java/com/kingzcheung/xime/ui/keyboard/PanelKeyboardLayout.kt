@@ -513,8 +513,9 @@ private fun OperatorPillarKey(
         bottomEnd = if (isLast) cornerRadius else 0.dp,
     )
     val density = LocalDensity.current
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -533,7 +534,7 @@ private fun OperatorPillarKey(
             .fillMaxWidth()
             .then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .background(glassFillPressed(backgroundColor, isPressed))
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {

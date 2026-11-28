@@ -354,8 +354,9 @@ private fun StrokeKeyboardContent(
 
     // 符号面板统一阴影（与九键左栏候选面板同款样式）
     val density = LocalDensity.current
-    val symbolPanelShadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
-        if (shadowEnabled) {
+    val symbolPanelDrawShadow = keyShadowEnabled(shadowEnabled)
+    val symbolPanelShadowModifier = remember(symbolPanelDrawShadow, shadowElevation, shadowShapeRadius, density, keyBackgroundColor) {
+        if (symbolPanelDrawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(keyBackgroundColor)
@@ -419,7 +420,7 @@ private fun StrokeKeyboardContent(
                     .padding(LocalKeyVisualPadding.current)
                     .then(symbolPanelShadowModifier)
                     .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                    .background(keyBackgroundColor)
+                    .background(glassFill(keyBackgroundColor))
             ) {
                 if (strokeSideSymbols.size <= 4) {
                     Column(
@@ -862,8 +863,9 @@ private fun ResetKey(
     val currentOnPress by rememberUpdatedState(onPress)
     val density = LocalDensity.current
     val shape = RoundedCornerShape(shadowShapeRadius)
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -884,7 +886,7 @@ private fun ResetKey(
             .padding(horizontal = 2.dp, vertical = 4.dp)
             .then(shadowModifier)
             .clip(shape)
-            .background(if (isPressed) backgroundColor.copy(alpha = 0.7f) else backgroundColor)
+            .background(glassFillPressed(backgroundColor, isPressed))
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
                     isPressed = true
@@ -941,8 +943,9 @@ private fun StrokeSpaceButton(
     val currentOnKeyPress by rememberUpdatedState(onKeyPress)
     val currentOnVoiceModeChange by rememberUpdatedState(onVoiceModeChange)
     val currentOnSwipeUp by rememberUpdatedState(onSwipeUp)
-    val shadowModifier = remember(shadowEnabled, shadowElevation, shadowShapeRadius, density, backgroundColor) {
-        if (shadowEnabled) {
+    val drawShadow = keyShadowEnabled(shadowEnabled)
+    val shadowModifier = remember(drawShadow, shadowElevation, shadowShapeRadius, density, backgroundColor) {
+        if (drawShadow) {
             val offsetPx = with(density) { shadowElevation.toPx() }
             val cornerPx = with(density) { shadowShapeRadius.toPx() }
             val color = crispShadowColor(backgroundColor)
@@ -1019,7 +1022,7 @@ private fun StrokeSpaceButton(
                 .fillMaxSize()
                 .then(shadowModifier)
                 .clip(RoundedCornerShape(LocalKeyCornerRadius.current))
-                .background(backgroundColor)
+                .background(glassFill(backgroundColor))
         )
         if (voiceSticky) {
             Text(
